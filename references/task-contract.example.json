@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "objective": "Plan structural scaffolding and test definitions for task validation module.",
+  "baseline": {
+    "revision": "example-baseline-not-verified",
+    "files": []
+  },
+  "documents": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Validator CLI script verifies package structural integrity and produces text or JSON envelope outputs."
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Task contract validation enforces schema constraints across plan, execute, and complete lifecycle stages."
+    }
+  ],
+  "operation": {
+    "risk": "low",
+    "action": "scaffold_validation_module",
+    "target": "validation_subsystem",
+    "revision": "example-baseline-not-verified",
+    "scope": ["scripts", "tests"]
+  }
+}
