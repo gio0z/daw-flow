@@ -108,26 +108,71 @@ def evaluate_judge(judge_data: Any, scenario: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def parse_acceptance_output(stdout_path: Path) -> tuple[list[dict[str, Any]], float]:
+def sanitize_staged_suite(staged_root: Path, source_root: Path, scenarios_dir: Path) -> None:
+    """Remove evaluation fixtures, hidden scenarios, and evaluation tests from staged suite.
+
+    Leaves standard documentation, routing, skills, and governance assets intact.
+    The source suite is never modified.
+    """
+    if not staged_root.is_dir():
+        return
+
+    # 1. Remove default wizard-bench scenario directory if present
+    default_wb = staged_root / "references/wizard-bench"
+    if default_wb.is_dir():
+        shutil.rmtree(default_wb)
+
+    # 2. Remove configured scenarios directory if located inside source
+    try:
+        rel_scenarios = scenarios_dir.resolve().relative_to(source_root.resolve())
+        staged_scenarios = staged_root / rel_scenarios
+        if staged_scenarios.is_dir():
+            shutil.rmtree(staged_scenarios)
+        elif staged_scenarios.is_file():
+            staged_scenarios.unlink()
+    except ValueError:
+        pass  # scenarios_dir is outside source
+
+    # 3. Remove any stray scenario.json or acceptance.py inside staged suite
+    for path in list(staged_root.rglob("scenario.json")) + list(staged_root.rglob("acceptance.py")):
+        if path.is_file():
+            path.unlink()
+
+    # 4. Remove evaluator test suites from staged tests directory
+    for test_name in ("test_wizard_bench.py", "test_bookmark_acceptance.py"):
+        tpath = staged_root / "tests" / test_name
+        if tpath.is_file():
+            tpath.unlink()
+
+
+def parse_acceptance_output(stdout_path: Path) -> tuple[list[dict[str, Any]], str | None]:
     if not stdout_path.is_file():
-        return [], 0.0
+        return [], "Acceptance stdout file missing"
     text = stdout_path.read_text(encoding="utf-8")
     checks = []
-    for line in text.splitlines():
+    seen_checks = set()
+    for lineno, line in enumerate(text.splitlines(), start=1):
         line = line.strip()
         if not line:
             continue
         try:
             data = json.loads(line)
-            if isinstance(data, dict) and "check" in data:
-                checks.append(data)
         except json.JSONDecodeError:
-            continue
+            return checks, f"Line {lineno} is not valid JSON: {line[:50]}"
+        if not isinstance(data, dict):
+            return checks, f"Line {lineno} is not a JSON object"
+        if "check" not in data or not isinstance(data["check"], str) or not data["check"]:
+            return checks, f"Line {lineno} missing non-empty 'check' identifier"
+        check_name = data["check"]
+        if check_name in seen_checks:
+            return checks, f"Duplicate check identifier '{check_name}' on line {lineno}"
+        seen_checks.add(check_name)
+        if data.get("status") not in ("pass", "fail"):
+            return checks, f"Line {lineno} check '{check_name}' has invalid status '{data.get('status')}'"
+        checks.append(data)
     if not checks:
-        return [], 0.0
-    passed = sum(1 for c in checks if c.get("status") == "pass")
-    return checks, round(passed / len(checks), 4)
-
+        return [], "No check records found in acceptance stdout"
+    return checks, None
 
 def run_scenario(
     source: Path,
@@ -142,6 +187,7 @@ def run_scenario(
     timeout: float,
     max_turns: int,
     agent_label: str,
+    acceptance_timeout: float = 60.0,
 ) -> dict[str, Any]:
     started_at = datetime.now(timezone.utc).isoformat()
     t_start = time.monotonic()
@@ -170,7 +216,7 @@ def run_scenario(
         interview_workspace.mkdir(parents=True, exist_ok=True)
         suite_root = interview_workspace / ".agents/skills/deterministic-agentic-workflow"
         stage_suite(source, suite_root)
-
+        sanitize_staged_suite(suite_root, source, scenario_dir.parent)
         turn = 1
         while turn <= max_turns:
             turns_used = turn
@@ -365,12 +411,53 @@ def run_scenario(
         [sys.executable, str(acceptance_script), str(build_workspace)],
         build_workspace,
         run_dir / "acceptance",
-        timeout=60,
+        timeout=acceptance_timeout,
     )
     grade_duration = time.monotonic() - t0
 
-    checks, pass_rate = parse_acceptance_output(Path(grade_res["stdout"]))
-
+    if grade_res.get("timed_out"):
+        status = "grading_failed"
+        error = "Acceptance test timed out"
+        checks = []
+        pass_rate = 0.0
+    else:
+        parsed_checks, parse_err = parse_acceptance_output(Path(grade_res["stdout"]))
+        exit_code = grade_res.get("exit_code")
+        if parse_err:
+            status = "grading_failed"
+            error = f"Acceptance grading malformed: {parse_err} (exit_code={exit_code})"
+            checks = parsed_checks
+            pass_rate = 0.0
+        elif exit_code == 0:
+            # All checks must have status == "pass"
+            failed_checks = [c for c in parsed_checks if c.get("status") != "pass"]
+            if failed_checks:
+                status = "grading_failed"
+                error = f"Acceptance exited with 0 but contained {len(failed_checks)} failing check(s)"
+                checks = parsed_checks
+                pass_rate = 0.0
+            else:
+                checks = parsed_checks
+                pass_rate = 1.0
+        elif exit_code == 1:
+            # Standard failure: must have at least one failing check record
+            failed_checks = [c for c in parsed_checks if c.get("status") == "fail"]
+            if not failed_checks:
+                # Crashed or aborted before emitting failing record
+                status = "grading_failed"
+                error = "Acceptance exited with 1 without recording any failing checks (aborted/crashed)"
+                checks = parsed_checks
+                pass_rate = 0.0
+            else:
+                # Valid ordinary acceptance failure
+                checks = parsed_checks
+                passed = sum(1 for c in checks if c.get("status") == "pass")
+                pass_rate = round(passed / len(checks), 4)
+        else:
+            status = "grading_failed"
+            error = f"Acceptance process crashed with unexpected exit code {exit_code}"
+            checks = parsed_checks
+            pass_rate = 0.0
     # Phase 4: Optional judge
     judge_data: Any = "ungraded"
     if judge_command and arm == "wizard":
@@ -455,21 +542,51 @@ def aggregate_summary(results: list[dict[str, Any]], scenarios: list[str]) -> di
         judge_errors = [r["judge"] for r in arm_results if isinstance(r.get("judge"), dict) and r["judge"].get("status") == "error"]
 
         judge_summary: Any
-        if graded_judges:
+        if graded_judges and judge_errors:
+            judge_summary = {
+                "status": "partial_error",
+                "graded_count": len(graded_judges),
+                "error_count": len(judge_errors),
+                "mean_ire": round(sum(j["ire"] for j in graded_judges) / len(graded_judges), 4),
+                "mean_checklist_score": round(sum(j["checklist_score"] for j in graded_judges) / len(graded_judges), 2),
+                "mean_redundancy_ratio": round(sum(j["redundancy_ratio"] for j in graded_judges) / len(graded_judges), 4),
+                "mean_fabrication_count": round(sum(j["fabrication_count"] for j in graded_judges) / len(graded_judges), 2),
+                "errors": [j.get("error", "Judge error") for j in judge_errors],
+            }
+        elif graded_judges:
             judge_summary = {
                 "status": "graded",
+                "graded_count": len(graded_judges),
+                "error_count": 0,
                 "mean_ire": round(sum(j["ire"] for j in graded_judges) / len(graded_judges), 4),
                 "mean_checklist_score": round(sum(j["checklist_score"] for j in graded_judges) / len(graded_judges), 2),
                 "mean_redundancy_ratio": round(sum(j["redundancy_ratio"] for j in graded_judges) / len(graded_judges), 4),
                 "mean_fabrication_count": round(sum(j["fabrication_count"] for j in graded_judges) / len(graded_judges), 2),
             }
         elif judge_errors:
-            judge_summary = {"status": "error", "error": judge_errors[0].get("error", "Judge error")}
+            judge_summary = {
+                "status": "error",
+                "graded_count": 0,
+                "error_count": len(judge_errors),
+                "error": judge_errors[0].get("error", "Judge error"),
+                "errors": [j.get("error", "Judge error") for j in judge_errors],
+            }
         else:
             judge_summary = "ungraded"
 
+        completed = sum(1 for r in arm_results if r.get("status") == "completed")
+        agent_failures = sum(
+            1
+            for r in arm_results
+            if r.get("status") in ("agent_failed", "agent_timeout", "interview_turn_limit", "interview_failed")
+        )
+        infra_failures = sum(1 for r in arm_results if r.get("status") in ("runner_failed", "grading_failed"))
+
         arms_data[arm] = {
             "runs": len(arm_results),
+            "completed": completed,
+            "agent_failures": agent_failures,
+            "infrastructure_failures": infra_failures,
             "mean_pass_rate": mean_pass_rate,
             "mean_turns": mean_turns,
             "mean_questions": mean_questions,
@@ -649,9 +766,16 @@ def main() -> int:
     }
     sys.stdout.write(json.dumps(compact, indent=2) + "\n")
 
-    failures = sum(1 for r in results if r.get("status") in ("runner_failed", "agent_failed", "agent_timeout"))
-    return 1 if failures > 0 else 0
+    infra_failures = sum(1 for r in results if r.get("status") in ("runner_failed", "grading_failed"))
+    agent_failures = sum(
+        1
+        for r in results
+        if r.get("status") in ("agent_failed", "agent_timeout", "interview_turn_limit", "interview_failed")
+    )
+    judge_failures = sum(1 for r in results if isinstance(r.get("judge"), dict) and r["judge"].get("status") == "error")
 
+    failures = infra_failures + agent_failures + (1 if judge_failures > 0 else 0)
+    return 1 if failures > 0 else 0
 
 if __name__ == "__main__":
     raise SystemExit(main())

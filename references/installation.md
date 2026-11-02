@@ -81,6 +81,14 @@ python3 scripts/install.py uninstall --agent codex --scope user
 
 Updates read the checkout that contains the invoked installer. Refresh that checkout first, then run `install --update`. Repeat `--no-aliases` for an installation that should remain root-only. Reinstalling identical contents returns `unchanged`.
 
+### Migration from historical releases
+
+Installations created with historical module sets (such as the 8-module release) are supported for status inspection, updates, and removal:
+
+- `status`: validates the installed bundle against historical known alias subsets without requiring manual receipt changes.
+- `install --update`: stages the full 10-module bundle, verifies existing alias symlinks and file inventory, creates symlinks for newly introduced modules (`daw-setup` and `daw-wizard`), and writes an updated receipt containing all canonical modules. Existing collisions with newly added module names abort the update to preserve foreign skills.
+- `uninstall`: cleanly removes historical installations by unlinking only the aliases recorded in the previous receipt and removing the suite bundle.
+
 `--dry-run` inspects the source and destination without creating files or directories. An actual update stages and validates the new bundle before replacement. The installer records file hashes and alias ownership in `.daw-install.json` inside its installed bundle. Updated, added, or missing installed files and changed aliases block both replacement and removal. Preserve your edits outside the installation and resolve the discrepancy before retrying; there is no force-overwrite option. Unrelated skills are left untouched.
 
 Updates and removal require an installer-owned bundle. An existing manually copied suite is preserved; choose another target or move it aside yourself. The receipt is a local ownership record, not a signature or authorization token. A lock prevents simultaneous installer mutations in the same skill directory. A stale lock after interruption must be inspected before manual removal. If rollback itself fails, the installer retains the previous bundle in a staging directory and reports its recovery path.

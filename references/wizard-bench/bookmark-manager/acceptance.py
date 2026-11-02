@@ -125,7 +125,7 @@ def main() -> int:
                 and len(data) == 1
                 and data[0].get("url") == "https://python.org"
                 and data[0].get("title") == "Python Official"
-                and data[0].get("tags") == ["python", "programming"] or data[0].get("tags") == ["programming", "python"]
+                and (data[0].get("tags") == ["python", "programming"] or data[0].get("tags") == ["programming", "python"])
             ):
                 emit_result("R2_json_persistence", "pass", "bookmarks.json structure and contents verified")
             else:

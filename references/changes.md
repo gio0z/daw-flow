@@ -1,5 +1,14 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-02: Installer Migration and Benchmark Correctness Fixes
+
+- Excluded hidden scenarios, acceptance scripts, and evaluator tests from staged wizard interview suites without changing source assets; staging is not an OS sandbox.
+- Restored status, upgrade, and removal for owned eight-module installations while retaining receipt shape, inventory, alias ownership, collision, and canonical module-path checks.
+- Reject acceptance timeouts, malformed or duplicate records, inconsistent exit statuses, and crashes after passing records instead of publishing perfect scores. Ordinary recorded acceptance failures retain fractional scores; custom graders must still emit their complete check set.
+- Propagate failed or exhausted interviews and requested judge failures through nonzero CLI exits. Mixed judge results expose graded/error counts and partial-error status rather than silently dropping failed runs.
+- Corrected bookmark persistence acceptance so either allowed tag order still requires valid URL, title, and record count.
+- Verified 136 unit tests and four public CLI smoke checks, plus direct failure-path and historical-release migration smokes. These checks establish runner correctness, not model efficacy.
+
 ## 2026-11-02: Wizard Interview Benchmark and Research-Backed Interview Rules
 
 - Added `scripts/wizard_bench.py`: a two-arm benchmark (`wizard` interview then build from `docs/specs/` only, versus `brief`-only baseline) scored by hidden acceptance tests, with optional strict-schema judge metrics (implicit-requirement elicitation ratio, redundancy, 8-item agent-ready checklist, unsupported claims). Unjudged metrics stay `ungraded`.

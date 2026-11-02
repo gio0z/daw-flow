@@ -288,6 +288,203 @@ class InstallTests(unittest.TestCase):
         non_json = subprocess.run([sys.executable, str(ROOT / "scripts" / "install.py"), "install", "--skills-dir", str(self.skills)], cwd=self.base, env=self.env, capture_output=True, text=True)
         self.assertNotEqual(non_json.returncode, 0)
         self.assertIn(str(lock), non_json.stderr)
+    def setup_true_historical_eight_payload(self, manifest_module_override=None):
+        if not self.symlinks:
+            self.skipTest("Directory symlinks unavailable; root-only installation is tested separately")
+        entries = installer.source_entries()
+        bundle = self.skills / SUITE
+        bundle.mkdir(parents=True)
+        for entry in entries:
+            target = bundle / entry.name
+            if entry.is_dir():
+                shutil.copytree(entry, target, ignore=installer.ignore_copy)
+            else:
+                shutil.copy2(entry, target)
+
+        manifest_path = bundle / "references" / "suite-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for mod in ("daw-setup", "daw-wizard"):
+            manifest["modules"].pop(mod, None)
+            shutil.rmtree(bundle / "skills" / mod, ignore_errors=True)
+        manifest["routes"].pop("setup", None)
+        manifest["routes"]["bootstrap"]["stages"] = ["daw-design", "daw-plan"]
+        if manifest_module_override:
+            mod_name, new_path = manifest_module_override
+            manifest["modules"][mod_name]["path"] = new_path
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+        for f_name in ("SKILL.md", "AGENTS.md"):
+            f_path = bundle / f_name
+            lines = f_path.read_text().splitlines(keepends=True)
+            out = []
+            fm_count = 0
+            for l in lines:
+                if l.strip() == "---" and fm_count < 2:
+                    fm_count += 1
+                    out.append(l)
+                    continue
+                if fm_count == 1:
+                    out.append(l)
+                    continue
+                if "daw-setup" in l or "daw-wizard" in l:
+                    continue
+                out.append(l)
+            f_path.write_text("".join(out))
+
+        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard")]
+        for m in eight_modules:
+            alias = self.skills / m
+            alias.symlink_to(installer.alias_path(m), target_is_directory=True)
+
+        receipt = {
+            "schema_version": 1,
+            "suite": SUITE,
+            "version": "0.1.0",
+            "aliases": eight_modules,
+            "files": installer.inventory(bundle),
+        }
+        (bundle / installer.RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        return bundle, eight_modules
+
+    def test_historical_eight_module_payload_status_update_and_uninstall(self):
+        bundle, eight_modules = self.setup_true_historical_eight_payload()
+
+        status = self.cli("status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertEqual(json.loads(status.stdout)["status"], "ready")
+
+        update = self.cli("install", "--update")
+        self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+        self.assertEqual(json.loads(update.stdout)["status"], "updated")
+        for m in MODULES:
+            self.assertTrue((self.skills / m).is_symlink())
+
+        status_after = self.cli("status")
+        self.assertEqual(status_after.returncode, 0, status_after.stdout + status_after.stderr)
+        self.assertEqual(json.loads(status_after.stdout)["status"], "ready")
+
+        uninst = self.cli("uninstall")
+        self.assertEqual(uninst.returncode, 0, uninst.stdout + uninst.stderr)
+        self.assertFalse(bundle.exists())
+        for m in MODULES:
+            self.assertFalse((self.skills / m).exists())
+
+
+    def test_historical_suite_rejects_external_manifest_module_paths(self):
+        outside_file = self.base / "external-skill.md"
+        outside_content = "# External Skill\nContent\n"
+        outside_file.write_text(outside_content, encoding="utf-8")
+
+        rel_escape = os.path.relpath(outside_file, self.skills / SUITE)
+        for escape_path in (str(outside_file.resolve()), rel_escape):
+            with self.subTest(escape_path=escape_path):
+                if self.skills.exists():
+                    shutil.rmtree(self.skills)
+                bundle, eight_modules = self.setup_true_historical_eight_payload(
+                    manifest_module_override=("daw-build", escape_path)
+                )
+
+                receipt = json.loads((bundle / installer.RECEIPT).read_text(encoding="utf-8"))
+                self.assertEqual(receipt["files"], installer.inventory(bundle))
+
+                status = self.cli("status")
+                self.assertNotEqual(status.returncode, 0, status.stdout + status.stderr)
+                payload = json.loads(status.stdout)
+                self.assertEqual(payload.get("status"), "error")
+                self.assertIn("error", payload)
+                self.assertEqual(outside_file.read_text(encoding="utf-8"), outside_content)
+                self.assertTrue(outside_file.is_file())
+                self.assertTrue(bundle.exists())
+                for m in eight_modules:
+                    self.assertTrue((self.skills / m).is_symlink())
+    def test_historical_eight_alias_receipt_status_update_and_uninstall(self):
+        bundle = self.installed()
+        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard")]
+        self.assertEqual(len(eight_modules), 8)
+        receipt_file = bundle / ".daw-install.json"
+        receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+        receipt["aliases"] = eight_modules
+        receipt_file.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        for added in ("daw-setup", "daw-wizard"):
+            (self.skills / added).unlink()
+
+        # Status is ready
+        status = self.cli("status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertEqual(json.loads(status.stdout)["status"], "ready")
+
+        # Collisions protect new aliases during update
+        conflict = self.skills / "daw-setup"
+        conflict.mkdir(parents=True)
+        (conflict / "user.txt").write_text("keep me")
+        colliding_update = self.cli("install", "--update")
+        self.assertEqual(colliding_update.returncode, 1)
+        self.assertIn("already used by another skill", colliding_update.stdout + colliding_update.stderr)
+        shutil.rmtree(conflict)
+
+        # Tampered files preserve existing suite
+        original_content = (bundle / "SKILL.md").read_bytes()
+        (bundle / "SKILL.md").write_bytes(b"tampered")
+        tampered_update = self.cli("install", "--update")
+        self.assertEqual(tampered_update.returncode, 1)
+        (bundle / "SKILL.md").write_bytes(original_content)
+
+        # Tampered alias symlink preserves existing suite
+        alias_to_tamper = self.skills / "daw-build"
+        alias_to_tamper.unlink()
+        alias_to_tamper.symlink_to(self.base, target_is_directory=True)
+        tampered_alias = self.cli("status")
+        self.assertEqual(tampered_alias.returncode, 1)
+        alias_to_tamper.unlink()
+        alias_to_tamper.symlink_to(installer.alias_path("daw-build"), target_is_directory=True)
+
+        # Malformed alias shape tests fail JSON cleanly without tracebacks
+        malformed_cases = [
+            "non-list",
+            {"invalid": "type"},
+            [123],
+            [{}],
+            ["daw-build", 123],
+            ["daw-build", "daw-build"],
+            ["daw-unknown"],
+            ["../daw-build"],
+            ["skills/daw-build"],
+        ]
+        for malformed in malformed_cases:
+            with self.subTest(malformed=malformed):
+                receipt["aliases"] = malformed
+                receipt_file.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+                malformed_res = self.cli("status")
+                self.assertEqual(malformed_res.returncode, 1)
+                payload = json.loads(malformed_res.stdout)
+                self.assertEqual(payload["status"], "error")
+                self.assertIn("Invalid installer receipt", payload["error"])
+
+        # Restore valid 8-alias receipt for update
+        receipt["aliases"] = eight_modules
+        receipt_file.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+        # Actual update adds the 2 missing aliases and updates receipt to 10 modules
+        update = self.cli("install", "--update")
+        self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+        self.assertEqual(json.loads(update.stdout)["status"], "updated")
+        for m in MODULES:
+            self.assertTrue((self.skills / m).is_symlink())
+        updated_receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+        self.assertEqual(updated_receipt["aliases"], list(MODULES))
+
+        # Uninstall after legacy migration succeeds
+        # Also verify uninstalling directly from 8-alias legacy state
+        receipt["aliases"] = eight_modules
+        receipt_file.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        for added in ("daw-setup", "daw-wizard"):
+            (self.skills / added).unlink()
+        uninst = self.cli("uninstall")
+        self.assertEqual(uninst.returncode, 0, uninst.stdout + uninst.stderr)
+        self.assertFalse(bundle.exists())
+        for m in eight_modules:
+            self.assertFalse((self.skills / m).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,8 +18,13 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "scripts/wizard_bench.py"
 ORACLE = REPO_ROOT / "scripts/wizard_oracle.py"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-FAKE_AGENT_CODE = """import sys
+from scripts.wizard_bench import aggregate_summary, run_scenario
+
+FAKE_AGENT_CODE = """import json
+import sys
 from pathlib import Path
 
 prompt_file = Path(sys.argv[1])
@@ -29,11 +34,26 @@ prompt = prompt_file.read_text(encoding="utf-8")
 
 if "Use daw-wizard" in prompt:
     # Interview phase
-    if action == "always_ask":
+    if action == "no_answer":
+        # Do nothing: neither questions nor specs produced
+        pass
+    elif action == "always_ask":
         q_dir = workspace / ".daw-interview"
         q_dir.mkdir(parents=True, exist_ok=True)
         (q_dir / "questions.md").write_text("1. What should we build?\\n")
     else:
+        if action == "secret_check":
+            staged_suite = workspace / ".agents/skills/deterministic-agentic-workflow"
+            leak_report = {
+                "wizard_bench_exists": (staged_suite / "references/wizard-bench").exists(),
+                "scenario_json_count": len(list(staged_suite.rglob("scenario.json"))),
+                "acceptance_py_count": len(list(staged_suite.rglob("acceptance.py"))),
+                "eval_test_exists": (staged_suite / "tests/test_wizard_bench.py").exists(),
+                "skill_md_exists": (staged_suite / "skills/daw-wizard/SKILL.md").exists(),
+                "routing_md_exists": (staged_suite / "references/routing.md").exists(),
+            }
+            (workspace / "secret_findings.json").write_text(json.dumps(leak_report), encoding="utf-8")
+
         # Check if oracle's answer was provided in transcript
         if "The program must be entry.py and printing SUCCESS." in prompt:
             # Turn 2: write specs without questions
@@ -61,6 +81,7 @@ else:
 
 FAKE_JUDGE_CODE = """import json
 import sys
+from pathlib import Path
 
 scenario_file, transcript_file, specs_dir, mode = sys.argv[1:5]
 if mode == "valid":
@@ -87,6 +108,54 @@ elif mode == "partial":
     }))
 elif mode == "malformed":
     print("{this is not valid json")
+elif mode == "mixed":
+    # Uses state file to succeed once then fail
+    state_file = Path(specs_dir).parent.parent / "judge_state.txt"
+    if not state_file.is_file():
+        state_file.write_text("called")
+        print(json.dumps({
+            "elicited_requirement_ids": ["R1"],
+            "redundant_question_count": 0,
+            "total_question_count": 1,
+            "checklist": {
+                "goal": True, "scope": True, "inputs_outputs": True, "data_changes": True,
+                "edge_cases": True, "acceptance_tests": True, "constraints": True, "no_change_list": True
+            },
+            "unsupported_claims": []
+        }))
+    else:
+        print("{malformed json on second run")
+"""
+
+CRASHED_ACCEPTANCE_CODE = """#!/usr/bin/env python3
+import json
+import sys
+print(json.dumps({"check": "R1_passes", "status": "pass"}))
+sys.stdout.flush()
+raise RuntimeError("Grader crashed after R1 passes")
+"""
+
+TIMEOUT_ACCEPTANCE_CODE = """#!/usr/bin/env python3
+import time
+time.sleep(10)
+"""
+
+MALFORMED_ACCEPTANCE_CODE = """#!/usr/bin/env python3
+print("not valid json at all")
+"""
+
+DUPLICATE_ACCEPTANCE_CODE = """#!/usr/bin/env python3
+import json
+print(json.dumps({"check": "R1", "status": "pass"}))
+print(json.dumps({"check": "R1", "status": "pass"}))
+"""
+
+ORDINARY_FAIL_ACCEPTANCE_CODE = """#!/usr/bin/env python3
+import json
+import sys
+print(json.dumps({"check": "R1_passes", "status": "pass"}))
+print(json.dumps({"check": "R2_fails", "status": "fail", "detail": "intentional check failure"}))
+sys.exit(1)
 """
 
 FIXTURE_ACCEPTANCE_CODE = """#!/usr/bin/env python3
@@ -162,6 +231,7 @@ class WizardBenchTests(unittest.TestCase):
         max_turns: int = 4,
         runs: int = 1,
         timeout: float = 10.0,
+        scenario: str = "all",
     ) -> tuple[subprocess.CompletedProcess[str], dict | None]:
         agent_cmd = [sys.executable, str(self.agent_script), "{prompt_file}", "{workspace}", action]
         oracle_cmd = [
@@ -193,6 +263,8 @@ class WizardBenchTests(unittest.TestCase):
             "--timeout",
             str(timeout),
         ]
+        if scenario != "all":
+            cmd.extend(["--scenario", scenario])
 
         if judge_mode:
             judge_cmd = [
@@ -263,44 +335,229 @@ class WizardBenchTests(unittest.TestCase):
         self.assertFalse((build_ws / "suite_found.txt").exists())
 
     def test_turn_limit_agent_that_always_asks(self) -> None:
-        """Turn limit: agent that always asks => status interview_turn_limit."""
+        """Turn limit: agent that always asks => status interview_turn_limit and nonzero exit."""
         output = self.root / "out_turn_limit"
         proc, summary = self.run_bench(output, arm="wizard", action="always_ask", max_turns=3)
-        self.assertEqual(proc.returncode, 0, f"Benchmark runner failed:\n{proc.stderr}")
+        self.assertEqual(proc.returncode, 1, f"Expected nonzero exit on turn limit:\n{proc.stderr}")
+
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["arms"]["wizard"]["agent_failures"], 1)
 
         run_dir = output / "fixture-scenario-wizard-001"
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "interview_turn_limit")
         self.assertEqual(result["turns_used"], 3)
 
+    def test_no_answer_agent_interview_failed(self) -> None:
+        """No-answer agent: produces neither questions nor specs => status interview_failed and nonzero exit."""
+        output = self.root / "out_no_answer"
+        proc, summary = self.run_bench(output, arm="wizard", action="no_answer", max_turns=3)
+        self.assertEqual(proc.returncode, 1, f"Expected nonzero exit on no-answer interview failure:\n{proc.stderr}")
+
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["arms"]["wizard"]["agent_failures"], 1)
+
+        run_dir = output / "fixture-scenario-wizard-001"
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "interview_failed")
+
     def test_judge_valid_malformed_and_ungraded(self) -> None:
-        """Judge: valid judge JSON => IRE and checklist score computed; malformed => error, not crashed; no judge => ungraded."""
+        """Judge: valid judge JSON => IRE computed; malformed => error and nonzero CLI exit; no judge => ungraded and exit 0."""
         # 1. Valid judge
         output_valid = self.root / "out_judge_valid"
         proc_v, summary_v = self.run_bench(output_valid, arm="wizard", action="normal", judge_mode="valid")
         self.assertEqual(proc_v.returncode, 0)
+        self.assertIsNotNone(summary_v)
+        self.assertEqual(summary_v["arms"]["wizard"]["judge"]["status"], "graded")
+        self.assertEqual(summary_v["arms"]["wizard"]["judge"]["graded_count"], 1)
+        self.assertEqual(summary_v["arms"]["wizard"]["judge"]["error_count"], 0)
         res_v = json.loads((output_valid / "fixture-scenario-wizard-001" / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(res_v["judge"]["status"], "graded")
         self.assertEqual(res_v["judge"]["ire"], 1.0)
         self.assertEqual(res_v["judge"]["checklist_score"], 8)
         self.assertEqual(res_v["judge"]["redundancy_ratio"], 0.0)
 
-        # 2. Malformed judge
+        # 2. Malformed judge => failure propagated by CLI
         output_mal = self.root / "out_judge_malformed"
         proc_m, summary_m = self.run_bench(output_mal, arm="wizard", action="normal", judge_mode="malformed")
-        # Run must not crash (exit 0)
-        self.assertEqual(proc_m.returncode, 0)
+        self.assertEqual(proc_m.returncode, 1, "Expected nonzero exit when judge fails")
+        self.assertIsNotNone(summary_m)
+        self.assertEqual(summary_m["arms"]["wizard"]["judge"]["status"], "error")
+        self.assertEqual(summary_m["arms"]["wizard"]["judge"]["graded_count"], 0)
+        self.assertEqual(summary_m["arms"]["wizard"]["judge"]["error_count"], 1)
         res_m = json.loads((output_mal / "fixture-scenario-wizard-001" / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(res_m["judge"]["status"], "error")
         self.assertIn("JSONDecodeError", res_m["judge"]["error"])
 
-        # 3. No judge => ungraded
+        # 3. No judge => ungraded and exit 0
         output_none = self.root / "out_judge_none"
         proc_n, summary_n = self.run_bench(output_none, arm="wizard", action="normal", judge_mode=None)
         self.assertEqual(proc_n.returncode, 0)
+        self.assertIsNotNone(summary_n)
+        self.assertEqual(summary_n["arms"]["wizard"]["judge"], "ungraded")
         res_n = json.loads((output_none / "fixture-scenario-wizard-001" / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(res_n["judge"], "ungraded")
 
+    def test_mixed_judge_graded_and_error(self) -> None:
+        """Judge partial error: mixed graded and error runs visible with counts, means over graded, and CLI exit 1."""
+        output = self.root / "out_judge_mixed"
+        proc, summary = self.run_bench(output, arm="wizard", action="normal", judge_mode="mixed", runs=2)
+        self.assertEqual(proc.returncode, 1, "Expected nonzero exit on mixed judge failure")
+        self.assertIsNotNone(summary)
+        judge_data = summary["arms"]["wizard"]["judge"]
+        self.assertEqual(judge_data["status"], "partial_error")
+        self.assertEqual(judge_data["graded_count"], 1)
+        self.assertEqual(judge_data["error_count"], 1)
+        self.assertEqual(judge_data["mean_ire"], 1.0)
+
+    def test_acceptance_crashed_after_passes_fails_closed(self) -> None:
+        """Acceptance crash: script prints pass then raises exception => status grading_failed, pass_rate 0, exit 1."""
+        scenario_crashed = self.scenarios_dir / "crashed-scenario"
+        scenario_crashed.mkdir(parents=True)
+        crashed_json = dict(FIXTURE_SCENARIO_JSON, id="crashed-scenario")
+        (scenario_crashed / "scenario.json").write_text(json.dumps(crashed_json), encoding="utf-8")
+        (scenario_crashed / "acceptance.py").write_text(CRASHED_ACCEPTANCE_CODE, encoding="utf-8")
+
+        output = self.root / "out_crashed"
+        proc, summary = self.run_bench(output, arm="wizard", action="normal", scenario="crashed-scenario")
+        self.assertEqual(proc.returncode, 1, "Expected nonzero exit when acceptance crashes")
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["arms"]["wizard"]["infrastructure_failures"], 1)
+
+        run_dir = output / "crashed-scenario-wizard-001"
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "grading_failed")
+        self.assertEqual(result["pass_rate"], 0.0)
+        self.assertEqual(len(result["checks"]), 1)
+        self.assertEqual(result["checks"][0]["check"], "R1_passes")
+
+    def test_acceptance_simulated_timeout_fails_closed(self) -> None:
+        """Acceptance timeout: runner enforces deadline fail-closed without 60s wait."""
+        scenario_timeout = self.scenarios_dir / "timeout-scenario"
+        scenario_timeout.mkdir(parents=True)
+        timeout_json = dict(FIXTURE_SCENARIO_JSON, id="timeout-scenario")
+        (scenario_timeout / "scenario.json").write_text(json.dumps(timeout_json), encoding="utf-8")
+        (scenario_timeout / "acceptance.py").write_text(TIMEOUT_ACCEPTANCE_CODE, encoding="utf-8")
+
+        output = self.root / "out_timeout"
+        run_dir = output / "timeout-scenario-wizard-001"
+        run_dir.mkdir(parents=True)
+        agent_cmd = [sys.executable, str(self.agent_script), "{prompt_file}", "{workspace}", "normal"]
+        oracle_cmd = [
+            sys.executable,
+            str(ORACLE),
+            "--scenario",
+            "{scenario_file}",
+            "--questions",
+            "{questions_file}",
+        ]
+        result = run_scenario(
+            source=REPO_ROOT,
+            run_dir=run_dir,
+            scenario_dir=scenario_timeout,
+            scenario_data=timeout_json,
+            arm="wizard",
+            repetition=1,
+            agent_command=agent_cmd,
+            oracle_command=oracle_cmd,
+            judge_command=None,
+            timeout=10.0,
+            max_turns=4,
+            agent_label="test",
+            acceptance_timeout=0.1,
+        )
+        self.assertEqual(result["status"], "grading_failed")
+        self.assertEqual(result["pass_rate"], 0.0)
+        self.assertEqual(result["error"], "Acceptance test timed out")
+        self.assertEqual(result["checks"], [])
+
+        summary = aggregate_summary([result], ["timeout-scenario"])
+        self.assertEqual(summary["arms"]["wizard"]["infrastructure_failures"], 1)
+
+        saved = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["status"], "grading_failed")
+        self.assertEqual(saved["pass_rate"], 0.0)
+    def test_acceptance_malformed_and_duplicate_checks_fail_closed(self) -> None:
+        """Acceptance malformed/duplicate checks fail closed."""
+        # 1. Malformed
+        scenario_mal = self.scenarios_dir / "mal-scenario"
+        scenario_mal.mkdir(parents=True)
+        mal_json = dict(FIXTURE_SCENARIO_JSON, id="mal-scenario")
+        (scenario_mal / "scenario.json").write_text(json.dumps(mal_json), encoding="utf-8")
+        (scenario_mal / "acceptance.py").write_text(MALFORMED_ACCEPTANCE_CODE, encoding="utf-8")
+
+        output_mal = self.root / "out_acceptance_mal"
+        proc_mal, summary_mal = self.run_bench(output_mal, arm="wizard", action="normal", scenario="mal-scenario")
+        self.assertEqual(proc_mal.returncode, 1)
+        self.assertIsNotNone(summary_mal)
+        self.assertEqual(summary_mal["arms"]["wizard"]["infrastructure_failures"], 1)
+        res_mal = json.loads((output_mal / "mal-scenario-wizard-001" / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(res_mal["status"], "grading_failed")
+        self.assertEqual(res_mal["pass_rate"], 0.0)
+
+        # 2. Duplicate
+        scenario_dup = self.scenarios_dir / "dup-scenario"
+        scenario_dup.mkdir(parents=True)
+        dup_json = dict(FIXTURE_SCENARIO_JSON, id="dup-scenario")
+        (scenario_dup / "scenario.json").write_text(json.dumps(dup_json), encoding="utf-8")
+        (scenario_dup / "acceptance.py").write_text(DUPLICATE_ACCEPTANCE_CODE, encoding="utf-8")
+
+        output_dup = self.root / "out_acceptance_dup"
+        proc_dup, summary_dup = self.run_bench(output_dup, arm="wizard", action="normal", scenario="dup-scenario")
+        self.assertEqual(proc_dup.returncode, 1)
+        self.assertIsNotNone(summary_dup)
+        self.assertEqual(summary_dup["arms"]["wizard"]["infrastructure_failures"], 1)
+        res_dup = json.loads((output_dup / "dup-scenario-wizard-001" / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(res_dup["status"], "grading_failed")
+        self.assertEqual(res_dup["pass_rate"], 0.0)
+
+    def test_acceptance_ordinary_failure_scored_fractionally(self) -> None:
+        """Ordinary acceptance failure: exit 1 with check failures preserves completed status and fractional score."""
+        scenario_ord = self.scenarios_dir / "ordinary-fail-scenario"
+        scenario_ord.mkdir(parents=True)
+        ord_json = dict(FIXTURE_SCENARIO_JSON, id="ordinary-fail-scenario")
+        (scenario_ord / "scenario.json").write_text(json.dumps(ord_json), encoding="utf-8")
+        (scenario_ord / "acceptance.py").write_text(ORDINARY_FAIL_ACCEPTANCE_CODE, encoding="utf-8")
+
+        output = self.root / "out_ordinary_fail"
+        proc, summary = self.run_bench(output, arm="wizard", action="normal", scenario="ordinary-fail-scenario")
+        self.assertEqual(proc.returncode, 0, f"Ordinary failure should not cause runner failure:\n{proc.stderr}")
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["arms"]["wizard"]["completed"], 1)
+        self.assertEqual(summary["arms"]["wizard"]["infrastructure_failures"], 0)
+        self.assertEqual(summary["arms"]["wizard"]["agent_failures"], 0)
+        self.assertEqual(summary["arms"]["wizard"]["mean_pass_rate"], 0.5)
+
+        run_dir = output / "ordinary-fail-scenario-wizard-001"
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["pass_rate"], 0.5)
+
+    def test_staged_suite_sanitization_and_source_intact(self) -> None:
+        """Staged suite is sanitized of hidden evaluation assets while source remains intact and skills functional."""
+        output = self.root / "out_secret_check"
+        proc, summary = self.run_bench(output, arm="wizard", action="secret_check")
+        self.assertEqual(proc.returncode, 0, f"Runner failed:\n{proc.stderr}")
+
+        run_dir = output / "fixture-scenario-wizard-001"
+        report_file = run_dir / "interview_workspace" / "secret_findings.json"
+        self.assertTrue(report_file.is_file())
+        report = json.loads(report_file.read_text(encoding="utf-8"))
+        self.assertFalse(report["wizard_bench_exists"])
+        self.assertEqual(report["scenario_json_count"], 0)
+        self.assertEqual(report["acceptance_py_count"], 0)
+        self.assertFalse(report["eval_test_exists"])
+        self.assertTrue(report["skill_md_exists"])
+        self.assertTrue(report["routing_md_exists"])
+
+        # Source suite at REPO_ROOT remains completely intact
+        self.assertTrue((REPO_ROOT / "references/wizard-bench").is_dir())
+        self.assertTrue((REPO_ROOT / "tests/test_wizard_bench.py").is_file())
+
+        # Fingerprint in result records the source suite identity
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertIn("suite_identity", result)
+        self.assertTrue(len(result["suite_identity"]) > 0)
     def test_reference_oracle_keyword_matching_and_out_of_scope(self) -> None:
         """Reference oracle: question mentioning requirement keywords gets answer; unrelated question gets out_of_scope_answer."""
         scenario_file = self.scenario_dir / "scenario.json"

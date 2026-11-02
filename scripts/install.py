@@ -80,10 +80,67 @@ def source_entries() -> list[Path]:
     return entries
 
 
-def ensure_valid_bundle(root: Path) -> None:
-    if not validate.validate_package(root)["valid"] or route.check_suite(root):
-        raise InstallError("Package or suite validation failed; no installation was applied.")
+HISTORICAL_MODULES = frozenset({
+    "daw-design",
+    "daw-plan",
+    "daw-debug",
+    "daw-build",
+    "daw-review",
+    "daw-verify",
+    "daw-workspace",
+    "daw-ask",
+})
+HISTORICAL_ROUTES = {
+    "bootstrap": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "adopt": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "feature": {"documentation_only": False, "read_only": False, "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"], "stages_unclear": ["daw-design", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "bugfix": {"documentation_only": False, "read_only": False, "stages": ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "patch": {"documentation_only": False, "read_only": False, "stages": ["daw-build", "daw-verify"], "evaluates_workspace": True},
+    "review": {"documentation_only": False, "read_only": True, "stages": ["daw-review"], "evaluates_workspace": False},
+    "ask": {"documentation_only": False, "read_only": True, "stages": ["daw-ask"], "evaluates_workspace": False},
+}
 
+
+def is_valid_historical_suite(root: Path) -> bool:
+    manifest_path = root / "references" / "suite-manifest.json"
+    if not manifest_path.is_file() or manifest_path.stat().st_size > 1024 * 1024:
+        return False
+    try:
+        data = validate.parse_strict_json(manifest_path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError, RecursionError):
+        return False
+    if not isinstance(data, dict) or data.get("schema_version") != 1 or data.get("suite") != SUITE:
+        return False
+    modules = data.get("modules")
+    if not isinstance(modules, dict) or set(modules.keys()) != HISTORICAL_MODULES:
+        return False
+    for mod_name, mod_info in modules.items():
+        if not isinstance(mod_info, dict) or set(mod_info.keys()) != {"path", "description"}:
+            return False
+        if not isinstance(mod_info.get("path"), str) or not isinstance(mod_info.get("description"), str):
+            return False
+        if mod_info["path"] != f"skills/{mod_name}/SKILL.md":
+            return False
+        mod_file = root / mod_info["path"]
+        if not mod_file.is_file():
+            return False
+    routes = data.get("routes")
+    if not isinstance(routes, dict) or set(routes.keys()) != set(HISTORICAL_ROUTES.keys()):
+        return False
+    for r_name, r_expected in HISTORICAL_ROUTES.items():
+        if routes.get(r_name) != r_expected:
+            return False
+    return True
+
+
+def ensure_valid_bundle(root: Path, allow_historical: bool = False) -> None:
+    if not validate.validate_package(root)["valid"]:
+        raise InstallError("Package or suite validation failed; no installation was applied.")
+    findings = route.check_suite(root)
+    if findings and allow_historical and is_valid_historical_suite(root):
+        findings = []
+    if findings:
+        raise InstallError("Package or suite validation failed; no installation was applied.")
 
 def ignore_copy(directory: str, names: list[str]) -> list[str]:
     return [name for name in names if name in IGNORED or name.endswith((".pyc", ".pyo"))]
@@ -110,6 +167,17 @@ def alias_path(module: str) -> Path:
 def exists(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 
+def validate_receipt_aliases(aliases: object) -> bool:
+    if not isinstance(aliases, list):
+        return False
+    seen = set()
+    for item in aliases:
+        if not isinstance(item, str) or item not in MODULES or item in seen:
+            return False
+        seen.add(item)
+    return True
+
+
 
 def inspect_installation(skills_dir: Path) -> dict | None:
     bundle = skills_dir / SUITE
@@ -128,7 +196,7 @@ def inspect_installation(skills_dir: Path) -> dict | None:
         not isinstance(receipt, dict)
         or receipt.get("schema_version") != 1
         or receipt.get("suite") != SUITE
-        or receipt.get("aliases") not in ([], list(MODULES))
+        or not validate_receipt_aliases(receipt.get("aliases"))
         or not isinstance(receipt.get("files"), dict)
         or not isinstance(receipt.get("version"), str)
     ):
@@ -307,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
             receipt = inspect_installation(skills_dir)
             result = {"action": "status", "skills_dir": str(skills_dir), "status": "ready" if receipt else "missing", "version": receipt["version"] if receipt else None}
             if receipt:
-                ensure_valid_bundle(skills_dir / SUITE)
+                ensure_valid_bundle(skills_dir / SUITE, allow_historical=True)
         code = 1 if result["status"] == "missing" else 0
     except (InstallError, OSError, RuntimeError, UnicodeError) as exc:
         message = str(exc) if isinstance(exc, InstallError) else "Filesystem operation failed; inspect destination permissions and paths."
