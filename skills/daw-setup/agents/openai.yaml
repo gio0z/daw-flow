@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Setup"
+  short_description: "Initialize or update DAW repository configuration"
+  default_prompt: "Use $daw-setup to discover repository settings and configure DAW in AGENTS.md."

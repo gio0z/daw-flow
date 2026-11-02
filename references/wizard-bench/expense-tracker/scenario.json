@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "id": "expense-tracker",
+  "brief": "Build a command-line expense tracker in Python that records daily expenditures and shows summaries.",
+  "hidden_requirements": [
+    {
+      "id": "R1",
+      "category": "constraint",
+      "text": "The executable entrypoint must be named `expenses.py` in the project root.",
+      "answer": "The script should be invoked as `python3 expenses.py <command>`.",
+      "keywords": [
+        "file name",
+        "filename",
+        "script",
+        "entrypoint",
+        "entry point",
+        "executable",
+        "invoke",
+        "run",
+        "command name",
+        "called"
+      ]
+    },
+    {
+      "id": "R2",
+      "category": "constraint",
+      "text": "Expenses must be persisted in a CSV file named `expenses.csv` in the current working directory, with headers: id,date,amount,category,description.",
+      "answer": "We store all records in `expenses.csv` in the working directory using headers: id, date, amount, category, description.",
+      "keywords": [
+        "store",
+        "stored",
+        "storage",
+        "save",
+        "saved",
+        "persist",
+        "persistence",
+        "file",
+        "format",
+        "database",
+        "csv",
+        "where",
+        "data"
+      ]
+    },
+    {
+      "id": "R3",
+      "category": "interaction",
+      "text": "The CLI must provide an `add` command: `expenses.py add --amount <float> --category <str> --description <str> [--date YYYY-MM-DD]` where date defaults to today in UTC (YYYY-MM-DD), and output `Added expense #<id>` on success.",
+      "answer": "To add an expense, run `expenses.py add --amount <amount> --category <category> --description <description> [--date YYYY-MM-DD]`. If date is omitted, default to today's UTC date. It should print `Added expense #<id>`.",
+      "keywords": [
+        "add",
+        "record",
+        "create",
+        "new expense",
+        "arguments",
+        "flags",
+        "options",
+        "date default"
+      ]
+    },
+    {
+      "id": "R4",
+      "category": "edge_case",
+      "text": "The `add` command must validate that amount is a positive number (> 0) and date matches YYYY-MM-DD; if invalid, print an error to stderr starting with `Error:` and exit with code 2.",
+      "answer": "Amount must be strictly positive, and any date must be formatted YYYY-MM-DD. On validation failure, print an error to stderr starting with `Error:` and exit with status code 2.",
+      "keywords": [
+        "validate",
+        "validation",
+        "invalid",
+        "error",
+        "errors",
+        "negative",
+        "wrong",
+        "bad input",
+        "exit code",
+        "fail"
+      ]
+    },
+    {
+      "id": "R5",
+      "category": "interaction",
+      "text": "The CLI must provide a `summary` command: `expenses.py summary [--category <str>]` that prints total spending formatted as `Total: $<amount:.2f>`. When `--category` is provided, total only expenses matching that category case-insensitively.",
+      "answer": "Run `expenses.py summary` to get total spending. You can filter by `--category <name>`. Category matching should be case-insensitive. Output should be `Total: $<amount:.2f>`.",
+      "keywords": [
+        "summary",
+        "summaries",
+        "total",
+        "totals",
+        "report",
+        "category filter",
+        "aggregate"
+      ]
+    },
+    {
+      "id": "R6",
+      "category": "style",
+      "text": "The CLI must provide a `list` command: `expenses.py list` that prints expenses sorted by date ascending, then id ascending, with columns `#<id> | <date> | $<amount:.2f> | <category> | <description>`. If no expenses exist, print `No expenses found.`",
+      "answer": "For `expenses.py list`, print each expense on its own line formatted as `#<id> | <date> | $<amount:.2f> | <category> | <description>`, sorted by date ascending then id ascending. If there are no expenses, print `No expenses found.`",
+      "keywords": [
+        "list",
+        "listing",
+        "show",
+        "display",
+        "order",
+        "ordered",
+        "sort",
+        "sorted",
+        "layout",
+        "columns",
+        "output style",
+        "look"
+      ]
+    },
+    {
+      "id": "R7",
+      "category": "edge_case",
+      "text": "If `expenses.csv` does not exist when running `summary` or `list`, the commands must treat it as empty (Total: $0.00 and No expenses found.) rather than crashing or exiting with an error.",
+      "answer": "If `expenses.csv` hasn't been created yet, `list` should just show `No expenses found.` and `summary` should show `Total: $0.00`.",
+      "keywords": [
+        "missing",
+        "empty",
+        "first run",
+        "no file",
+        "nonexistent",
+        "doesn't exist",
+        "no data"
+      ]
+    }
+  ],
+  "out_of_scope_answer": "That is out of scope. We only need the core CLI commands: add, list, and summary with CSV persistence."
+}

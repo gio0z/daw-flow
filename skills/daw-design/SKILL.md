@@ -32,6 +32,7 @@ The design module governs structural analysis, architectural evaluation, and int
 - **Task Objective / Requirements:** User prompt, feature request, or upstream PRD.
 - **Target Project Root:** Determined from explicit argument or current working directory.
 - **Existing Specifications:** Inspect `docs/specs/` (or established project convention).
+- **Configuration Block Consumption Rule:** Before inferring conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
 - **Canonical Templates & Reference Base:**
   - Reference templates located in `../../templates/` (e.g. `blueprint.md`, `prd.md`).
   - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-design`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.

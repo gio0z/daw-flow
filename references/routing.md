@@ -9,19 +9,18 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 ## 1. Intent Precedence & Routing Hierarchy
 
-Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 7 finite intents:
+Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 8 finite intents:
 
-| Precedence | Intent      | Classification Criteria                                                                     | Read-Only | Doc-Only | Stage Pipeline                                                                                                                             |
-| :--------: | :---------- | :------------------------------------------------------------------------------------------ | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------- |
-|   **1**    | `review`    | Diff review, security posture audit, boundary compliance check.                             |    Yes    |    No    | `daw-review`                                                                                                                               |
-|   **2**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                              |    Yes    |    No    | `daw-ask`                                                                                                                                  |
-|   **3**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                 |
-|   **4**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                     |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                 |
-|   **5**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, and regression test.                          |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                   |
-|   **6**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes.                        |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                |
-|   **7**    | `feature`   | New capability or functional evolution.<br>- Clear requirements:<br>- Unclear requirements: | No<br>No  | No<br>No | <br>`daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>`daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
-
-### Read-Only Precedence & Intent Decisions
+| Precedence | Intent      | Classification Criteria                                                                       | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
+| :--------: | :---------- | :-------------------------------------------------------------------------------------------- | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   **1**    | `review`    | Diff review, security posture audit, boundary compliance check.                               |    Yes    |    No    | `daw-review`                                                                                                                                           |
+|   **2**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                                |    Yes    |    No    | `daw-ask`                                                                                                                                              |
+|   **3**    | `setup`     | Interactive configuration setup, tool command discovery, and repo convention block authoring. |    No     |   Yes    | `daw-setup`                                                                                                                                            |
+|   **4**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                  |    No     |   Yes    | `daw-wizard` -> `daw-design` -> `daw-plan`                                                                                                             |
+|   **5**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                       |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                             |
+|   **6**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, and regression test.                            |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
+|   **7**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes.                          |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
+|   **8**    | `feature`   | New capability or functional evolution requiring plan, build, review, and verification.       |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
 
 - When user intent is evaluation, code audit, or PR review, `review` takes precedence.
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
@@ -41,7 +40,7 @@ If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfi
 
 ## 2. Declarative Suite Manifest Policy & Route Engine
 
-Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 7 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades.
+Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 8 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades.
 
 ### Strict Envelope Parsing & Limits
 
@@ -55,7 +54,8 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 | :------------------ | :------------------------------------------------------------------------ | :---------------------------------------------------- |
 | `ask`               | `daw-ask`                                                                 | Read-only; ignores risk and workspace.                |
 | `review`            | `daw-review`                                                              | Read-only; ignores risk and workspace.                |
-| `bootstrap`         | `daw-design` -> `daw-plan`                                                | Documentation-only; allows unclear requirements.      |
+| `setup`             | `daw-setup`                                                               | Documentation-only; allows unclear requirements.      |
+| `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                | Documentation-only; allows unclear requirements.      |
 | `adopt`             | `daw-design` -> `daw-plan`                                                | Documentation-only; preserves user code.              |
 | `bugfix`            | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`  | Prepends `daw-workspace` if `workspace: "isolated"`.  |
 | `patch`             | `daw-build` -> `daw-verify`                                               | Prepends `daw-workspace` if `workspace: "isolated"`.  |
@@ -205,7 +205,7 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
 ### 6. `design.md` — Visual Design System & Component Library Specification
 
 - **Trigger:** Authoring visual design systems, design tokens (colors, spacing, typography, elevation), shared component libraries, and UI themes. (Note: Low-level software/module design belongs in `blueprint.md`, `frd.md`, and `techstack.md`).
-- **Inputs & Prerequisites:** `prd.md`, `wireframe.md` (or relevant existing equivalents), brand assets, style guidelines.
+- **Inputs & Prerequisites:** `prd.md`, `wireframe.md` (or relevant existing equivalents), brand assets, style guidelines. A user-supplied or wizard-drafted root `DESIGN.md` in the open [DESIGN.md format](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) is the normative token source when present; this spec references its tokens instead of redefining them.
 - **Required Capability:** Explicit inline orchestrator (visual layout, theme definitions, and component hierarchies).
 - **Conditional Capabilities:**
   - UI design capability — Optional specialist capability when authoring a dedicated shared design system, token dictionary, or reusable component library.
@@ -354,7 +354,7 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
 
 ## 5. Canonical Module Handoff Contract
 
-This section defines the canonical output envelope produced by all 8 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`).
+This section defines the canonical output envelope produced by all 10 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`).
 
 > **Contract Scope Note:** This schema defines the **runtime module handoff contract** returned across module completion stages. It is distinct from the top-level route decision payload emitted by `scripts/route.py` and the task verification envelope checked by `scripts/validate.py`.
 

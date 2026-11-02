@@ -33,7 +33,7 @@ def make_request(
 
 
 def setup_suite_fixture(base_dir: pathlib.Path) -> pathlib.Path:
-    """Create a fully valid suite fixture with manifest and all 8 modules."""
+    """Create a fully valid suite fixture with manifest and all 10 modules."""
     manifest_src = REPO_ROOT / "references" / "suite-manifest.json"
     manifest_dst = base_dir / "references" / "suite-manifest.json"
     manifest_dst.parent.mkdir(parents=True, exist_ok=True)
@@ -145,9 +145,12 @@ class TestRouteSuite(unittest.TestCase):
         req = make_request(intent="bootstrap", requirements="clear", risk="low", workspace="in-place")
         res = route.resolve_route(req, root=self.suite_root)
         self.assertEqual(res["status"], "ready")
-        self.assertEqual(res["stages"], ["daw-design", "daw-plan"])
+        # 10. Bootstrap (documentation only, starts with daw-wizard)
+        req = make_request(intent="bootstrap", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-wizard", "daw-design", "daw-plan"])
         self.assertTrue(res["constraints"]["documentation_only"])
-
         # 11. Adopt (documentation only)
         req = make_request(intent="adopt", requirements="clear", risk="low", workspace="in-place")
         res = route.resolve_route(req, root=self.suite_root)
@@ -155,6 +158,14 @@ class TestRouteSuite(unittest.TestCase):
         self.assertEqual(res["stages"], ["daw-design", "daw-plan"])
         self.assertTrue(res["constraints"]["documentation_only"])
 
+
+        # 12. Setup (documentation only, stages [daw-setup])
+        req = make_request(intent="setup", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-setup"])
+        self.assertTrue(res["constraints"]["documentation_only"])
+        self.assertFalse(res["constraints"]["read_only"])
     def test_missing_stage_module_blocks_route(self):
         # Remove a core module (daw-workspace) even when requesting patch
         ws_file = self.suite_root / "skills" / "daw-workspace" / "SKILL.md"
@@ -163,6 +174,12 @@ class TestRouteSuite(unittest.TestCase):
         res = route.resolve_route(req, root=self.suite_root)
         self.assertEqual(res["status"], "blocked")
         self.assertTrue(any(b["code"] == "MODULE_NOT_FOUND" for b in res["blockers"]))
+
+    def test_check_suite_missing_wizard_module(self):
+        wizard_file = self.suite_root / "skills" / "daw-wizard" / "SKILL.md"
+        wizard_file.unlink()
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MODULE_NOT_FOUND" and "daw-wizard" in f["message"] for f in findings))
 
     def test_requirements_and_workspace_handling(self):
         # Unknown requirements for feature -> needs-input, stages empty

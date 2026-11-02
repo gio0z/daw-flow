@@ -12,6 +12,7 @@ import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "scripts/evaluate.py"
+MODULE_COUNT = len(json.loads((REPO_ROOT / "references/suite-manifest.json").read_text())["modules"])
 FAKE_AGENT = '''import pathlib
 import sys
 import time
@@ -74,7 +75,7 @@ class EvaluateRunnerTests(unittest.TestCase):
         installed = pathlib.Path(run["installed_suite"])
         self.assertTrue((installed / "scripts/route.py").is_file())
         self.assertTrue((installed / "references/suite-manifest.json").is_file())
-        self.assertEqual(len(list((installed / "skills").glob("daw-*/SKILL.md"))), 8)
+        self.assertEqual(len(list((installed / "skills").glob("daw-*/SKILL.md"))), MODULE_COUNT)
         self.assertEqual(len(list((installed / "templates").glob("*.md"))), 13)
         observed = run["checks"][1]["observed"]
         self.assertIn("4 public add behavior checks passed", pathlib.Path(observed["stdout"]).read_text())

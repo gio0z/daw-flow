@@ -35,12 +35,12 @@ Before writing or modifying code:
 2. **Behavioral Invariants & Interface Signatures:** Function signatures, input/output contracts, or API schemas to implement or maintain.
 3. **Diagnostic Report (for Bug Fixes):** Root cause mechanism, failing signature, and regression test requirement from `daw-debug`.
 4. **Clean File Ownership Assignment:** If running in a parallel multi-agent session, verify that the assigned target files do not overlap with any active sibling subagent.
-5. **Relative Reference Base & Canonical Path Resolution:**
-   - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-build`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.
+5. **Configuration Block Consumption Rule:** Before inferring conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
+6. **Relative Reference Base & Canonical Path Resolution:**
    - The suite root is the canonical module directory's `../..`.
    - Resolve all relative links (`../../references/...`, `../../SKILL.md`) relative to the canonical physical module directory, NEVER relative to the logical alias path or `cwd`.
    - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-6. **Mandatory Governance Loading:**
+7. **Mandatory Governance Loading:**
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before mutating any files or writing code, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Standard local file construction requires no production credentials.

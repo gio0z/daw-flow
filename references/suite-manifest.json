@@ -33,13 +33,21 @@
     "daw-ask": {
       "path": "skills/daw-ask/SKILL.md",
       "description": "Read-only advisory, guidance & architecture consultation"
+    },
+    "daw-setup": {
+      "path": "skills/daw-setup/SKILL.md",
+      "description": "Interactive configuration setup, tool command discovery & project conventions"
+    },
+    "daw-wizard": {
+      "path": "skills/daw-wizard/SKILL.md",
+      "description": "Interactive greenfield requirements interview, architecture scoping & specification generation"
     }
   },
   "routes": {
     "bootstrap": {
       "documentation_only": true,
       "read_only": false,
-      "stages": ["daw-design", "daw-plan"],
+      "stages": ["daw-wizard", "daw-design", "daw-plan"],
       "allow_unclear_requirements": true,
       "evaluates_workspace": false
     },
@@ -91,6 +99,13 @@
       "documentation_only": false,
       "read_only": true,
       "stages": ["daw-ask"],
+      "evaluates_workspace": false
+    },
+    "setup": {
+      "documentation_only": true,
+      "read_only": false,
+      "stages": ["daw-setup"],
+      "allow_unclear_requirements": true,
       "evaluates_workspace": false
     }
   }

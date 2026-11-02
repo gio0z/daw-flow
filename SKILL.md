@@ -1,6 +1,6 @@
 ---
 name: deterministic-agentic-workflow
-description: "Use to route multi-step engineering tasks, bootstrap greenfield specifications, adopt documentation for existing codebases, or govern execution across the bundled DAW suite: provides router dispatch across 8 specialized execution modules (daw-design, daw-plan, daw-debug, daw-build, daw-review, daw-verify, daw-workspace, daw-ask), document-driven planning across the 13-doc specification matrix, capability routing, preflight checks, fail-closed risk gating, and verifiable evidence gates."
+description: "Use to route multi-step engineering tasks, bootstrap greenfield specifications, adopt documentation for existing codebases, or govern execution across the bundled DAW suite: provides router dispatch across 10 specialized execution modules (daw-design, daw-plan, daw-debug, daw-build, daw-review, daw-verify, daw-workspace, daw-ask, daw-setup, daw-wizard), document-driven planning across the 13-doc specification matrix, capability routing, preflight checks, fail-closed risk gating, and verifiable evidence gates."
 compatibility: "Python 3.10+ stdlib validator & route engine; core workflow instructions remain fully usable without Python."
 license: MIT
 metadata:
@@ -12,34 +12,36 @@ metadata:
 Operate AI agents using the core architectural axiom: **"Otaknya boleh generative, tangannya harus deterministic."**
 Generative cognitive capabilities are reserved for reading context, analyzing intent, designing specifications, planning execution, and synthesizing solutions. All state mutation, system modification, deployment, migration, and verification must execute through deterministic scripts, bounded tools, and verifiable proof gates.
 
-> **Instructional Contract & Scope Notice:** This skill acts as the root router and governance entrypoint for the complete bundled Deterministic Agentic Workflow suite. It directs execution to 8 dedicated, bundled modules in `skills/daw-*/` (and their canonical sibling symlinks). It does not install runtime system hooks, daemon supervisors, automated enforcement interceptors, or external tool suites. Deterministic execution tools and scripts do not automatically guarantee semantic success; truthful verification requires inspecting observable runtime evidence against Acceptance Criteria. Documents alone never constitute running background services or deployment authorization.
+> **Instructional Contract & Scope Notice:** This skill acts as the root router and governance entrypoint for the complete bundled Deterministic Agentic Workflow suite. It directs execution to 10 dedicated, bundled modules in `skills/daw-*/` (and their canonical sibling symlinks). It does not install runtime system hooks, daemon supervisors, automated enforcement interceptors, or external tool suites. Deterministic execution tools and scripts do not automatically guarantee semantic success; truthful verification requires inspecting observable runtime evidence against Acceptance Criteria. Documents alone never constitute running background services or deployment authorization.
 
 Install the complete suite using [the offline installer](references/installation.md). It targets documented skill locations for Codex, Claude Code, Gemini CLI, Cursor, and Copilot. Keep the root and all modules together; on hosts without directory symlinks, load child modules by their canonical paths from this root. Host tools, approval mechanisms, and client discovery remain environment-specific.
 
 Article Reference: Rama Digital — _Agentic Tapi Deterministic Workflow AI Agent_ (https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent).  
-_Advice separation note:_ Core article principles (generative planning, deterministic mutation, document contracts, verification gates) establish the architectural foundation. Local operational additions in this skill and references define the 8-module suite architecture, declarative manifest routing, two-stage review loops, and isolated workspace controls for multi-agent CLI and workstation environments.
+_Advice separation note:_ Core article principles (generative planning, deterministic mutation, document contracts, verification gates) establish the architectural foundation. Local operational additions in this skill and references define the 10-module suite architecture, declarative manifest routing, two-stage review loops, and isolated workspace controls for multi-agent CLI and workstation environments.
 
 ---
 
 ## 1. Suite Architecture & Bundled Module Delegation
 
-The DAW suite is **self-contained as a complete 8-module bundle**. It requires **no external workflow frameworks (e.g. Superpowers) or third-party registries**. However, all 8 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
+The DAW suite is **self-contained as a complete 10-module bundle**. It requires **no external workflow frameworks (e.g. Superpowers) or third-party registries**. However, all 10 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
 
-| Module            | Canonical Path                                                 | Primary Responsibility                                                                   |
-| :---------------- | :------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| **daw-design**    | [skills/daw-design/SKILL.md](skills/daw-design/SKILL.md)       | Architecture, technical requirements, specification authoring, 13-doc matrix.            |
-| **daw-plan**      | [skills/daw-plan/SKILL.md](skills/daw-plan/SKILL.md)           | Structured task planning, phase breakdowns, risk assessment, task contracts.             |
-| **daw-debug**     | [skills/daw-debug/SKILL.md](skills/daw-debug/SKILL.md)         | Root cause analysis, minimal reproduction, failure diagnostics, regression isolation.    |
-| **daw-build**     | [skills/daw-build/SKILL.md](skills/daw-build/SKILL.md)         | Implementation, code editing, minimal change construction, zero dead weight.             |
-| **daw-review**    | [skills/daw-review/SKILL.md](skills/daw-review/SKILL.md)       | Two-stage code review, architectural boundary compliance, security auditing.             |
-| **daw-verify**    | [skills/daw-verify/SKILL.md](skills/daw-verify/SKILL.md)       | Behavioral verification, test execution, regression proof, evidence checks.              |
-| **daw-workspace** | [skills/daw-workspace/SKILL.md](skills/daw-workspace/SKILL.md) | Isolated workspace/worktree setup, git worktree lifecycle, boundary containment.         |
-| **daw-ask**       | [skills/daw-ask/SKILL.md](skills/daw-ask/SKILL.md)             | Read-only architecture consultation, contextual guidance, decision frontier exploration. |
+| Module            | Canonical Path                                                 | Primary Responsibility                                                                    |
+| :---------------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------- |
+| **daw-design**    | [skills/daw-design/SKILL.md](skills/daw-design/SKILL.md)       | Architecture, technical requirements, specification authoring, 13-doc matrix.             |
+| **daw-plan**      | [skills/daw-plan/SKILL.md](skills/daw-plan/SKILL.md)           | Structured task planning, phase breakdowns, risk assessment, task contracts.              |
+| **daw-debug**     | [skills/daw-debug/SKILL.md](skills/daw-debug/SKILL.md)         | Root cause analysis, minimal reproduction, failure diagnostics, regression isolation.     |
+| **daw-build**     | [skills/daw-build/SKILL.md](skills/daw-build/SKILL.md)         | Implementation, code editing, minimal change construction, zero dead weight.              |
+| **daw-review**    | [skills/daw-review/SKILL.md](skills/daw-review/SKILL.md)       | Two-stage code review, architectural boundary compliance, security auditing.              |
+| **daw-verify**    | [skills/daw-verify/SKILL.md](skills/daw-verify/SKILL.md)       | Behavioral verification, test execution, regression proof, evidence checks.               |
+| **daw-workspace** | [skills/daw-workspace/SKILL.md](skills/daw-workspace/SKILL.md) | Isolated workspace/worktree setup, git worktree lifecycle, boundary containment.          |
+| **daw-ask**       | [skills/daw-ask/SKILL.md](skills/daw-ask/SKILL.md)             | Read-only architecture consultation, contextual guidance, decision frontier exploration.  |
+| **daw-setup**     | [skills/daw-setup/SKILL.md](skills/daw-setup/SKILL.md)         | Interactive configuration setup, tool command discovery, and repo convention authoring.   |
+| **daw-wizard**    | [skills/daw-wizard/SKILL.md](skills/daw-wizard/SKILL.md)       | Interactive greenfield requirements interview & initial specification document authoring. |
 
 ### Module Delegation Rules
 
 1. **Delegation, Not Recursion:** The root router dispatches to modules based on classified intent and operational facts. Modules perform their specific phase and yield back to the orchestrator with recommended next stages. Modules **NEVER** recursively call the root router or invoke each other in circular loops.
-2. **Missing Module Policy:** All 8 modules are required core components. If any required internal module is missing from the suite, the workflow is **blocked**; it does not silently degrade into shallow inline approximations. External specialist domain skills remain optional augmentations.
+2. **Missing Module Policy:** All 10 modules are required core components. If any required internal module is missing from the suite, the workflow is **blocked**; it does not silently degrade into shallow inline approximations. External specialist domain skills remain optional augmentations.
 3. **Proportionality:** Small, single-line patches or isolated fixes do not trigger the full 13-document matrix. Planning overhead scales proportionally with risk and blast radius.
 4. **Canonical Relative Linking:** Modules reference suite documentation and templates using root-relative paths resolved from their location (`../../references/...` or `../../templates/...`).
 
@@ -52,9 +54,9 @@ The DAW suite is **self-contained as a complete 8-module bundle**. It requires *
 1. **Explicit Bare Invocation:**
    - When invoked bare without a task (e.g. `"Use deterministic-agentic-workflow"`):
      - The agent immediately inspects the target directory (`cwd`). It does not scan parent directories unless explicitly directed.
-     - If existing code or partial documentation is found -> enters **Adopt** mode.
-     - If the target directory is empty and a brief is provided -> enters **Bootstrap** mode.
-     - If the target directory is empty and **no brief** is provided -> halts and asks **ONE concrete material question** to establish scope. It halts blocked and **never invents phantom product documents**.
+     - If existing code or partial documentation is found -> enters **Adopt** mode (suggest **Setup** first if no `## DAW Configuration` block exists).
+     - If the target directory is empty and a brief is provided -> enters **Bootstrap** mode (starts with `daw-wizard` interview).
+     - If the target directory is empty and **no brief** is provided -> starts `daw-wizard` interview phase 1; the wizard's phase 1 round acts as the material question round to establish project concept, scope, and target users. It halts blocked on unanswered material questions and **never invents phantom product documents**.
 2. **Task-Specific Invocation:**
    - When loaded alongside an explicit user task (e.g. `"Use deterministic-agentic-workflow to fix the NPE in auth"` or `"Use deterministic-agentic-workflow to review PR #12"`):
      - This is **not** a bare invocation. The agent does not halt for empty briefs; it extracts the explicit intent and proceeds directly to dispatch.
@@ -79,11 +81,12 @@ The workflow routes incoming tasks using an explicit finite intent decision hier
 
 1. **Review (`review`):** Static analysis, code review, diff audit, or security boundary assessment on existing code or PRs. When the user's primary intent is evaluation/audit of code or diffs, `review` takes precedence. Strictly read-only; ignores unknown risk or workspace preferences. Dispatches to `daw-review`.
 2. **Ask (`ask`):** Purely conversational, read-only architectural consultation, codebase Q&A, or decision trade-off analysis. Read-only user intent always wins. Ignores unknown risk or workspace preferences. Dispatches to `daw-ask`.
-3. **Bootstrap (`bootstrap`):** Greenfield project specification from a brief or prompt in an empty or new directory. Generates core specification documents. Dispatches to `daw-design` -> `daw-plan` (documentation-only).
-4. **Adopt (`adopt`):** Reverse-engineering and specification authoring for an existing codebase with missing or partial documentation. Dispatches to `daw-design` -> `daw-plan` (documentation-only; preserves user code).
-5. **Bugfix (`bugfix`):** Diagnosing, reproducing, and resolving an existing defect or test failure. Dispatches to `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
-6. **Patch (`patch`):** Minimal, pre-diagnosed fix or surgical change with well-defined constraints. Dispatches to `daw-build` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
-7. **Feature (`feature`):** Multi-step functional change or new capability. If requirements are clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. If requirements are unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
+3. **Setup (`setup`):** Interactive project configuration discovery and repo convention block authoring. Explores repository commands and context files, confirms settings with the user, and writes/updates `<!-- daw-config:start -->` in `AGENTS.md` (or `CLAUDE.md`). Dispatches to `daw-setup`. Suggest this on first DAW use in a repository with no existing DAW configuration block.
+4. **Bootstrap (`bootstrap`):** Greenfield project specification from a brief or prompt in an empty or new directory. Begins with an interactive requirements interview via `daw-wizard`, then generates core specification documents and planning breakdown. Dispatches to `daw-wizard` -> `daw-design` -> `daw-plan` (documentation-only).
+5. **Adopt (`adopt`):** Reverse-engineering and specification authoring for an existing codebase with missing or partial documentation. Dispatches to `daw-design` -> `daw-plan` (documentation-only; preserves user code).
+6. **Bugfix (`bugfix`):** Diagnosing, reproducing, and resolving an existing defect or test failure. Dispatches to `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
+7. **Patch (`patch`):** Minimal, pre-diagnosed fix or surgical change with well-defined constraints. Dispatches to `daw-build` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
+8. **Feature (`feature`):** Multi-step functional change or new capability. If requirements are clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. If requirements are unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
 
 ### Routing Execution API & Manifest Policy
 

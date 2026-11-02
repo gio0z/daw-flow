@@ -22,15 +22,15 @@ The adapter path is a placeholder for your existing client integration, not a bu
 
 ## Cases and observed checks
 
-| Case | Task | Deterministic artifact checks | Human review still needed |
-| --- | --- | --- | --- |
-| `patch` | Fix addition in an integer calculator without changing its CLI or adding specifications/dependencies | Four public function cases, actual CLI output, bounded file changes | Meaningful regression strategy, truthful reported evidence, appropriate scope |
-| `review` | Review a cache that returns one customer's report to another customer; no edits or script execution | Workspace bytes, modes, mtimes, links, and directory entries remain unchanged | Concrete requirement/confidentiality reasoning, line evidence, correct limited-triage status, no hidden execution |
-| `cli` | Verify missing arguments exit 2 and valid suite inspection exits 0 | Unchanged workspace; grader independently runs both real CLI commands | Agent declared expectations first, actually executed checks, and correctly reported expected rejection |
+| Case     | Task                                                                                                 | Deterministic artifact checks                                                 | Human review still needed                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `patch`  | Fix addition in an integer calculator without changing its CLI or adding specifications/dependencies | Four public function cases, actual CLI output, bounded file changes           | Meaningful regression strategy, truthful reported evidence, appropriate scope                                     |
+| `review` | Review a cache that returns one customer's report to another customer; no edits or script execution  | Workspace bytes, modes, mtimes, links, and directory entries remain unchanged | Concrete requirement/confidentiality reasoning, line evidence, correct limited-triage status, no hidden execution |
+| `cli`    | Verify missing arguments exit 2 and valid suite inspection exits 0                                   | Unchanged workspace; grader independently runs both real CLI commands         | Agent declared expectations first, actually executed checks, and correctly reported expected rejection            |
 
 `--case` selects one case or `all`. Fixture definitions and graders live in the runner so the small suite can be inspected together. Grader subprocesses are bounded to ten seconds and retain their own stdout/stderr. They do not depend on tests written by the agent. Unexpected output, failed imports, syntax errors, nonzero test exits, or a grader error fail the relevant check.
 
-For `skill` mode, each workspace receives the complete supported distribution at `.agents/skills/deterministic-agentic-workflow/`: the root skill, README, AGENTS contract, MIT LICENSE, VERSION, all eight modules, scripts, references, templates, tests, docs, and optional agent UI metadata. The copied payload matches the installer; Git metadata and caches are excluded. The prompt explicitly invokes that installed copy. For `bare` mode, patch/review fixtures contain no workspace-local DAW installation; the CLI case receives a tool copy under `tools/daw/`, outside the conventional skills directory. Each case, mode, and repetition uses a fresh directory.
+For `skill` mode, each workspace receives the complete supported distribution at `.agents/skills/deterministic-agentic-workflow/`: the root skill, README, AGENTS contract, MIT LICENSE, VERSION, all ten modules, scripts, references, templates, tests, docs, and optional agent UI metadata. The copied payload matches the installer; Git metadata and caches are excluded. The prompt explicitly invokes that installed copy. For `bare` mode, patch/review fixtures contain no workspace-local DAW installation; the CLI case receives a tool copy under `tools/daw/`, outside the conventional skills directory. Each case, mode, and repetition uses a fresh directory.
 
 `both` is a useful control, but it is not full isolation from the host. The agent inherits your environment, home configuration, credentials, global skills, and client hooks. A clean control requires a caller-provided clean harness/home/configuration without globally installed DAW instructions. Record those conditions in `--agent-label` and the human review. The runner does not infer a client's version or model from process output.
 
@@ -45,3 +45,63 @@ Result statuses distinguish `artifact_checks_passed`, `artifact_checks_failed`, 
 Every result retains `human_review.status: "ungraded"`. Snapshot preservation alone does not establish a useful review, and a grader's CLI probe does not establish that the agent ran or understood it. Inspect the retained transcript and mark reasoning, evidence integrity, and instruction adherence separately. Do not call these results a completed benchmark, peer-repository parity, or efficacy certification until that review and the actual runs have occurred.
 
 `tests/test_evaluate.py` uses fake local adapters to test process execution, literal argv handling, output retention, failures, timeouts, and artifact graders. Those tests establish runner plumbing; they are not real-agent behavioral evidence. The broader manual scenarios remain in `tests/behavior-scenarios.md` and are not all automated by this runner.
+
+## Requirements interview benchmark (`wizard_bench.py`)
+
+`scripts/wizard_bench.py` evaluates greenfield requirements elicitation and downstream specification-driven implementation using the `daw-wizard` module. It tests an agent's ability to uncover hidden requirements from deliberately underspecified user briefs through structured dialogue before implementing code.
+
+### Research basis and citations
+
+The benchmark design and metric framework ground directly in recent requirements elicitation and ambiguity research:
+
+- **ReqElicitGym** ([arXiv:2602.18306](https://arxiv.org/abs/2602.18306)): Formulates the user oracle grounded in hidden implicit requirements, and introduces the **IRE** (Implicit Requirement Elicitation) metric: $\text{IRE} = \frac{|\text{elicited} \cap \text{hidden requirements}|}{|\text{hidden requirements}|}$. In baseline studies, top-tier LLMs elicit fewer than a third of implicit constraints (IRE $\le 0.32$).
+- **CONTRA** ([arXiv:2610.01769](https://arxiv.org/abs/2610.01769)): Demonstrates that redundant or off-topic questions degrade precision, frustrate users, and inflate context. Evaluates redundancy ratio $\frac{\text{redundant questions}}{\text{total questions}}$.
+- **Ambig-SWE** (ICLR 2026) and **Asuka-Bench** (EMNLP 2026): Demonstrate that dialogue quality alone is insufficient; downstream pass rate on hidden behavioral acceptance tests is the definitive metric for whether elicitation succeeded.
+- **Uvik SDD Benchmark**: Defines an 8-item specification checklist for software design documents: goal, scope, inputs/outputs, data changes, edge cases, acceptance tests, constraints, and no-change list.
+
+### Evaluation arms and pipeline
+
+Each scenario is evaluated across two arms:
+
+1. **`wizard` arm**:
+   - **Interview phase**: The workspace is staged with the suite at `.agents/skills/deterministic-agentic-workflow`. In a multi-turn loop (up to `--max-turns`), the agent asks questions via `.daw-interview/questions.md`. The runner feeds these to the configured oracle (`--oracle-command`), captures the answers into `transcript.md`, and supplies the transcript to subsequent turns. The interview concludes when the agent writes specifications under `docs/specs/` without creating `questions.md`.
+   - **Build phase**: A clean, isolated workspace is populated exclusively with `docs/specs/` (no suite staged, so the builder relies strictly on authored specifications). The agent implements the project.
+   - **Acceptance phase**: The scenario's hidden `acceptance.py` executes against the build workspace and records check results.
+2. **`brief` arm** (baseline control):
+   - The builder receives only the underspecified 1-2 sentence brief in a clean workspace (no interview, no `docs/specs/`, no staged suite). It tests whether unguided code generation can guess hidden requirements.
+
+### Invocation
+
+```bash
+python3 scripts/wizard_bench.py \
+  --agent-command '["/path/to/agent-adapter", "{prompt_file}", "{workspace}"]' \
+  --oracle-command '["python3", "scripts/wizard_oracle.py", "--scenario", "{scenario_file}", "--questions", "{questions_file}"]' \
+  --judge-command '["/path/to/judge-adapter", "{scenario_file}", "{transcript_file}", "{specs_dir}"]' \
+  --output-dir /tmp/daw-wizard-bench-001 \
+  --arm both --runs 3 --max-turns 6 --agent-label "client/version; model"
+```
+
+Command placeholders (`{prompt_file}`, `{workspace}`, `{suite_root}`, `{scenario_file}`, `{questions_file}`, `{transcript_file}`, `{specs_dir}`) are substituted by the runner without shell expansion.
+
+### Reference oracle (`wizard_oracle.py`)
+
+The suite provides `scripts/wizard_oracle.py`, a deterministic, zero-dependency reference oracle for testing and CI. It extracts questions from markdown lists, computes stopword-filtered keyword overlap against hidden scenario requirements, and returns the requirement's answer if the overlap meets the threshold, or `out_of_scope_answer` otherwise.
+
+**Note**: `wizard_oracle.py` is a deterministic, low-fidelity stand-in. In production evaluations, an LLM oracle (ReqElicitGym style) is recommended via `--oracle-command` to parse diverse semantic phrasing.
+
+### Metrics and scoring
+
+- **Downstream pass rate** (`pass_rate`): Ratio of passed hidden acceptance checks ($\in [0.0, 1.0]$).
+- **Interview efficiency**: `turns_used` (1 to `--max-turns`) and `question_count` (numbered/bulleted questions).
+- **Implicit Requirement Elicitation (IRE)**: Derived from judge output as $\frac{|\text{elicited} \cap \text{hidden}|}{|\text{hidden}|}$.
+- **Checklist completeness**: Score 0–8 measuring coverage of the 8 Uvik SDD categories.
+- **Redundancy ratio**: Fraction of questions identified as redundant.
+- **Fabrication count**: Count of unsupported claims or fabricated requirements in specifications.
+
+When `--judge-command` is omitted, judge metrics are explicitly marked as `"ungraded"` (never guessed or fabricated).
+
+### Limitations and honesty rules
+
+- The benchmark runner executes local processes; it is not a containerized sandbox.
+- The deterministic keyword oracle cannot interpret creative paraphrasing or multi-part complex questions.
+- Results are identified with `--agent-label` and suite hash metadata. Human review of interview transcripts and specifications remains essential to audit reasoning quality.

@@ -13,6 +13,8 @@
   - [`skills/daw-verify/SKILL.md`](skills/daw-verify/SKILL.md): Verification, testing, behavioral validation & evidence checks.
   - [`skills/daw-workspace/SKILL.md`](skills/daw-workspace/SKILL.md): Isolated workspace/worktree setup & lifecycle management.
   - [`skills/daw-ask/SKILL.md`](skills/daw-ask/SKILL.md): Read-only architectural guidance & consultation (original advisor; no persona impersonation).
+  - [`skills/daw-setup/SKILL.md`](skills/daw-setup/SKILL.md): Interactive configuration setup, tool command discovery & project conventions.
+  - [`skills/daw-wizard/SKILL.md`](skills/daw-wizard/SKILL.md): Interactive greenfield requirements interview & initial specification document authoring.
 - **Route Engine & Policy:**
   - [`scripts/route.py`](scripts/route.py): Read-only, zero-dependency suite routing engine and `--check-suite` structural validator.
   - [`references/suite-manifest.json`](references/suite-manifest.json): Declarative routing policy table and module mapping schema.

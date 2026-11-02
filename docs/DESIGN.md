@@ -195,17 +195,17 @@ The internal architecture of the DAW suite follows a modular, pipeline-oriented 
 #### 3.1 Suite Router & Specialized Modular Skills
 
 1. **Root Router (`SKILL.md`):** Serves as the top-level suite entry point. Reads incoming user intent and coordinates child modules using `scripts/route.py` and `references/suite-manifest.json`. Router does not run bloated flat procedures.
-2. **Specialized Child Skills (`skills/daw-*`):** 8 self-contained skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`) containing concrete operational steps and returning clean orchestrator handoffs.
+2. **Specialized Child Skills (`skills/daw-*`):** 10 self-contained skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`) containing concrete operational steps and returning clean orchestrator handoffs.
 3. **Advisory Skill (`daw-ask`):** Acts as an original, objective architecture consultant without persona impersonation or external identity spoofing.
 4. **Sibling Symlink Distribution:** Installed environments mount sibling directories symlinked to bundled `skills/daw-*` directories. Unbundled standalone claims are rejected.
 
 #### 3.2 Route Engine (`scripts/route.py`)
 
 1. **Input Parser & Strict JSON Hook:** Uses custom JSON object pairs hook to reject duplicate keys and verifies mandatory keys (`schema_version`, `intent`, `requirements`, `risk`, `workspace`). Unknown keys and nonstandard types fail immediately with exit code 2.
-2. **Policy Evaluation Engine:** Evaluates declarative rules from `references/suite-manifest.json`. Maps intents (`bootstrap`, `adopt`, `feature`, `bugfix`, `patch`, `review`, `ask`) to appropriate stages.
+2. **Policy Evaluation Engine:** Evaluates declarative rules from `references/suite-manifest.json`. Maps intents (`bootstrap`, `adopt`, `feature`, `bugfix`, `patch`, `review`, `ask`, `setup`) to appropriate stages.
 3. **Workspace Precedence:** Evaluates `workspace` for mutating intents (`feature`, `bugfix`, `patch`). Prepends `daw-workspace` if `isolated`; proceeds if `in-place`; marks `needs-input` if `unknown`.
 4. **High-Risk Constraint Enforcing:** If `risk` is `high`, marks `constraints.interactive_approval_required: true`. Permanently emits `constraints.authorization_granted: false`.
-5. **Structural Suite Checker (`--check-suite`):** Validates existence of all 8 module skill directories and files within the suite root boundary without circular imports.
+5. **Structural Suite Checker (`--check-suite`):** Validates existence of all 10 module skill directories and files within the suite root boundary without circular imports.
 
 #### 3.3 Validation Engine (`scripts/validate.py`)
 

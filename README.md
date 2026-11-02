@@ -5,7 +5,7 @@ A portable planning, execution, and verification suite for AI coding agents. Pyt
 > **"Otaknya boleh generative, tangannya harus deterministic."**  
 > _(Generative cognitive reasoning for context and planning; deterministic execution and verification for system state)._
 
-Based on the architectural principles articulated in Rama Digital's [_Agentic Tapi Deterministic Workflow AI Agent_](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent), this package provides a comprehensive, self-contained engineering workflow suite combining root router dispatch, an explicit 8-module execution architecture (`skills/daw-*/`), the canonical 13-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
+Based on the architectural principles articulated in Rama Digital's [_Agentic Tapi Deterministic Workflow AI Agent_](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent), this package provides a comprehensive, self-contained engineering workflow suite combining root router dispatch, an explicit 10-module execution architecture (`skills/daw-*/`), the canonical 13-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
 
 ---
 
@@ -46,27 +46,35 @@ See [installation and compatibility](references/installation.md) for exact paths
 1. **Explicit Bare Invocation (Inspect & Resolve):**
    - _Prompt:_ `"Use deterministic-agentic-workflow"`
    - _Behavior:_ The agent immediately inspects the target directory (`cwd`).
-     - If existing code or specs are found -> enters **Adopt** mode.
-     - If the target directory is empty and a brief is provided -> enters **Bootstrap** mode.
-     - If the target directory is empty and **no brief** is provided -> halts and asks **ONE concrete material question** to establish requirements. It never fabricates phantom product documents.
+     - If existing code or specs are found -> enters **Adopt** mode (suggests **Setup** first if no `## DAW Configuration` block exists).
+     - If the target directory is empty and a brief is provided -> enters **Bootstrap** mode (starts with `daw-wizard` interview).
+     - If the target directory is empty and **no brief** is provided -> starts `daw-wizard` interview phase 1; the wizard's phase 1 round acts as the material question round to establish project concept, scope, and target users. It halts blocked on unanswered material questions and **never invents phantom product documents**.
 
-2. **Bugfix (Diagnose, Plan, Build, Review, Verify):**
+2. **Interactive Configuration Setup:**
+   - _Prompt:_ `"Use deterministic-agentic-workflow to set up DAW conventions for this repo."`
+   - _Routing:_ Dispatches to `daw-setup`. Explores existing project context (`git remote`, context files, test/lint/build runners, CI workflows, spec directory), confirms settings with the user, and writes/updates `<!-- daw-config:start -->` in `AGENTS.md` (or `CLAUDE.md`).
+
+3. **Greenfield Wizard & Bootstrap:**
+   - _Prompt:_ `"Use deterministic-agentic-workflow to build a real-time multiplayer whiteboard web app from scratch."`
+   - _Routing:_ Dispatches to `daw-wizard` -> `daw-design` -> `daw-plan` (documentation-only). Conducts a structured interactive interview across problem concept, scope, system components, tech stack, and ops/roadmap, authoring initial specifications into `docs/specs/`.
+
+4. **Bugfix (Diagnose, Plan, Build, Review, Verify):**
    - _Prompt:_ `"Use deterministic-agentic-workflow to fix the null pointer exception when parsing JSON payloads in auth controller."`
    - _Routing:_ Dispatches through `daw-debug` (reproduce & RCA) -> `daw-plan` (patch plan) -> `daw-build` (minimal diff) -> `daw-review` (security & boundary audit) -> `daw-verify` (failing-to-passing test evidence). Prepends `daw-workspace` if isolated workspace is requested.
 
-3. **Feature (Plan, Build, Review, Verify):**
+5. **Feature (Plan, Build, Review, Verify):**
    - _Prompt:_ `"Use deterministic-agentic-workflow to add a rate-limiting middleware to the payment service."`
    - _Routing:_ If requirements are clear, dispatches to `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. If requirements are unclear, routes first to `daw-design` for specification authoring. Prepends `daw-workspace` if isolated workspace is requested.
 
-4. **Read-Only Consultation / Ask:**
+6. **Read-Only Consultation / Ask:**
    - _Prompt:_ `"Use deterministic-agentic-workflow to explain the database connection lifecycle and recommend connection pooling strategies."`
    - _Routing:_ Strictly read-only; dispatches to `daw-ask`. Evaluates context and surfaces trade-offs on the decision frontier without modifying workspace files or drafting phantom documents. Ignores risk and workspace preferences.
 
-5. **Greenfield Bootstrap (New Project Specification):**
+7. **Greenfield Bootstrap (New Project Specification):**
    - _Prompt:_ `"Use deterministic-agentic-workflow to bootstrap specifications for a multi-tenant metrics ingestion engine in Go."`
    - _Routing:_ Dispatches to `daw-design` -> `daw-plan` (documentation-only). Selects proportional specification templates from `templates/` and generates initial architecture documents.
 
-6. **Codebase Adoption (Reverse-Engineering & Spec Alignment):**
+8. **Codebase Adoption (Reverse-Engineering & Spec Alignment):**
    - _Prompt:_ `"Use deterministic-agentic-workflow to document this existing repository and identify missing specification coverage."`
    - _Routing:_ Dispatches to `daw-design` -> `daw-plan` (documentation-only). Analyzes existing code and creates specs without modifying application source code.
 
@@ -74,20 +82,22 @@ See [installation and compatibility](references/installation.md) for exact paths
 
 ## 2. Suite Architecture & Bundled Modules
 
-The DAW suite is **self-contained as a complete 8-module bundle**. It does not depend on external workflow frameworks (like Superpowers or external registries). However, all 8 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
+The DAW suite is **self-contained as a complete 10-module bundle**. It does not depend on external workflow frameworks (like Superpowers or external registries). However, all 10 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
 
-| Module            | Location                        | Role                                                                  |
-| :---------------- | :------------------------------ | :-------------------------------------------------------------------- |
-| **daw-design**    | `skills/daw-design/SKILL.md`    | Specification authoring, technical requirements, 13-doc matrix.       |
-| **daw-plan**      | `skills/daw-plan/SKILL.md`      | Task decomposition, execution sequencing, task contracts, risk flags. |
-| **daw-debug**     | `skills/daw-debug/SKILL.md`     | Root cause analysis, minimal reproduction, failure diagnostics.       |
-| **daw-build**     | `skills/daw-build/SKILL.md`     | Minimal code construction, surgical edits, no dead weight.            |
-| **daw-review**    | `skills/daw-review/SKILL.md`    | Two-stage code review, architectural boundaries, security checks.     |
-| **daw-verify**    | `skills/daw-verify/SKILL.md`    | Semantic test verification, regression proof, evidence capture.       |
-| **daw-workspace** | `skills/daw-workspace/SKILL.md` | Isolated git worktree lifecycle and directory isolation.              |
-| **daw-ask**       | `skills/daw-ask/SKILL.md`       | Read-only architecture advisory, contextual trade-offs, Q&A.          |
+| Module            | Location                        | Role                                                                   |
+| :---------------- | :------------------------------ | :--------------------------------------------------------------------- |
+| **daw-design**    | `skills/daw-design/SKILL.md`    | System architecture, requirements authoring, 13-doc specification.     |
+| **daw-plan**      | `skills/daw-plan/SKILL.md`      | Phase decomposition, task contracts, atomic task boundaries.           |
+| **daw-debug**     | `skills/daw-debug/SKILL.md`     | Root cause analysis, minimal reproduction, failure diagnostics.        |
+| **daw-build**     | `skills/daw-build/SKILL.md`     | Minimal code construction, surgical edits, no dead weight.             |
+| **daw-review**    | `skills/daw-review/SKILL.md`    | Two-stage code review, architectural boundaries, security checks.      |
+| **daw-verify**    | `skills/daw-verify/SKILL.md`    | Semantic test verification, regression proof, evidence capture.        |
+| **daw-workspace** | `skills/daw-workspace/SKILL.md` | Isolated git worktree lifecycle and directory isolation.               |
+| **daw-ask**       | `skills/daw-ask/SKILL.md`       | Read-only architectural guidance & decision frontier exploration.      |
+| **daw-setup**     | `skills/daw-setup/SKILL.md`     | Interactive configuration setup, tool command discovery & conventions. |
+| **daw-wizard**    | `skills/daw-wizard/SKILL.md`    | Greenfield requirements interview & initial specification authoring.   |
 
-> **Missing Module Policy:** All 8 modules are strictly required. If any required internal module is missing from the suite, execution is **blocked**. The workflow does not silently fall back to shallow inline approximations. External specialist skills remain optional domain augmentations.
+> **Missing Module Policy:** All 10 modules are strictly required. If any required internal module is missing from the suite, execution is **blocked**. The workflow does not silently fall back to shallow inline approximations. External specialist skills remain optional domain augmentations.
 
 ---
 
@@ -99,7 +109,7 @@ Automated routing is governed deterministically by `references/suite-manifest.js
 # Evaluate routing request
 python3 scripts/route.py request.json [--format text|json] [--root SUITE_ROOT]
 
-# Verify suite integrity (manifest + 8 bundled modules)
+# Verify suite integrity (manifest + 10 bundled modules)
 python3 scripts/route.py --check-suite [--format text|json] [--root SUITE_ROOT]
 ```
 
@@ -117,7 +127,7 @@ Routing requires classified input facts rather than arbitrary keyword matching:
 }
 ```
 
-- `intent`: enum `bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `ask`
+- `intent`: enum `bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `ask` | `setup`
 - `requirements`: enum `clear` | `unclear` | `unknown`
 - `risk`: enum `low` | `high` | `unknown`
 - `workspace`: enum `in-place` | `isolated` | `unknown`
@@ -126,11 +136,12 @@ Routing requires classified input facts rather than arbitrary keyword matching:
 
 1. `ask` -> `daw-ask` (read-only, workspace unaffected)
 2. `review` -> `daw-review` (read-only, workspace unaffected)
-3. `bootstrap` -> `daw-design`, `daw-plan` (documentation-only)
-4. `adopt` -> `daw-design`, `daw-plan` (documentation-only, preserves code)
-5. `bugfix` -> `daw-debug`, `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (workspace prepended if `isolated`)
-6. `patch` -> `daw-build`, `daw-verify` (workspace prepended if `isolated`)
-7. `feature` -> `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (or starts with `daw-design` if requirements are `unclear`; workspace prepended if `isolated`)
+3. `setup` -> `daw-setup` (documentation-only, workspace unaffected)
+4. `bootstrap` -> `daw-wizard`, `daw-design`, `daw-plan` (documentation-only)
+5. `adopt` -> `daw-design`, `daw-plan` (documentation-only, preserves code)
+6. `bugfix` -> `daw-debug`, `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (workspace prepended if `isolated`)
+7. `patch` -> `daw-build`, `daw-verify` (workspace prepended if `isolated`)
+8. `feature` -> `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (or starts with `daw-design` if requirements are `unclear`; workspace prepended if `isolated`)
 
 ### High-Risk Gating & Preflight Rules
 
@@ -146,7 +157,7 @@ The suite includes two read-only Python 3.10+ standard library diagnostic utilit
 
 1. **Suite Integrity Check (`route.py --check-suite`):**
    - Validates that `references/suite-manifest.json` conforms to schema 1.
-   - Verifies all 8 bundled module `SKILL.md` files exist within the suite root and prevents symlink path escapes.
+   - Verifies all 10 bundled module `SKILL.md` files exist within the suite root and prevents symlink path escapes.
    - Exits `0` on pass (`ready`), `1` on missing modules/blockers (`blocked`), `2` on malformed manifest (`error`).
 
 2. **Package & Task Contract Validator (`validate.py`):**

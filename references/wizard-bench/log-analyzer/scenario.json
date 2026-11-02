@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "log-analyzer",
+  "brief": "Build a log analysis tool in Python that processes server log files and reports request statistics and error rates.",
+  "hidden_requirements": [
+    {
+      "id": "R1",
+      "category": "constraint",
+      "text": "The executable entrypoint must be named `logparser.py` in the project root.",
+      "answer": "The program should be executed as `python3 logparser.py <logfile> [options]`.",
+      "keywords": [
+        "file name",
+        "filename",
+        "script",
+        "entrypoint",
+        "entry point",
+        "executable",
+        "invoke",
+        "run",
+        "called"
+      ]
+    },
+    {
+      "id": "R2",
+      "category": "content",
+      "text": "Log records follow Common Log Format: `<ip> - - [<timestamp>] \"<method> <path> <proto>\" <status> <bytes>`. Status is an integer; bytes is an integer or `-` (representing 0 bytes). Lines not matching this format must be skipped.",
+      "answer": "The input files follow standard Common Log Format: `<host> - - [<timestamp>] \"<method> <path> <version>\" <status> <bytes>`. If bytes is `-`, treat it as 0 bytes. Lines that do not match should be skipped.",
+      "keywords": [
+        "log format",
+        "input format",
+        "parse",
+        "parsing",
+        "line format",
+        "fields",
+        "common log",
+        "structure",
+        "malformed"
+      ]
+    },
+    {
+      "id": "R3",
+      "category": "interaction",
+      "text": "The CLI syntax must be `logparser.py <file> [--min-status <int>] [--json]`. Output is printed to stdout with exit code 0.",
+      "answer": "Run `logparser.py <file> [--min-status <code>] [--json]`. The summary is written to standard output with exit code 0.",
+      "keywords": [
+        "cli",
+        "arguments",
+        "flags",
+        "options",
+        "usage",
+        "syntax",
+        "command line",
+        "interface"
+      ]
+    },
+    {
+      "id": "R4",
+      "category": "constraint",
+      "text": "When `--min-status <int>` is provided, only requests with HTTP status code >= min_status are counted in statistics. If min_status is not an integer between 100 and 599 inclusive, print `Error: invalid min-status` to stderr and exit with code 2.",
+      "answer": "When `--min-status` is specified, filter for status codes greater than or equal to that code. Valid range is 100 through 599. If outside that range or not an integer, print `Error: invalid min-status` to stderr and exit with status 2.",
+      "keywords": [
+        "filter",
+        "threshold",
+        "minimum",
+        "status code",
+        "min status",
+        "limit"
+      ]
+    },
+    {
+      "id": "R5",
+      "category": "style",
+      "text": "Default plain-text output format: `Total Requests: <int>\\nTotal Bytes: <int>\\nError Rate: <float:.1f>%\\nTop Paths:\\n  - <path>: <count>` listing up to 3 paths ordered by count descending then path ascending. Error rate is percentage of included requests with status >= 400 (or 0.0% if total requests is 0).",
+      "answer": "In plain-text mode, format the output as:\nTotal Requests: <N>\nTotal Bytes: <N>\nError Rate: <X.X>%\nTop Paths:\n  - <path>: <count>\nList up to 3 top paths sorted by count descending, then path ascending. Error rate is the percentage of requests with status >= 400, or 0.0% if there are none.",
+      "keywords": [
+        "output",
+        "report",
+        "display",
+        "layout",
+        "plain text",
+        "text format",
+        "top paths",
+        "look",
+        "output style"
+      ]
+    },
+    {
+      "id": "R6",
+      "category": "content",
+      "text": "When `--json` is passed, output a JSON object: `{\"total_requests\": int, \"total_bytes\": int, \"error_rate\": float, \"top_paths\": [{\"path\": str, \"count\": int}]}` where error_rate is rounded to 1 decimal place and top_paths has at most 3 items sorted by count descending then path ascending.",
+      "answer": "When `--json` is passed, output valid JSON with keys `total_requests`, `total_bytes`, `error_rate` (rounded to 1 decimal place), and `top_paths` as a list of up to 3 `{\"path\": str, \"count\": int}` objects.",
+      "keywords": [
+        "json",
+        "machine readable",
+        "structured output",
+        "export"
+      ]
+    },
+    {
+      "id": "R7",
+      "category": "edge_case",
+      "text": "If the log file does not exist, print `Error: file not found` to stderr and exit with code 1. If the file is empty or has no parseable lines, exit with code 0 and output 0 requests, 0 bytes, 0.0% error rate, and an empty top paths list.",
+      "answer": "If the log file does not exist, print `Error: file not found` to stderr and exit with code 1. If the file is empty or all lines are unparseable, output 0 requests, 0 bytes, 0.0% error rate, and empty top paths with exit code 0.",
+      "keywords": [
+        "missing",
+        "empty",
+        "not found",
+        "no file",
+        "nonexistent",
+        "error handling",
+        "exit code",
+        "no lines"
+      ]
+    }
+  ],
+  "out_of_scope_answer": "That is out of scope. We only need `logparser.py` analyzing Common Log Format files with `--min-status` and `--json` options."
+}

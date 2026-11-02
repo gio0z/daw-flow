@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import install as installer
 SUITE = "deterministic-agentic-workflow"
-MODULES = ("daw-design", "daw-plan", "daw-debug", "daw-build", "daw-review", "daw-verify", "daw-workspace", "daw-ask")
+MODULES = installer.MODULES
 
 
 class InstallTests(unittest.TestCase):

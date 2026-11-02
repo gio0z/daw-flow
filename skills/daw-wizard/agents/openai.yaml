@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Wizard"
+  short_description: "Guided greenfield project specification interview"
+  default_prompt: "Use $daw-wizard to guide an interactive specification interview for a greenfield project."

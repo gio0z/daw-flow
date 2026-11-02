@@ -68,12 +68,14 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 
 - **REQ-RTE-01: Declarative Route Manifest & Policy**
   - _Description:_ Suite routing must be governed declaratively by `references/suite-manifest.json` via `scripts/route.py REQUEST`.
-  - _AC-RTE-01.1:_ Input request schema requires strict JSON keys: `schema_version` (integer 1), `intent` (`bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `ask`), `requirements` (`clear` | `unclear` | `unknown`), `risk` (`low` | `high` | `unknown`), and `workspace` (`in-place` | `isolated` | `unknown`). Rejects unknown keys, duplicate keys, or nonstandard constants.
+  - _AC-RTE-01.1:_ Input request schema requires strict JSON keys: `schema_version` (integer 1), `intent` (`bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `ask` | `setup`), `requirements` (`clear` | `unclear` | `unknown`), `risk` (`low` | `high` | `unknown`), and `workspace` (`in-place` | `isolated` | `unknown`). Rejects unknown keys, duplicate keys, or nonstandard constants.
   - _AC-RTE-01.2:_ Output response schema guarantees deterministic keys: `schema_version`, `status` (`ready` | `needs-input` | `blocked`), `stages` (ordered list of module names), `reasons` (list of strings), `blockers` (list of code/message objects), `constraints` (`read_only`, `documentation_only`, `interactive_approval_required`, `authorization_granted: false`), and `limitations` (list of strings).
   - _AC-RTE-01.3:_ Route execution exit codes: `0` (route ready), `1` (needs-input or incomplete modules), `2` (malformed input, manifest violation, or CLI usage error).
 - **REQ-RTE-02: Policy Routing Logic & Workspace Selection**
   - _Description:_ Route calculation honors declared matrix:
-    - `bootstrap` / `adopt` -> `[daw-design, daw-plan]` (`documentation_only: true`).
+    - `bootstrap` -> `[daw-wizard, daw-design, daw-plan]` (`documentation_only: true`).
+    - `adopt` -> `[daw-design, daw-plan]` (`documentation_only: true`).
+    - `setup` -> `[daw-setup]` (`documentation_only: true`).
     - `feature` with clear requirements -> `[daw-plan, daw-build, daw-review, daw-verify]`.
     - `feature` with unclear requirements -> `[daw-design, daw-plan, daw-build, daw-review, daw-verify]`.
     - `bugfix` -> `[daw-debug, daw-plan, daw-build, daw-review, daw-verify]`.
@@ -85,7 +87,7 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - _AC-RTE-02.3:_ When `risk` is `high`, `constraints.interactive_approval_required` is set to `true`, and `constraints.authorization_granted` is permanently `false`.
 - **REQ-RTE-03: Structural Suite Verification (`--check-suite`)**
   - _Description:_ `scripts/route.py --check-suite [--root ROOT]` validates structural consistency of the suite manifest and bundled modules without modifying existing validator contracts.
-  - _AC-RTE-03.1:_ Validates all 8 declared module paths exist within the root boundary, checks frontmatter scalar integrity, and verifies route mapping soundness.
+  - _AC-RTE-03.1:_ Validates all 10 declared module paths exist within the root boundary, checks frontmatter scalar integrity, and verifies route mapping soundness.
   - _AC-RTE-03.2:_ Returns exit code 0 when the suite is complete and sound; returns exit code 1 if any module or route definition is broken or missing.
 
 ### 4. Non-Functional Requirements
@@ -99,7 +101,7 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 ### 5. Scope & Non-Goals
 
 - **In Scope:**
-  - Suite router and 8 specialized modular skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`).
+  - Suite router and 10 specialized modular skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`).
   - Declarative route policy engine and structural check (`scripts/route.py`, `references/suite-manifest.json`).
   - Static structural validation of skill packages and task contract schemas via `scripts/validate.py`.
   - Hash matching against disk files and root path containment verification.

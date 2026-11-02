@@ -1,6 +1,6 @@
 # Installation and Agent Compatibility
 
-DAW is distributed as one complete root skill with eight bundled modules. Install from a complete checkout or extracted release using Python 3.10+. The installer uses only the standard library and performs no network access.
+DAW is distributed as one complete root skill with ten bundled modules. Install from a complete checkout or extracted release using Python 3.10+. The installer uses only the standard library and performs no network access.
 
 ## Install
 
@@ -34,21 +34,21 @@ skills/
 │   ├── templates/
 │   └── skills/daw-build/SKILL.md
 ├── daw-build -> deterministic-agentic-workflow/skills/daw-build
-└── ... seven other module aliases
+└── ... nine other module aliases
 ```
 
-The copy survives removal of the original checkout. All eight modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
+The copy survives removal of the original checkout. All ten modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
 
 ## Client locations
 
 These presets follow official local discovery documentation, checked 2 November 2026:
 
-| Agent | Project preset | User preset | Official reference |
-| --- | --- | --- | --- |
-| Codex | `.agents/skills` | `~/.agents/skills` | [Build skills](https://learn.chatgpt.com/docs/build-skills) |
-| Claude Code | `.claude/skills` | `~/.claude/skills` | [Skills](https://code.claude.com/docs/en/skills) |
-| Gemini CLI | `.gemini/skills` | `~/.gemini/skills` | [Agent skills](https://geminicli.com/docs/cli/skills/) |
-| Cursor | `.cursor/skills` | `~/.cursor/skills` | [Skills](https://cursor.com/docs/skills) |
+| Agent       | Project preset   | User preset         | Official reference                                                                                |
+| ----------- | ---------------- | ------------------- | ------------------------------------------------------------------------------------------------- |
+| Codex       | `.agents/skills` | `~/.agents/skills`  | [Build skills](https://learn.chatgpt.com/docs/build-skills)                                       |
+| Claude Code | `.claude/skills` | `~/.claude/skills`  | [Skills](https://code.claude.com/docs/en/skills)                                                  |
+| Gemini CLI  | `.gemini/skills` | `~/.gemini/skills`  | [Agent skills](https://geminicli.com/docs/cli/skills/)                                            |
+| Cursor      | `.cursor/skills` | `~/.cursor/skills`  | [Skills](https://cursor.com/docs/skills)                                                          |
 | Copilot CLI | `.github/skills` | `~/.copilot/skills` | [Add skills](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills) |
 
 Several clients also recognize shared `.agents/skills` directories. Use `--skills-dir` for a shared location or a different supported client. Avoid duplicate installations in overlapping discovery paths.

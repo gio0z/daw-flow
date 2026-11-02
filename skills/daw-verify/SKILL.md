@@ -48,7 +48,9 @@ Do NOT invoke `daw-verify` for:
    - The suite root is the canonical module directory's `../..`.
    - Resolve all relative links (`../../references/...`, `../../SKILL.md`) relative to the canonical physical module directory, NEVER relative to the logical alias path or `cwd`.
    - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-4. **Mandatory Governance Loading:**
+4. **Configuration Block Consumption Rule:**
+   - Before inferring test commands or conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
+5. **Mandatory Governance Loading:**
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before running test commands, scripts, or operational verifications, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Verification uses read-only tests and non-destructive probes. High-risk live testing, load tests, or external service calls require interactive approval per operations.md §2; halt with `status: "blocked"` if unapproved. Local unit/integration suites require no production credentials.

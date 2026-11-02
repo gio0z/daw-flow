@@ -49,9 +49,11 @@ Do NOT invoke `daw-workspace` for:
 2. **Task Intent & Routing Context:**
    - `workspace` parameter (`in-place`, `isolated`, or `unknown`).
    - Risk assessment (`low` vs `high`).
-3. **Explicit User Authorization:**
+3. **Configuration Block Consumption Rule:**
+   - Before inferring workspace policy or conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`workspace`, `spec_dir`, `test_command`, `lint_command`, `build_command`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
+4. **Explicit User Authorization:**
    - Isolated worktrees require explicit user instruction or explicit task policy authorization. High risk alone must NOT trigger worktree isolation without authorization.
-4. **Mandatory Governance Loading:**
+5. **Mandatory Governance Loading:**
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before modifying any git references, worktrees, or exclude configurations, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before workspace mutations. Local read-only status inspections require no production credentials.

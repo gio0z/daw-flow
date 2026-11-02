@@ -242,7 +242,7 @@ Records verifiable artifacts demonstrating AC satisfaction.
 
 ## 6. Suite Integrity Check (`scripts/route.py --check-suite`)
 
-Complementary to `validate.py package` (which performs purely structural validation of package assets and templates), `scripts/route.py --check-suite` validates the declarative suite manifest (`references/suite-manifest.json`) and verifies that all 8 bundled internal execution modules exist within the suite root without path traversal escapes.
+Complementary to `validate.py package` (which performs purely structural validation of package assets and templates), `scripts/route.py --check-suite` validates the declarative suite manifest (`references/suite-manifest.json`) and verifies that all 10 bundled internal execution modules exist within the suite root without path traversal escapes.
 
 ### CLI Invocation Examples
 
@@ -261,7 +261,7 @@ python3 "$SUITE_DIR/scripts/route.py" --check-suite --root "$SUITE_DIR" --format
 
 ### Exit Codes
 
-- `0`: Suite manifest valid and all 8 bundled modules present (`status: "ready"`).
+- `0`: Suite manifest valid and all 10 bundled modules present (`status: "ready"`).
 - `1`: One or more required modules missing or corrupted (`status: "blocked"`).
 - `2`: Manifest malformed, unparseable JSON, or schema violation (`status: "error"`).
 

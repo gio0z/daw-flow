@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "id": "bookmark-manager",
+  "brief": "Create a CLI tool in Python to save web links with tags and search through bookmarked links.",
+  "hidden_requirements": [
+    {
+      "id": "R1",
+      "category": "constraint",
+      "text": "The executable entrypoint must be named `bookmarks.py` in the project root.",
+      "answer": "The CLI should be executed as `python3 bookmarks.py <subcommand>`.",
+      "keywords": [
+        "file name",
+        "filename",
+        "script",
+        "entrypoint",
+        "entry point",
+        "executable",
+        "invoke",
+        "run",
+        "called"
+      ]
+    },
+    {
+      "id": "R2",
+      "category": "constraint",
+      "text": "Bookmarks must be stored in a JSON file named `bookmarks.json` in the working directory as an array of objects: `[{\"url\": str, \"title\": str, \"tags\": [str]}]`.",
+      "answer": "Store bookmarks in `bookmarks.json` in the working directory as a JSON array of objects with keys `url`, `title`, and `tags` (a list of strings).",
+      "keywords": [
+        "store",
+        "stored",
+        "storage",
+        "save",
+        "saved",
+        "persist",
+        "persistence",
+        "file",
+        "format",
+        "database",
+        "json",
+        "where",
+        "data"
+      ]
+    },
+    {
+      "id": "R3",
+      "category": "interaction",
+      "text": "The CLI must provide an `add` command: `bookmarks.py add --url <url> --title <title> [--tags <t1,t2,...>]`. Tags must be split by comma, stripped of whitespace, lowercased, and deduplicated. Prints `Saved bookmark: <title>` on success.",
+      "answer": "Use `bookmarks.py add --url <url> --title <title> [--tags tag1,tag2]`. Tags are comma-separated, should be trimmed, lowercased, and deduplicated. Print `Saved bookmark: <title>` when saved.",
+      "keywords": [
+        "add",
+        "save link",
+        "create",
+        "arguments",
+        "flags",
+        "options",
+        "tags format",
+        "comma"
+      ]
+    },
+    {
+      "id": "R4",
+      "category": "edge_case",
+      "text": "Validation & duplicate handling: URL must start with `http://` or `https://`. If invalid, print `Error: invalid URL scheme` to stderr and exit with code 1. If a bookmark with the exact same URL already exists, update its title and tags and print `Updated bookmark: <title>` with exit code 0.",
+      "answer": "URLs must begin with http:// or https://. If not, print `Error: invalid URL scheme` to stderr and exit with code 1. If the URL already exists, update its title and tags in place and print `Updated bookmark: <title>`.",
+      "keywords": [
+        "validate",
+        "validation",
+        "invalid",
+        "error",
+        "errors",
+        "duplicate",
+        "duplicates",
+        "scheme",
+        "exit code",
+        "fail"
+      ]
+    },
+    {
+      "id": "R5",
+      "category": "interaction",
+      "text": "The CLI must provide a `search` command: `bookmarks.py search [--tag <tag>] [--query <text>]`. When both are provided, both must match (AND condition). Tag matches case-insensitively against the tags list. Query performs a case-insensitive substring search across title and url.",
+      "answer": "Search with `bookmarks.py search [--tag <tag>] [--query <text>]`. If both options are passed, both must match. Tag match is exact but case-insensitive; query is a case-insensitive substring match in either title or URL.",
+      "keywords": [
+        "search",
+        "find",
+        "filter",
+        "query",
+        "match",
+        "matching",
+        "lookup"
+      ]
+    },
+    {
+      "id": "R6",
+      "category": "style",
+      "text": "Search results must be sorted alphabetically by title (ascending) and printed one per line as `[<tag1, tag2>] <title> - <url>`. Tags inside the brackets must be sorted alphabetically. If a bookmark has no tags, output `[] <title> - <url>`. If no bookmarks match, print `No bookmarks found.`",
+      "answer": "Format search output sorted by title ascending as `[<tags>] <title> - <url>` where tags are comma+space separated and sorted alphabetically, or `[]` if none. If no matches, print `No bookmarks found.`",
+      "keywords": [
+        "order",
+        "ordered",
+        "sort",
+        "sorted",
+        "display",
+        "layout",
+        "show",
+        "results look",
+        "output style",
+        "format results"
+      ]
+    },
+    {
+      "id": "R7",
+      "category": "edge_case",
+      "text": "If `bookmarks.json` does not exist when executing `search`, the command must exit with code 0 and output `No bookmarks found.` without creating any file.",
+      "answer": "If `bookmarks.json` doesn't exist yet, `search` should simply print `No bookmarks found.` with exit code 0 and not create the file.",
+      "keywords": [
+        "missing",
+        "empty",
+        "first run",
+        "no file",
+        "nonexistent",
+        "doesn't exist",
+        "no bookmarks"
+      ]
+    }
+  ],
+  "out_of_scope_answer": "That is out of scope. We only need `bookmarks.py` with `add` and `search` subcommands backed by `bookmarks.json`."
+}

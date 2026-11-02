@@ -1,5 +1,19 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-02: Wizard Interview Benchmark and Research-Backed Interview Rules
+
+- Added `scripts/wizard_bench.py`: a two-arm benchmark (`wizard` interview then build from `docs/specs/` only, versus `brief`-only baseline) scored by hidden acceptance tests, with optional strict-schema judge metrics (implicit-requirement elicitation ratio, redundancy, 8-item agent-ready checklist, unsupported claims). Unjudged metrics stay `ungraded`.
+- Added three headless scenarios under `references/wizard-bench/` (expense tracker, bookmark manager, log analyzer; 7 hidden requirements each) and `scripts/wizard_oracle.py`, a deterministic keyword-weighted stand-in oracle; an LLM oracle is recommended for real runs.
+- `daw-wizard` now filters already-answered questions, asks behavior-changing questions first, caps rounds at 5 questions, enforces the 8-item agent-ready checklist, and handles visual style through a user-supplied `DESIGN.md` or one drafted to the open DESIGN.md format. Sources: ReqElicitGym, CONTRA, Ambig-SWE, Asuka-Bench, Uvik SDD benchmark (cited in `references/evaluation.md`).
+- Local gate: 121 tests passed; a scripted end-to-end smoke ran both arms. These results establish runner plumbing, not agent efficacy.
+
+## 2026-11-02: Repository Setup and Greenfield Interview Wizard
+
+- Added `daw-setup`: inspects a repository, confirms conventions with the operator in one batched round, and writes a single `<!-- daw-config:start -->` block (spec directory, test/lint/build commands, workspace policy, high-risk paths, issue tracker, default branch) into `AGENTS.md` or `CLAUDE.md`. New `setup` intent routes to it.
+- Added `daw-wizard`: phased interview for blank workspaces that produces a confirmed, proportional subset of the 13-document matrix, recording unanswered material facts as Open Questions instead of inventing them. It is now the first `bootstrap` stage (`daw-wizard` -> `daw-design` -> `daw-plan`) and refuses non-empty targets in favor of `adopt`.
+- `daw-design`, `daw-plan`, `daw-build`, `daw-verify` and `daw-workspace` read the configuration block before inferring conventions; values are hints and never grant authorization.
+- Suite grows to 10 modules and 8 intents; the installer creates 10 module aliases. Local gate: 116 tests passed with package and suite checks passing.
+
 ## 2026-11-02: Installable 0.1.0 Distribution and Review Corrections
 
 - Added an offline stdlib installer for project/user skill directories in Codex, Claude Code, Gemini CLI, Cursor, and Copilot, plus explicit custom directories. Complete bundle copies, relative module aliases, root-only fallback, ownership receipts, staged updates, removal, dry-run parity, locking, and retained recovery copies protect unrelated or edited installations.

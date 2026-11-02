@@ -38,7 +38,7 @@ The business goal is not financial monetization or SaaS subscription revenue, bu
 
 - **Adoption Friction:** Time-to-first-validation under 5 seconds on any environment with Python 3.10+, verified by running `scripts/validate.py package` and `scripts/route.py --check-suite`.
 - **Test Integrity:** 100% test pass rate across all baseline unit tests in `tests/test_validate.py` and `tests/test_route.py` without requiring third-party library installation.
-- **Specification Coverage:** Complete, actionable reference documentation across all 13 document templates, 8 specialized modular skills, and runtime specification documents.
+- **Specification Coverage:** Complete, actionable reference documentation across all 13 document templates, 10 specialized modular skills, and runtime specification documents.
 - **Zero-Failure Gate Compliance:** Verification that task contracts and routing requests fail closed whenever required fields, valid hashes, or approved boundaries are violated.
 
 ### 6. Scope Boundaries & Non-Goals

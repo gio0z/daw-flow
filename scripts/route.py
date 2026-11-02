@@ -23,7 +23,7 @@ MAX_INPUT_BYTES = 1024 * 1024  # 1 MiB bounded input limit
 MAX_MODULE_BYTES = 256 * 1024  # 256 KiB bounded module read limit
 
 VALID_ENUMS: dict[str, frozenset[str]] = {
-    "intent": frozenset({"bootstrap", "adopt", "feature", "bugfix", "patch", "review", "ask"}),
+    "intent": frozenset({"bootstrap", "adopt", "feature", "bugfix", "patch", "review", "ask", "setup"}),
     "requirements": frozenset({"clear", "unclear", "unknown"}),
     "risk": frozenset({"low", "high", "unknown"}),
     "workspace": frozenset({"in-place", "isolated", "unknown"}),
@@ -40,11 +40,13 @@ MANIFEST_MODULE_KEYS = frozenset({
     "daw-verify",
     "daw-workspace",
     "daw-ask",
+    "daw-setup",
+    "daw-wizard",
 })
 
 # Invariant stage definitions per intent (v1 fixed canonical policy)
 CANONICAL_ROUTE_STAGES: dict[str, Any] = {
-    "bootstrap": ["daw-design", "daw-plan"],
+    "bootstrap": ["daw-wizard", "daw-design", "daw-plan"],
     "adopt": ["daw-design", "daw-plan"],
     "feature": {
         "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
@@ -54,6 +56,7 @@ CANONICAL_ROUTE_STAGES: dict[str, Any] = {
     "patch": ["daw-build", "daw-verify"],
     "review": ["daw-review"],
     "ask": ["daw-ask"],
+    "setup": ["daw-setup"],
 }
 
 
@@ -186,7 +189,7 @@ def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) 
 
 
 def _validate_module_entries(modules: Any) -> list[dict[str, str]]:
-    """Validate manifest modules object and all 8 entries."""
+    """Validate manifest modules object and all 10 entries."""
     findings: list[dict[str, str]] = []
     if not isinstance(modules, dict):
         return [{"code": "MANIFEST_INVALID_MODULES", "message": "Manifest modules must be a JSON object."}]
@@ -252,7 +255,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
             continue
 
         # Invariant checks for flags
-        expected_doc = (r_name in ("bootstrap", "adopt"))
+        expected_doc = (r_name in ("bootstrap", "adopt", "setup"))
         expected_ro = (r_name in ("review", "ask"))
         expected_ws = (r_name in ("feature", "bugfix", "patch"))
 
@@ -274,7 +277,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
             if r_def.get("stages") != expected_stage_spec:
                 findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' stages must match canonical {expected_stage_spec}."})
             expected_keys = {"documentation_only", "read_only", "stages", "evaluates_workspace"}
-            if r_name in ("bootstrap", "adopt"):
+            if r_name in ("bootstrap", "adopt", "setup"):
                 expected_keys.add("allow_unclear_requirements")
                 if r_def.get("allow_unclear_requirements") is not True:
                     findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' allow_unclear_requirements must be True."})
@@ -329,7 +332,7 @@ def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[
 
 
 def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[dict[str, str]]:
-    """Verify that all 8 canonical modules exist on disk within root."""
+    """Verify that all 10 canonical modules exist on disk within root."""
     findings: list[dict[str, str]] = []
     modules = manifest.get("modules", {})
     for mod_name in sorted(MANIFEST_MODULE_KEYS):
@@ -342,7 +345,7 @@ def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[di
 
 
 def check_suite(root: pathlib.Path | str | None = None) -> list[dict[str, str]]:
-    """Validate suite manifest and verify all 8 canonical modules on disk within root."""
+    """Validate suite manifest and verify all 10 canonical modules on disk within root."""
     resolved_root = find_suite_root(root)
     manifest, findings = load_manifest(resolved_root)
     if findings:
@@ -465,7 +468,7 @@ def resolve_route(
             interactive_approval_required=interactive_approval_required,
         )
 
-    # All 8 core suite modules must exist on disk
+    # All 10 core suite modules must exist on disk
     module_findings = check_suite_modules(resolved_root, manifest)
     if module_findings:
         return create_response(
