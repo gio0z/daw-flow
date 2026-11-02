@@ -50,7 +50,7 @@ Before conducting a code review:
 
 ### Stage 1: Requirements Conformity Gate
 
-_Stage 1 must pass completely before evaluating Stage 2. If an implementation does not do what was asked, analyzing code quality is premature._
+_Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity gate still produces a complete review report; evident security or data-loss risks must remain visible._
 
 1. **Scope & Goal Alignment:**
    - Verify every item in the task contract or user request has a corresponding implementation.
@@ -60,7 +60,7 @@ _Stage 1 must pass completely before evaluating Stage 2. If an implementation do
    - Verify that the core requested behavior actually exists and is exercised in the diff.
    - Ensure the implementation solves the real problem requested, not a simplified or familiar substitute.
 3. **Stage 1 Decision Gate:**
-   - If requirements conformity fails: Halt review immediately, generate a `Stage 1: FAILED` report detailing missing or misaligned requirements, and skip Stage 2.
+   - If requirements conformity fails: Record `Stage 1: FAILED`, outer `status: "fail"`, and `details.review_verdict: "CHANGES_REQUESTED"`. Skip the full Stage 2 audit, but perform bounded static triage of evident confidentiality, authorization, or data-loss risks in the inspected paths. Record Stage 2 as `LIMITED_SECURITY_TRIAGE` when such triage is performed, or `SKIPPED` otherwise; neither status claims a full technical audit passed.
    - If requirements conformity passes: Proceed to Stage 2.
 
 ### Stage 2: Technical Correctness, Security, Performance & Maintainability Gate
@@ -174,7 +174,7 @@ _(Note: `status: "pass"` indicates that the review phase evaluation criteria hav
 The review phase is complete when:
 
 1. Stage 1 Requirements Conformity has been explicitly evaluated against authoritative requirements.
-2. Stage 2 Technical Audit has examined correctness, security, performance, and maintainability with concrete line references and empirical evidence or static code proofs.
+2. If Stage 1 passed, Stage 2 has examined correctness, security, performance, and maintainability. If Stage 1 failed, the report records Stage 2 as `SKIPPED` or `LIMITED_SECURITY_TRIAGE`, states the unexamined scope, and includes any evident security or data-loss findings. A failed conformity review is complete with outer `status: "fail"`; it never receives a passing verdict.
 3. Every finding includes an objective technical rationale and evidence (no subjective taste or unsourced assertions).
 4. Detailed review verdict is recorded under `details.review_verdict` (`PASSED`, `CHANGES_REQUESTED`, `CONTRADICTION_HALT`, or `REPLAN_REQUIRED`).
 5. No automated or uncoordinated file modifications were performed by this skill.

@@ -2,6 +2,9 @@
 name: deterministic-agentic-workflow
 description: "Use to route multi-step engineering tasks, bootstrap greenfield specifications, adopt documentation for existing codebases, or govern execution across the bundled DAW suite: provides router dispatch across 8 specialized execution modules (daw-design, daw-plan, daw-debug, daw-build, daw-review, daw-verify, daw-workspace, daw-ask), document-driven planning across the 13-doc specification matrix, capability routing, preflight checks, fail-closed risk gating, and verifiable evidence gates."
 compatibility: "Python 3.10+ stdlib validator & route engine; core workflow instructions remain fully usable without Python."
+license: MIT
+metadata:
+  version: "0.1.0"
 ---
 
 # Deterministic Agentic Workflow
@@ -10,6 +13,8 @@ Operate AI agents using the core architectural axiom: **"Otaknya boleh generativ
 Generative cognitive capabilities are reserved for reading context, analyzing intent, designing specifications, planning execution, and synthesizing solutions. All state mutation, system modification, deployment, migration, and verification must execute through deterministic scripts, bounded tools, and verifiable proof gates.
 
 > **Instructional Contract & Scope Notice:** This skill acts as the root router and governance entrypoint for the complete bundled Deterministic Agentic Workflow suite. It directs execution to 8 dedicated, bundled modules in `skills/daw-*/` (and their canonical sibling symlinks). It does not install runtime system hooks, daemon supervisors, automated enforcement interceptors, or external tool suites. Deterministic execution tools and scripts do not automatically guarantee semantic success; truthful verification requires inspecting observable runtime evidence against Acceptance Criteria. Documents alone never constitute running background services or deployment authorization.
+
+Install the complete suite using [the offline installer](references/installation.md). It targets documented skill locations for Codex, Claude Code, Gemini CLI, Cursor, and Copilot. Keep the root and all modules together; on hosts without directory symlinks, load child modules by their canonical paths from this root. Host tools, approval mechanisms, and client discovery remain environment-specific.
 
 Article Reference: Rama Digital — _Agentic Tapi Deterministic Workflow AI Agent_ (https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent).  
 _Advice separation note:_ Core article principles (generative planning, deterministic mutation, document contracts, verification gates) establish the architectural foundation. Local operational additions in this skill and references define the 8-module suite architecture, declarative manifest routing, two-stage review loops, and isolated workspace controls for multi-agent CLI and workstation environments.

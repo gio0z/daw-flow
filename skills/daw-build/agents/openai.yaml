@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Build"
+  short_description: "Build scoped changes with behavioral regression tests"
+  default_prompt: "Use $daw-build to implement this scoped change and verify its behavior."

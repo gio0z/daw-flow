@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Verify"
+  short_description: "Verify results against observable runtime evidence"
+  default_prompt: "Use $daw-verify to check these acceptance criteria against actual outputs."

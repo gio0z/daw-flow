@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Plan"
+  short_description: "Plan implementation with clear scope and acceptance"
+  default_prompt: "Use $daw-plan to turn this request into bounded implementation tasks and acceptance criteria."

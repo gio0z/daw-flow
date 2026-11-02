@@ -1,6 +1,6 @@
 # Deterministic Agentic Workflow (DAW) Suite
 
-A portable, document-driven planning, execution, and verification suite for AI coding agents.
+A portable planning, execution, and verification suite for AI coding agents. Python 3.10+, no third-party runtime dependencies, MIT licensed.
 
 > **"Otaknya boleh generative, tangannya harus deterministic."**  
 > _(Generative cognitive reasoning for context and planning; deterministic execution and verification for system state)._
@@ -11,7 +11,35 @@ Based on the architectural principles articulated in Rama Digital's [_Agentic Ta
 
 ## 1. Quickstart & Invocation
 
-Invoke the workflow using natural conversational prompts across any agent harness or via client skill mentions (e.g. `@deterministic-agentic-workflow`).
+Clone or download the complete repository, then install it into your agent's user skill directory:
+
+```bash
+git clone https://github.com/gio0z/deterministic-agentic-workflow.git
+cd deterministic-agentic-workflow
+python3 scripts/install.py install --agent codex --scope user
+```
+
+Choose `codex`, `claude`, `gemini`, `cursor`, or `copilot`. For a project installation, use `--scope project --project-root /path/to/project`. On Windows, use `python` if that is your Python 3 command. If directory symlinks are unavailable, add `--no-aliases`; the complete root skill still loads its bundled modules by path.
+
+Restart or reload skills in your agent, then ask:
+
+```text
+Use deterministic-agentic-workflow to fix this bug and verify the result.
+```
+
+Codex also supports `$deterministic-agentic-workflow`; Claude Code exposes `/deterministic-agentic-workflow`. Other clients provide their own skill menus and invocation syntax. Native discovery depends on client version and settings.
+
+Inspect, update from a refreshed checkout, or remove the same installation:
+
+```bash
+python3 scripts/install.py status --agent codex --scope user
+python3 scripts/install.py install --agent codex --scope user --update
+python3 scripts/install.py uninstall --agent codex --scope user
+```
+
+`--dry-run` previews an action without writing. Updates and removal refuse changed files, extra files, and unrelated skills. The installer copies the full suite, so removing the source checkout does not break it. It never modifies agent configuration or Git hooks, downloads packages, or installs agent CLIs.
+
+See [installation and compatibility](references/installation.md) for exact paths, platform limits, and custom directories. `status` checks files and module aliases; confirm client discovery in your agent's skill list after installation.
 
 ### Common Invocations & Routing Behavior
 
@@ -156,3 +184,21 @@ Default greenfield projects author the 6-doc core set (`blueprint`, `prd`, `frd`
 - **`references/validation.md`**: Detailed validator contracts for `route.py --check-suite` and `validate.py`.
 - **`references/changes.md`**: Suite change history and architecture evolution log.
 - **`tests/behavior-scenarios.md`**: Reusable behavior test scenarios for verifying agent compliance.
+
+## 7. Development & Behavioral Evaluation
+
+Run the local quality gate:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+python3 scripts/validate.py package
+python3 scripts/route.py --check-suite
+```
+
+CI configures these checks across Linux, macOS, and Windows with Python 3.10 and 3.14. A local passing run does not imply that the hosted matrix has run.
+
+The [behavioral evaluation runner](references/evaluation.md) executes an explicitly supplied agent command against fresh fixtures, retains transcripts and timing, and supports repeated comparisons with and without a workspace-local skill. It does not select a model, disable approvals, or treat harness tests as evidence of agent quality. Review the retained evidence and any ungraded criteria before claiming workflow compliance.
+
+The suite follows the [Agent Skills format](https://agentskills.io/specification). Its supported directory layouts are documented in the installation guide; cross-client behavioral parity requires actual client runs.
+
+Licensed under the [MIT License](LICENSE). See [VERSION](VERSION) for the current package version.

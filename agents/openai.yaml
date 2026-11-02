@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deterministic Agentic Workflow"
+  short_description: "Plan, build, review, and verify bounded engineering work"
+  default_prompt: "Use $deterministic-agentic-workflow to complete this engineering task with proportional planning and verified results."

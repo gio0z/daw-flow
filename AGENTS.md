@@ -20,6 +20,8 @@
   - Runtime: Python 3.10+ standard library only (`argparse`, `hashlib`, `json`, `os`, `pathlib`, `re`, `sys`, `urllib.parse`).
   - Dependencies: Zero third-party runtime dependencies; strictly read-only filesystem access; no network, no Git CLI execution, no subshell spawning.
   - Subcommands: `package` (package integrity & link resolution) and `contract` (JSON task contract lifecycle validation).
+- **Installer:** [`scripts/install.py`](scripts/install.py) is a separate, explicitly mutating stdlib CLI for complete-bundle installation, ownership-checked updates, status, and removal. Its mutation behavior never extends to the validator or route engine.
+- **Behavioral Evaluations:** [`scripts/evaluate.py`](scripts/evaluate.py) and [`references/evaluation.md`](references/evaluation.md) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
 - **Test Suites:**
   - [`tests/test_validate.py`](tests/test_validate.py): Standard library `unittest` verifying package checks, contract schemas, boundary traversal prevention, duplicate-key rejection, and stage transitions.
   - [`tests/test_route.py`](tests/test_route.py): Standard library `unittest` verifying route calculations, schema constraints, path containment, high-risk flags, error envelopes, and `--check-suite`.

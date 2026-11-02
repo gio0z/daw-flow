@@ -1291,6 +1291,42 @@ class TestValidateCLI(unittest.TestCase):
             error_findings = [f for f in payload["findings"] if f.get("severity") == "error"]
             self.assertTrue(len(error_findings) > 0, "Expected error findings for escaping directory symlink")
 
+    def test_package_parent_directory_symlink_escape_rejected(self):
+        for directory in ("references", "scripts", "tests", "extras"):
+            with self.subTest(directory=directory), tempfile.TemporaryDirectory() as tmpdir:
+                base_dir = pathlib.Path(tmpdir)
+                pkg_dir = self.create_minimal_package_fixture(base_dir)
+                # No links in SKILL.md: required-file containment must stand alone.
+                (pkg_dir / "SKILL.md").write_text(
+                    "---\nname: deterministic-agentic-workflow\ndescription: Valid package\n---\n",
+                    encoding="utf-8",
+                )
+                source_dir = pkg_dir / directory
+                if not source_dir.exists():
+                    source_dir.mkdir()
+                external_dir = base_dir / "outside"
+                source_dir.rename(external_dir)
+                source_dir.symlink_to(external_dir, target_is_directory=True)
+                res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+                self.assertEqual(res.returncode, 1, msg=res.stdout)
+                codes = {f["code"] for f in json.loads(res.stdout)["findings"]}
+                self.assertIn("symlink_escapes_package", codes)
+
+    def test_package_external_directory_contents_are_not_read(self):
+        for directory, filename in (("references", "routing.md"), ("templates", "blueprint.md")):
+            with self.subTest(directory=directory), tempfile.TemporaryDirectory() as tmpdir:
+                base_dir = pathlib.Path(tmpdir)
+                pkg_dir = self.create_minimal_package_fixture(base_dir)
+                external_dir = base_dir / "outside"
+                (pkg_dir / directory).rename(external_dir)
+                (external_dir / filename).write_bytes(b"\xff")
+                (pkg_dir / directory).symlink_to(external_dir, target_is_directory=True)
+                res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+                self.assertEqual(res.returncode, 1, msg=res.stdout)
+                codes = {f["code"] for f in json.loads(res.stdout)["findings"]}
+                self.assertIn("symlink_escapes_package", codes)
+                self.assertNotIn("utf8_decode_error", codes, "Escaping files must not be opened")
+
     def test_package_markdown_windows_absolute_link_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
@@ -1394,6 +1430,31 @@ class TestValidateCLI(unittest.TestCase):
                 self.assertFalse(payload.get("valid"))
                 error_findings = [f for f in payload.get("findings", []) if f.get("severity") == "error"]
                 self.assertTrue(len(error_findings) > 0, f"Expected error finding for {label}")
+
+    def test_package_metadata_nonstring_plain_values_rejected(self):
+        values = ("[one, two]", "{key: value}", "true", "FALSE", "null", "~", "123", "1.25", ".inf", "2026-11-02", "*alias", "!!str 123")
+        for field in ("description", "compatibility"):
+            for value in values:
+                with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as tmpdir:
+                    pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+                    skill_file = pkg_dir / "SKILL.md"
+                    text = skill_file.read_text(encoding="utf-8")
+                    old = "description: Deterministic agentic workflow standard." if field == "description" else "compatibility: Python 3.10+"
+                    skill_file.write_text(text.replace(old, f"{field}: {value}"), encoding="utf-8")
+                    res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+                    self.assertEqual(res.returncode, 1, msg=res.stdout)
+                    codes = {f["code"] for f in json.loads(res.stdout)["findings"]}
+                    self.assertIn("invalid_frontmatter", codes)
+
+    def test_package_metadata_quoted_nonstring_looking_values_allowed(self):
+        for value in ('"[one, two]"', "'true'", '"123"', '"null"'):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmpdir:
+                pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+                skill_file = pkg_dir / "SKILL.md"
+                text = skill_file.read_text(encoding="utf-8")
+                skill_file.write_text(text.replace("description: Deterministic agentic workflow standard.", f"description: {value}"), encoding="utf-8")
+                res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+                self.assertEqual(res.returncode, 0, msg=res.stdout)
 
     def test_package_metadata_unknown_maps_allowed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1531,6 +1592,56 @@ class TestValidateCLI(unittest.TestCase):
             self.assertFalse(payload.get("valid"))
             error_findings = [f for f in payload.get("findings", []) if f.get("severity") == "error"]
             self.assertTrue(len(error_findings) > 0, "Expected error findings for unknown contract keys")
+
+    def test_contract_diagnostic_payload_values_redacted(self):
+        marker = "SYNTHETIC_SECRET_DO_NOT_ECHO"
+        cases = ("duplicate_key", "document_kind", "document_status", "baseline_path", "document_path", "evidence_path", "criterion_id", "missing_contract")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmpdir:
+                base_dir = pathlib.Path(tmpdir)
+                proj_dir, baseline = self.create_minimal_project_fixture(base_dir)
+                contract = self.create_contract_dict(baseline_files=baseline)
+                if case == "document_kind":
+                    contract["documents"] = [{"kind": marker, "status": "current", "path": "src/app.py"}]
+                elif case == "document_status":
+                    contract["documents"] = [{"kind": "prd", "status": {"secret": marker}, "path": "src/app.py"}]
+                elif case == "baseline_path":
+                    contract["baseline"]["files"][0]["path"] = marker
+                elif case == "document_path":
+                    contract["documents"] = [{"kind": "prd", "status": "current", "path": marker}]
+                elif case == "evidence_path":
+                    contract["evidence"] = [{"criterion_id": "AC-1", "status": "passed", "reference": marker, "summary": "Observed"}]
+                elif case == "criterion_id":
+                    criterion = {"id": marker, "criterion": "Pass"}
+                    contract["acceptance_criteria"] = [criterion, criterion]
+                contract_file = proj_dir / "contract.json"
+                raw = f'{{"{marker}": 1, "{marker}": 2}}' if case == "duplicate_key" else json.dumps(contract)
+                contract_file.write_text(raw, encoding="utf-8")
+                input_file = proj_dir / marker if case == "missing_contract" else contract_file
+                res = self.run_cli(["contract", str(input_file), "--project-root", str(proj_dir), "--format", "json"])
+                self.assertIn(res.returncode, (1, 2))
+                self.assertNotIn(marker, res.stdout + res.stderr)
+
+    def test_package_diagnostic_payload_values_redacted(self):
+        marker = "synthetic-secret-do-not-echo"
+        for case in ("frontmatter_name", "frontmatter_key", "markdown_target", "routing_section"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmpdir:
+                pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+                skill_file = pkg_dir / "SKILL.md"
+                text = skill_file.read_text(encoding="utf-8")
+                if case == "frontmatter_name":
+                    text = text.replace("name: deterministic-agentic-workflow", f"name: {marker}")
+                elif case == "frontmatter_key":
+                    text = text.replace("---\n\n", f'{marker}: "unclosed\n---\n\n', 1)
+                elif case == "markdown_target":
+                    text += f"\n[broken]({marker})\n"
+                else:
+                    routing_file = pkg_dir / "references" / "routing.md"
+                    routing_file.write_text(f"### 1. `{marker}`\n", encoding="utf-8")
+                skill_file.write_text(text, encoding="utf-8")
+                res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+                self.assertEqual(res.returncode, 1, msg=res.stdout)
+                self.assertNotIn(marker, res.stdout + res.stderr)
 
     # -------------------------------------------------------------------------
     # Baseline completion, approval scope, and evidence status regression tests
@@ -1768,5 +1879,92 @@ class TestValidateCLI(unittest.TestCase):
             codes = [f.get("code") for f in payload_comp.get("findings", []) if f.get("severity") == "error"]
             self.assertIn("unpassed_evidence_at_complete", codes)
 
+    def test_package_required_file_traversal_yields_path_escapes_package(self):
+        sys_path = sys.path[:]
+        try:
+            sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+            import validate
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+                orig_rf = validate.validate_package.__globals__["resolve_bounded_path"]
+                try:
+                    # 1. Non-symlink boundary escape yields path_escapes_package
+                    def mock_resolve_traversal(root, rel):
+                        if rel == "templates":
+                            return None, "absolute_or_traversal_path"
+                        return orig_rf(root, rel)
+                    validate.validate_package.__globals__["resolve_bounded_path"] = mock_resolve_traversal
+                    result = validate.validate_package(pkg_dir)
+                    codes = {f["code"] for f in result["findings"]}
+                    self.assertIn("path_escapes_package", codes)
+                    self.assertNotIn("symlink_escapes_package", codes)
+
+                    # 2. Symlink boundary escape yields symlink_escapes_package
+                    def mock_resolve_symlink(root, rel):
+                        if rel == "templates":
+                            return None, "symlink_escapes_root"
+                        return orig_rf(root, rel)
+                    validate.validate_package.__globals__["resolve_bounded_path"] = mock_resolve_symlink
+                    result_sym = validate.validate_package(pkg_dir)
+                    codes_sym = {f["code"] for f in result_sym["findings"]}
+                    self.assertIn("symlink_escapes_package", codes_sym)
+                    self.assertNotIn("path_escapes_package", codes_sym)
+                finally:
+                    validate.validate_package.__globals__["resolve_bounded_path"] = orig_rf
+        finally:
+            sys.path = sys_path
+
+    def test_package_version_consistency(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+
+            # 1. No VERSION file -> passes (skipped)
+            res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+            self.assertEqual(res.returncode, 0, msg=res.stdout)
+
+            # 2. VERSION file exists and matches SKILL.md metadata.version -> passes
+            (pkg_dir / "VERSION").write_text("0.1.0\n", encoding="utf-8")
+            skill_md = (
+                "---\n"
+                "name: deterministic-agentic-workflow\n"
+                "description: Deterministic agentic workflow standard.\n"
+                "compatibility: Python 3.10+\n"
+                "license: MIT\n"
+                "metadata:\n"
+                '  version: "0.1.0"\n'
+                "---\n\n"
+                "# Deterministic Agentic Workflow\n\n"
+                "See [routing](references/routing.md) and [operations](references/operations.md).\n"
+                "Templates are available in [templates](templates/blueprint.md).\n"
+                "Read [validation](references/validation.md) and [installation](references/installation.md).\n"
+            )
+            (pkg_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+            self.assertEqual(res.returncode, 0, msg=res.stdout)
+
+            # 3. VERSION file exists but metadata.version is mismatched -> version_mismatch
+            (pkg_dir / "VERSION").write_text("0.2.0\n", encoding="utf-8")
+            res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+            self.assertEqual(res.returncode, 1, msg=res.stdout)
+            codes = {f["code"] for f in json.loads(res.stdout)["findings"]}
+            self.assertIn("version_mismatch", codes)
+
+            # 4. VERSION file exists but metadata.version is absent -> version_mismatch
+            skill_no_ver = (
+                "---\n"
+                "name: deterministic-agentic-workflow\n"
+                "description: Deterministic agentic workflow standard.\n"
+                "compatibility: Python 3.10+\n"
+                "---\n\n"
+                "# Deterministic Agentic Workflow\n\n"
+                "See [routing](references/routing.md) and [operations](references/operations.md).\n"
+                "Templates are available in [templates](templates/blueprint.md).\n"
+                "Read [validation](references/validation.md) and [installation](references/installation.md).\n"
+            )
+            (pkg_dir / "SKILL.md").write_text(skill_no_ver, encoding="utf-8")
+            res = self.run_cli(["package", "--root", str(pkg_dir), "--format", "json"])
+            self.assertEqual(res.returncode, 1, msg=res.stdout)
+            codes = {f["code"] for f in json.loads(res.stdout)["findings"]}
+            self.assertIn("version_mismatch", codes)
 if __name__ == "__main__":
     unittest.main()

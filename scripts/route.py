@@ -14,7 +14,8 @@ import pathlib
 import sys
 from typing import Any, Tuple
 
-# Direct import of bundled validator helpers
+# Bundled helper imports must not modify the installed suite.
+sys.dont_write_bytecode = True
 import validate
 
 SCHEMA_VERSION = 1

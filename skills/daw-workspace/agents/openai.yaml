@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Workspace"
+  short_description: "Prepare isolated workspaces while preserving user changes"
+  default_prompt: "Use $daw-workspace to inspect this repository and prepare the authorized workspace."

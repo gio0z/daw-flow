@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Review"
+  short_description: "Review requirements, correctness, and security"
+  default_prompt: "Use $daw-review to review this change against its requirements and report concrete findings."

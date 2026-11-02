@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Ask"
+  short_description: "Discuss architecture and code without changing files"
+  default_prompt: "Use $daw-ask to explain this architecture question using the available repository context."

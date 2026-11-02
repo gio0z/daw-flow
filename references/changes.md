@@ -1,5 +1,16 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-02: Installable 0.1.0 Distribution and Review Corrections
+
+- Added an offline stdlib installer for project/user skill directories in Codex, Claude Code, Gemini CLI, Cursor, and Copilot, plus explicit custom directories. Complete bundle copies, relative module aliases, root-only fallback, ownership receipts, staged updates, removal, dry-run parity, locking, and retained recovery copies protect unrelated or edited installations.
+- Added the operator-selected MIT license, package version, optional Codex UI metadata for all nine skills, current official discovery references, and source-checkout setup instructions.
+- Fixed package containment through symlinked parent directories, conservative required-frontmatter type validation, and diagnostics that echoed untrusted payloads. Router inspection also prevents bytecode writes without requiring caller environment overrides.
+- Corrected expected nonzero verification probes, completion of failed conformity reviews with bounded security triage, and the complete-bundle prerequisite in the stateless scenario.
+- Added a configurable, opt-in behavioral evaluation runner with retained fixtures, transcripts, timing, source fingerprints, explicit artifact checks, and ungraded human-review criteria. Fake adapters in its tests establish runner plumbing, not agent efficacy.
+- Local integration gate: 110 standard-library tests passed, with package and suite checks passing. A fresh-agent cache review returned failed conformity plus limited confidentiality triage without changing fixture bytes. Native Gemini CLI 0.62.0 discovered the root and all eight module aliases in an isolated temporary home.
+- Added a GitHub Actions matrix for Linux, macOS, and Windows on Python 3.10/3.14. Hosted matrix execution and cross-client behavioral parity remain unexercised; no release, commit, or push was performed.
+- Review corrections: installer receipts ignore bytecode and test caches, so running the bundled tests no longer blocks `status`, `--update`, or `uninstall`; lock collisions name the lock file. Evaluator placeholders substitute in one pass. Package validation reports `path_escapes_package` separately from `symlink_escapes_package` and enforces `version_mismatch` between `VERSION` and `SKILL.md` `metadata.version`. CI action SHA pins were confirmed against their tags.
+
 ## 2026-11-02: Module Governance, Canonical Handoffs & Crash Hardening
 
 - **Module Direct Invocation Governance:** Enforced mandatory governance loading sequence across all 8 internal modules (`skills/daw-*/SKILL.md`). Modules resolve root contracts (`SKILL.md` §4 & §6, `references/routing.md` §5 & §6, `references/operations.md` §1 & §2) before executing mutations. High-risk actions fail closed to `blocked` without interactive operator confirmation at point of risk; safe read-only intake and inspection remain unblocked.

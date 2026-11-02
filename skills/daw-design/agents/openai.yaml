@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Design"
+  short_description: "Design bounded architecture and project specifications"
+  default_prompt: "Use $daw-design to define the architecture and specifications needed for this task."

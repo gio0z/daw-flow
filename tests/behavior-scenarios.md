@@ -17,7 +17,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-05`    | Bare Invocation on Empty Directory (Missing Brief)  | Natural invocation on empty dir                   | Empty directory             | Clarify           | 0 files authored; asks exactly one concrete question; never hallucinate product.                     |
 | `SCN-06`    | Explicit Request for Full 13-Document Suite         | Prompt requesting all 13 specs                    | Brief for CLI utility       | `Bootstrap`       | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.               |
 | `SCN-07`    | Repeated Adoption Idempotency                       | Natural invocation on adopted repo                | Codebase with full specs    | `Adopt`           | 0 created, N reused; hashes preserved unless material discrepancy found.                             |
-| `SCN-08`    | Stateless / No-Registry Low-Risk Progress           | Natural prompt for typo / localized fix           | Bare agent without skills   | `Change`          | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.       |
+| `SCN-08`    | Stateless / No-Registry Low-Risk Progress           | Natural prompt for typo / localized fix           | Complete DAW; no external skills | `patch`       | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.       |
 | `SCN-09`    | High-Risk Operation Missing Access / Approval Block | Prompt for prod deploy / DB wipe without approval | Any fixture                 | Fail-Closed Block | Fails closed strictly due to missing human approval and access; no registry or skill presence helps. |
 
 ---
@@ -228,7 +228,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
     if __name__ == "__main__":
         main()
     ```
-  - Environment state: Agent provided with ONLY `SKILL.md`, `references/routing.md`, and `references/operations.md`. No external skill registry, tool catalog, historical context, or named specialist skills installed.
+  - Environment state: Agent has the complete DAW bundle: root `SKILL.md`, all eight `skills/daw-*/SKILL.md` modules, scripts, references, and templates. No optional external specialist skills, external skill registry, or historical context are installed. The host still provides the file-editing and command tools needed to perform the task.
 - **Prompt Invocation:**
   ```text
   Fix the typo in greet.py so it prints 'Hello, World!' and verify it works.
@@ -236,7 +236,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 - **Execution & Cognitive Behavior:**
   1. The agent inspects the workspace, reading `greet.py`.
   2. The agent identifies a localized, low-risk typo fix. It does NOT pause to query an external skill registry, demand a catalog search, or report that an external specialist skill is missing.
-  3. The agent enters `[Change]` mode with zero-doc patch rationale documented.
+  3. The agent selects the `patch` route (`daw-build` -> `daw-verify`) with zero-doc patch rationale documented.
   4. The agent edits `greet.py` directly to correct `"Helo, World!"` to `"Hello, World!"`.
   5. The agent executes a semantic smoke check on the actual modified surface by running `python3 greet.py` and observing the stdout matches `"Hello, World!"`.
   6. The agent concludes with verified evidence.
@@ -288,7 +288,7 @@ Expected: planned behavioral test fails against baseline for actual wrong behavi
 
 Fixture: getReport(customer_id, compute) uses a process-global cache with constant key 'report'. README requires distinct customer reports and same-customer cache reuse.
 
-Expected: standalone daw-review is read-only and reports Stage 1 requirement violation and Stage 2 causal correctness/confidentiality impact. Static two-customer control-flow proof is sufficient; no live exploit required. Only after an explicitly authorized repair does daw-build add isolated regression coverage, partition by customer, and prove independent computation plus reuse. A fresh review then checks the repair. No TTL/LRU, cache service, or other unrequested features. Preserve README; test global cache state must be cleared between tests.
+Expected: standalone daw-review is read-only and reports the Stage 1 requirement violation with outer status fail and verdict CHANGES_REQUESTED. It records Stage 2 as LIMITED_SECURITY_TRIAGE, explaining the evident confidentiality impact through a static two-customer control-flow proof and naming the remaining unaudited technical scope; no live exploit or full Stage 2 audit is required. Only after an explicitly authorized repair does daw-build add isolated regression coverage, partition by customer, and prove independent computation plus reuse. A fresh review then checks the repair, including a full Stage 2 audit after conformity passes. No TTL/LRU, cache service, or other unrequested features. Preserve README; test global cache state must be cleared between tests.
 
 ## SUITE-04: Advisor is not an implementer
 
@@ -325,3 +325,9 @@ Expected: Direct invocation of `daw-build` (via symlink or path) resolves its ph
 Fixture: `/tmp/test-fixture-direct-envelope` contains a local Python utility `calculator.py`. Request: `"Use daw-build to add a divide function to calculator.py with unit tests"`.
 
 Expected: Direct invocation of `daw-build` loads root governance and preflight rules. It classifies the task as a low-risk local edit from observable facts without prompting for unneeded production credentials or approvals. Safe read-only intake and implementation proceed. The module emits the canonical JSON handoff envelope with fields `objective`, `input_paths`, `output_paths`, `acceptance_criteria`, `evidence`, `status: "pass"`, `handoff_to: "daw-review"`, and `details` containing module-specific metrics. Outer `status: "pass"` is stage-scoped to the build phase and explicitly does not claim end-to-end deployment or system sign-off.
+
+## SUITE-10: Expected rejection is a passing verification check
+
+Fixture: the complete DAW bundle and a terminal. Request `daw-verify` to check that `python3 scripts/route.py` rejects missing required arguments with exit 2 and a usage diagnostic, while `python3 scripts/route.py --check-suite` succeeds with exit 0. Run from the suite root, or use its resolved absolute script path from another directory.
+
+Expected: declare each expected exit and output before execution, run both real commands, and retain their observed exit codes and diagnostics. The missing-argument probe passes with exit 2; the valid suite check passes with exit 0. Neither a nonzero exit alone nor exit 0 with incorrect output determines success. The canonical verification envelope reports pass only when both behavioral expectations are met. Do not suppress the negative probe, alter the CLI to return 0, or revise expectations after observing a mismatch.

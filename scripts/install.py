@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""Offline, standard-library installation of the complete DAW skill bundle."""
+
+from __future__ import annotations
+
+import argparse
+from contextlib import contextmanager
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+
+sys.dont_write_bytecode = True
+
+import route
+import validate
+
+
+SUITE = "deterministic-agentic-workflow"
+SOURCE = Path(__file__).resolve().parents[1]
+RECEIPT = ".daw-install.json"
+MODULES = tuple(sorted(route.MANIFEST_MODULE_KEYS))
+PAYLOAD = ("SKILL.md", "README.md", "AGENTS.md", "LICENSE", "VERSION", "scripts", "references", "templates", "skills", "tests", "docs", "agents")
+REQUIRED = set(PAYLOAD) - {"agents"}
+SKILL_DIRS = {
+    "codex": (".agents/skills", ".agents/skills"),
+    "claude": (".claude/skills", ".claude/skills"),
+    "gemini": (".gemini/skills", ".gemini/skills"),
+    "cursor": (".cursor/skills", ".cursor/skills"),
+    "copilot": (".github/skills", ".copilot/skills"),
+}
+IGNORED = {"__pycache__", ".pytest_cache", ".git", ".DS_Store"}
+
+
+class InstallError(ValueError):
+    pass
+
+
+def inventory(root: Path) -> dict[str, str]:
+    """Hash every owned file and record directories without following symlinks."""
+    records = {}
+    for current, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [name for name in dirs if name not in IGNORED and not name.endswith((".pyc", ".pyo"))]
+        for name in sorted(dirs + files):
+            if name in IGNORED or name.endswith((".pyc", ".pyo")):
+                continue
+            path = Path(current) / name
+            relative = path.relative_to(root).as_posix()
+            if relative == RECEIPT:
+                continue
+            if path.is_symlink():
+                raise InstallError("A bundle entry is a symlink; preserving the installation.")
+            if path.is_dir():
+                records[relative] = "directory"
+            elif path.is_file():
+                records[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+            else:
+                raise InstallError("A bundle entry is not a regular file or directory.")
+    return records
+
+
+def source_entries() -> list[Path]:
+    missing = [name for name in REQUIRED if not (SOURCE / name).exists()]
+    if missing:
+        raise InstallError("Source bundle is incomplete; use a complete release or checkout.")
+    entries = [SOURCE / name for name in PAYLOAD if (SOURCE / name).exists()]
+    for entry in entries:
+        paths = [entry]
+        if entry.is_dir() and not entry.is_symlink():
+            paths.extend(entry.rglob("*"))
+        for path in paths:
+            if path.is_symlink():
+                raise InstallError("Source bundle contains a symlink; refusing to copy its target.")
+            if not path.is_file() and not path.is_dir():
+                raise InstallError("Source bundle contains a non-regular entry.")
+    ensure_valid_bundle(SOURCE)
+    return entries
+
+
+def ensure_valid_bundle(root: Path) -> None:
+    if not validate.validate_package(root)["valid"] or route.check_suite(root):
+        raise InstallError("Package or suite validation failed; no installation was applied.")
+
+
+def ignore_copy(directory: str, names: list[str]) -> list[str]:
+    return [name for name in names if name in IGNORED or name.endswith((".pyc", ".pyo"))]
+
+
+def payload_inventory(entries: list[Path]) -> dict[str, str]:
+    records = {}
+    for entry in entries:
+        paths = [entry]
+        if entry.is_dir():
+            for current, dirs, files in os.walk(entry):
+                dirs[:] = [name for name in dirs if name not in ignore_copy(current, dirs)]
+                paths.extend(Path(current) / name for name in dirs + files if name not in ignore_copy(current, [name]))
+        for path in paths:
+            relative = path.relative_to(SOURCE).as_posix()
+            records[relative] = "directory" if path.is_dir() else hashlib.sha256(path.read_bytes()).hexdigest()
+    return records
+
+
+def alias_path(module: str) -> Path:
+    return Path(SUITE) / "skills" / module
+
+
+def exists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def inspect_installation(skills_dir: Path) -> dict | None:
+    bundle = skills_dir / SUITE
+    if not exists(bundle):
+        return None
+    if bundle.is_symlink() or not bundle.is_dir():
+        raise InstallError("The suite path is not an owned directory; preserving it.")
+    receipt_file = bundle / RECEIPT
+    if receipt_file.is_symlink() or not receipt_file.is_file() or receipt_file.stat().st_size > 2 * 1024 * 1024:
+        raise InstallError("No valid installer receipt; preserving the existing suite.")
+    try:
+        receipt = validate.parse_strict_json(receipt_file.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError, RecursionError):
+        raise InstallError("Invalid installer receipt; preserving the existing suite.") from None
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("schema_version") != 1
+        or receipt.get("suite") != SUITE
+        or receipt.get("aliases") not in ([], list(MODULES))
+        or not isinstance(receipt.get("files"), dict)
+        or not isinstance(receipt.get("version"), str)
+    ):
+        raise InstallError("Invalid installer receipt; preserving the existing suite.")
+    if inventory(bundle) != receipt["files"]:
+        raise InstallError("Installed files were changed, added, or removed; preserving local work.")
+    for module in receipt["aliases"]:
+        alias = skills_dir / module
+        if not alias.is_symlink() or os.readlink(alias) != str(alias_path(module)):
+            raise InstallError("A module alias was changed or removed; preserving local work.")
+        if alias.resolve() != bundle / "skills" / module:
+            raise InstallError("A module alias resolves outside its owned target.")
+    return receipt
+
+
+def check_alias_collisions(skills_dir: Path, previous: dict | None, aliases: list[str]) -> None:
+    owned = previous["aliases"] if previous else []
+    for module in aliases:
+        if module not in owned and exists(skills_dir / module):
+            raise InstallError("A module name is already used by another skill; preserving it.")
+
+
+@contextmanager
+def installation_lock(skills_dir: Path):
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    lock = skills_dir / ".daw-install.lock"
+    try:
+        descriptor = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        raise InstallError(f"Another installation holds the lock at {lock}; if no installer is running, delete that file and retry.") from None
+    try:
+        os.close(descriptor)
+        yield
+    finally:
+        lock.unlink()
+
+
+@contextmanager
+def staging_area(skills_dir: Path, prefix: str):
+    staging = Path(tempfile.mkdtemp(prefix=prefix, dir=skills_dir))
+    try:
+        yield staging
+    except BaseException:
+        if (staging / "previous").exists():
+            raise InstallError(f"Rollback could not finish. The previous bundle is preserved at {staging / 'previous'}; inspect it before retrying.") from None
+        shutil.rmtree(staging)
+        raise
+    else:
+        shutil.rmtree(staging)
+
+
+def install(skills_dir: Path, update: bool, no_aliases: bool, dry_run: bool) -> dict:
+    entries = source_entries()
+    bundle = skills_dir / SUITE
+    if bundle == SOURCE or SOURCE.is_relative_to(bundle):
+        raise InstallError("Installation cannot replace or contain its source checkout.")
+    if any(entry.is_dir() and skills_dir.is_relative_to(entry) for entry in entries):
+        raise InstallError("Installation cannot be nested in source resources.")
+    previous = inspect_installation(skills_dir)
+    aliases = [] if no_aliases else list(MODULES)
+    check_alias_collisions(skills_dir, previous, aliases)
+    result = {"action": "install", "skills_dir": str(skills_dir), "aliases": aliases, "version": (SOURCE / "VERSION").read_text(encoding="utf-8").strip()}
+    receipt = {"schema_version": 1, "suite": SUITE, "version": result["version"], "aliases": aliases, "files": payload_inventory(entries)}
+    if previous and previous != receipt and not update:
+        raise InstallError("A different managed version exists; pass --update to replace it.")
+    if dry_run:
+        return dict(result, status="planned")
+    with installation_lock(skills_dir):
+        previous = inspect_installation(skills_dir)
+        check_alias_collisions(skills_dir, previous, aliases)
+        with staging_area(skills_dir, ".daw-stage-") as staging:
+            candidate = staging / SUITE
+            candidate.mkdir()
+            for entry in entries:
+                target = candidate / entry.name
+                if entry.is_dir():
+                    shutil.copytree(entry, target, ignore=ignore_copy)
+                else:
+                    shutil.copy2(entry, target)
+            ensure_valid_bundle(candidate)
+            if inventory(candidate) != receipt["files"]:
+                raise InstallError("Source contents changed during installation; no installation was applied.")
+            if previous == receipt:
+                return dict(result, status="unchanged")
+            if previous and not update:
+                raise InstallError("A different managed version exists; pass --update to replace it.")
+            (candidate / RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+            if aliases:
+                try:
+                    probe = staging / "symlink-probe"
+                    probe.symlink_to(SUITE, target_is_directory=True)
+                    probe.unlink()
+                except OSError:
+                    raise InstallError("Directory symlinks are unavailable; rerun with --no-aliases for root-only discovery.") from None
+            previous_aliases = previous["aliases"] if previous else []
+            backup = staging / "previous"
+            added, removed = [], []
+            try:
+                if previous:
+                    bundle.rename(backup)
+                candidate.rename(bundle)
+                for module in previous_aliases:
+                    if module not in aliases:
+                        (skills_dir / module).unlink()
+                        removed.append(module)
+                for module in aliases:
+                    if module not in previous_aliases:
+                        (skills_dir / module).symlink_to(alias_path(module), target_is_directory=True)
+                        added.append(module)
+            except OSError:
+                for module in added:
+                    (skills_dir / module).unlink()
+                if exists(bundle) and not candidate.exists():
+                    bundle.rename(candidate)
+                if backup.exists():
+                    backup.rename(bundle)
+                for module in removed:
+                    (skills_dir / module).symlink_to(alias_path(module), target_is_directory=True)
+                raise
+    return dict(result, status="updated" if previous else "installed")
+
+
+def uninstall(skills_dir: Path, dry_run: bool) -> dict:
+    previous = inspect_installation(skills_dir)
+    if previous is None:
+        raise InstallError("No managed installation exists in this skills directory.")
+    result = {"action": "uninstall", "skills_dir": str(skills_dir), "status": "planned" if dry_run else "removed"}
+    if dry_run:
+        return result
+    with installation_lock(skills_dir):
+        previous = inspect_installation(skills_dir)
+        if previous is None:
+            raise InstallError("The installation was removed before the operation started.")
+        with staging_area(skills_dir, ".daw-remove-") as staging:
+            bundle = skills_dir / SUITE
+            backup = staging / "previous"
+            removed = []
+            bundle.rename(backup)
+            try:
+                for module in previous["aliases"]:
+                    (skills_dir / module).unlink()
+                    removed.append(module)
+            except OSError:
+                backup.rename(bundle)
+                for module in removed:
+                    (skills_dir / module).symlink_to(alias_path(module), target_is_directory=True)
+                raise
+    return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("install", "status", "uninstall"))
+    parser.add_argument("--agent", choices=tuple(SKILL_DIRS), default="codex")
+    parser.add_argument("--scope", choices=("project", "user"), default="project")
+    parser.add_argument("--project-root", type=Path, default=Path.cwd())
+    parser.add_argument("--skills-dir", type=Path, help="Explicit skill directory, overriding agent/scope presets")
+    parser.add_argument("--update", action="store_true", help="Replace an unchanged, installer-owned bundle")
+    parser.add_argument("--no-aliases", action="store_true", help="Install complete bundle with only root discovery")
+    parser.add_argument("--dry-run", action="store_true", help="Inspect without creating files or directories")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    if args.action != "install" and (args.update or args.no_aliases):
+        parser.error("--update and --no-aliases apply only to install")
+    if args.skills_dir is not None:
+        skills_dir = args.skills_dir.expanduser().resolve()
+    else:
+        local, personal = SKILL_DIRS[args.agent]
+        skills_dir = ((args.project_root / local) if args.scope == "project" else Path.home() / personal).expanduser().resolve()
+    try:
+        if args.action == "install":
+            result = install(skills_dir, args.update, args.no_aliases, args.dry_run)
+        elif args.action == "uninstall":
+            result = uninstall(skills_dir, args.dry_run)
+        else:
+            receipt = inspect_installation(skills_dir)
+            result = {"action": "status", "skills_dir": str(skills_dir), "status": "ready" if receipt else "missing", "version": receipt["version"] if receipt else None}
+            if receipt:
+                ensure_valid_bundle(skills_dir / SUITE)
+        code = 1 if result["status"] == "missing" else 0
+    except (InstallError, OSError, RuntimeError, UnicodeError) as exc:
+        message = str(exc) if isinstance(exc, InstallError) else "Filesystem operation failed; inspect destination permissions and paths."
+        result = {"action": args.action, "skills_dir": str(skills_dir), "status": "error", "error": message}
+        code = 1
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"{result['status']}: {skills_dir}")
+        if "error" in result:
+            print(result["error"], file=sys.stderr)
+        elif args.action == "install":
+            print("Restart or reload your agent's skills, then invoke deterministic-agentic-workflow.")
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

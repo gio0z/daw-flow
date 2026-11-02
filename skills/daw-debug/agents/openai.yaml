@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Debug"
+  short_description: "Diagnose failures through falsifiable experiments"
+  default_prompt: "Use $daw-debug to investigate this failure and identify its cause with evidence."

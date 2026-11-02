@@ -342,6 +342,38 @@ class TestRouteSuite(unittest.TestCase):
         findings = route.check_suite(self.suite_root)
         self.assertTrue(any("ESCAPE" in f["code"] or "NON_CANONICAL" in f["code"] for f in findings))
 
+    def test_cli_preserves_suite_files_without_bytecode_environment_flags(self):
+        scripts_dir = self.suite_root / "scripts"
+        scripts_dir.mkdir()
+        for name in ("route.py", "validate.py"):
+            (scripts_dir / name).write_bytes((REPO_ROOT / "scripts" / name).read_bytes())
+        request_path = self.suite_root / "request.json"
+        request_path.write_text(json.dumps(make_request(intent="patch")), encoding="utf-8")
+        before = {
+            path.relative_to(self.suite_root).as_posix(): path.read_bytes() if path.is_file() else None
+            for path in self.suite_root.rglob("*")
+        }
+        env = os.environ.copy()
+        env.pop("PYTHONDONTWRITEBYTECODE", None)
+        env.pop("PYTHONPYCACHEPREFIX", None)
+        for arguments in (["--check-suite"], [str(request_path)]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, str(scripts_dir / "route.py"), *arguments],
+                    cwd=self.suite_root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(json.loads(result.stdout)["status"], "ready")
+                after = {
+                    path.relative_to(self.suite_root).as_posix(): path.read_bytes() if path.is_file() else None
+                    for path in self.suite_root.rglob("*")
+                }
+                self.assertEqual(before.keys(), after.keys(), "Read-only routing created or removed filesystem entries")
+                self.assertEqual(before, after, "Read-only routing changed file contents")
+
     def test_cli_execution_modes(self):
         script_path = str(REPO_ROOT / "scripts" / "route.py")
 

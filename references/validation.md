@@ -125,7 +125,7 @@ When running `validate.py package`, the following checks are enforced:
    - `scripts/validate.py`
    - `tests/test_validate.py`
    - `templates/` containing exactly the 13 canonical document templates:
-     `brd.md`, `prd.md`, `frd.md`, `techstack.md`, `blueprint.md`, `design.md`, `ui-ux.md`, `wireframe.md`, `roadmap.md`, `runbook.md`, `deployment.md`, `security.md`, `qa.md`. (Unrecognized extra Markdown files in `templates/` trigger validation errors).
+     `brd.md`, `prd.md`, `frd.md`, `techstack.md`, `blueprint.md`, `design.md`, `ui-ux.md`, `wireframe.md`, `roadmap.md`, `runbook.md`, `deployment.md`, `security.md`, `qa.md`. (Unrecognized extra Markdown files in `templates/` trigger validation errors). Escaping paths or symlinks yield `symlink_escapes_package` (for symlink escapes) or `path_escapes_package` (for non-symlink/traversal boundary escapes).
 2. **Frontmatter Validation:**
    - `name`: Must match the directory name (e.g., `deterministic-agentic-workflow`), non-empty, alphanumeric + hyphens, $\le 64$ characters.
    - `description`: Non-empty string, $\le 1024$ characters.
@@ -138,6 +138,9 @@ When running `validate.py package`, the following checks are enforced:
    - Markdown code fences (` ``` ` or `~~~`) must be properly balanced.
 5. **Routing Reference Structure:**
    - `references/routing.md` must contain 13 sections for the 13 document types, each including the mandatory structural labels: `Trigger`, `Inputs & Prerequisites`, `Required Capability`, `Conditional Capabilities`, `Template Link`, `Output Contract`, `Exit Criterion`, `Downstream Handoff`, and `Stop / Replan Trigger`.
+
+6. **Version Consistency:**
+   - When `VERSION` exists at the package root, and `SKILL.md` frontmatter defines `metadata.version`, both values must match exactly (`VERSION` stripped; metadata value unquoted). If `VERSION` exists but `metadata.version` is missing or mismatched, a `version_mismatch` error is raised. If `VERSION` is absent, the check is skipped.
 
 ---
 

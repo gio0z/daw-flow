@@ -69,13 +69,13 @@ def _strict_json_object_pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, An
     obj: dict[str, Any] = {}
     for k, v in pairs:
         if k in obj:
-            raise DuplicateKeyError(f"Duplicate key detected in JSON object: {k!r}")
+            raise DuplicateKeyError("Duplicate key detected in JSON object.")
         obj[k] = v
     return obj
 
 
 def _reject_nonstandard_json_constants(val: str) -> None:
-    raise ValueError(f"Non-standard JSON constant rejected: {val}")
+    raise ValueError("Non-standard JSON constant rejected.")
 
 
 def parse_strict_json(raw_text: str) -> Any:
@@ -200,7 +200,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, str] | None, list[str]]:
                     # This is a nested structure (e.g. map or list)
                     # If this is one of the required scalar keys, record an error
                     if key in ("name", "description", "compatibility"):
-                        errors.append(f"Field '{key}' must be a scalar string, not a nested mapping or list.")
+                        errors.append("Required frontmatter field must be a scalar string, not a nested mapping or list.")
                     # Skip the nested lines
                     i += 1
                     while i < len(f_lines) and (f_lines[i].startswith("  ") or f_lines[i].startswith("\t") or not f_lines[i].strip()):
@@ -210,22 +210,39 @@ def parse_frontmatter(content: str) -> tuple[dict[str, str] | None, list[str]]:
         # Check quoted strings for proper matching quotes
         if val.startswith('"'):
             if not val.endswith('"') or len(val) < 2:
-                errors.append(f"Unclosed or unterminated double quote in scalar field '{key}'.")
+                errors.append("Unclosed or unterminated double quote in frontmatter scalar field.")
                 i += 1
                 continue
             val = val[1:-1]
         elif val.startswith("'"):
             if not val.endswith("'") or len(val) < 2:
-                errors.append(f"Unclosed or unterminated single quote in scalar field '{key}'.")
+                errors.append("Unclosed or unterminated single quote in frontmatter scalar field.")
                 i += 1
                 continue
             val = val[1:-1]
         else:
             # Check for illegal trailing unclosed quote
             if val.endswith('"') or val.endswith("'"):
-                errors.append(f"Mismatched quotes in scalar field '{key}'.")
+                errors.append("Mismatched quotes in frontmatter scalar field.")
                 i += 1
                 continue
+            if key in ("name", "description", "compatibility"):
+                plain = re.split(r"\s+#", val, maxsplit=1)[0].strip()
+                nonstring_word = plain.lower() in {
+                    "null", "~", "true", "false", "yes", "no", "on", "off", ".nan", ".inf", "+.inf", "-.inf",
+                }
+                numeric = re.fullmatch(
+                    r"[-+]?(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|"
+                    r"(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)(?:[eE][-+]?[0-9]+)?|"
+                    r"[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?)",
+                    plain,
+                )
+                timestamp = re.match(r"^\d{4}-\d{1,2}-\d{1,2}(?:$|[Tt\s])", plain)
+                unsupported = plain.startswith(("[", "{", "&", "*", "!", "- ", "? ", ": "))
+                if nonstring_word or numeric or timestamp or unsupported:
+                    errors.append("Required frontmatter field must use a supported scalar string; quote string values that resemble YAML types.")
+                    i += 1
+                    continue
 
         result[key] = val
         i += 1
@@ -322,6 +339,47 @@ def check_skill_references(content: str) -> list[tuple[str, int]]:
     return issues
 
 
+def extract_frontmatter_metadata_version(content: str) -> str | None:
+    """Extract metadata.version from YAML frontmatter block if present."""
+    lines = content.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    end_idx = -1
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            end_idx = idx
+            break
+    if end_idx == -1:
+        return None
+    f_lines = lines[1:end_idx]
+    in_metadata = False
+    for line in f_lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        m_top = re.match(r"^([a-zA-Z0-9_-]+)\s*:\s*(.*)$", line)
+        if m_top:
+            key = m_top.group(1).strip()
+            val = m_top.group(2).strip()
+            if key == "metadata" and not val:
+                in_metadata = True
+                continue
+            else:
+                in_metadata = False
+        elif in_metadata:
+            m_sub = re.match(r"^\s+([a-zA-Z0-9_-]+)\s*:\s*(.*)$", line)
+            if m_sub:
+                sub_key = m_sub.group(1).strip()
+                sub_val = m_sub.group(2).strip()
+                if sub_key == "version":
+                    if (sub_val.startswith('"') and sub_val.endswith('"') and len(sub_val) >= 2) or (
+                        sub_val.startswith("'") and sub_val.endswith("'") and len(sub_val) >= 2
+                    ):
+                        return sub_val[1:-1]
+                    return sub_val
+    return None
+
+
 def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
     findings: list[dict[str, str]] = []
 
@@ -344,27 +402,23 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
     ]
 
     for rf in required_files:
-        p = root_path / rf
-        if p.is_symlink():
-            try:
-                resolved = p.resolve()
-                resolved.relative_to(root_path)
-            except (ValueError, OSError):
-                add_error("symlink_escapes_package", rf, f"Required file symlink escapes package root: {rf}")
-                continue
-        if not p.is_file():
+        p, err = resolve_bounded_path(root_path, rf)
+        if err == "symlink_escapes_root":
+            add_error("symlink_escapes_package", rf, "Required file path escapes package root or cannot be safely resolved.")
+            continue
+        elif err:
+            add_error("path_escapes_package", rf, "Required file path escapes package root or cannot be safely resolved.")
+            continue
+        if p is None or not p.is_file():
             add_error("missing_required_file", rf, f"Required file is missing: {rf}")
 
     # 2. Templates directory
-    tpl_dir = root_path / "templates"
-    if tpl_dir.is_symlink():
-        try:
-            resolved_tpl = tpl_dir.resolve()
-            resolved_tpl.relative_to(root_path)
-        except (ValueError, OSError):
-            add_error("symlink_escapes_package", "templates", "Templates directory symlink escapes package root.")
-            resolved_tpl = None
-    if not tpl_dir.is_dir():
+    tpl_dir, tpl_err = resolve_bounded_path(root_path, "templates")
+    if tpl_err == "symlink_escapes_root":
+        add_error("symlink_escapes_package", "templates", "Templates directory escapes package root or cannot be safely resolved.")
+    elif tpl_err:
+        add_error("path_escapes_package", "templates", "Templates directory escapes package root or cannot be safely resolved.")
+    elif tpl_dir is None or not tpl_dir.is_dir():
         add_error("missing_templates_dir", "templates", "Templates directory is missing.")
     else:
         for ct in CANONICAL_TEMPLATES:
@@ -395,7 +449,7 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
 
     # 3. Frontmatter validation in SKILL.md
     skill_file = root_path / "SKILL.md"
-    if skill_file.is_file() and not any(f["path"] == "SKILL.md" and f["code"] == "symlink_escapes_package" for f in findings):
+    if skill_file.is_file() and not any(f["path"] == "SKILL.md" and f["code"] in ("symlink_escapes_package", "path_escapes_package") for f in findings):
         try:
             skill_content = skill_file.read_text(encoding="utf-8")
             fm, fm_errors = parse_frontmatter(skill_content)
@@ -418,7 +472,7 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
                         add_error(
                             "frontmatter_name_mismatch",
                             "SKILL.md:name",
-                            f"Frontmatter 'name' ({name_val}) does not match root dir name ({root_path.name}).",
+                            "Frontmatter 'name' does not match the package root directory name.",
                         )
 
                 desc_val = fm.get("description")
@@ -430,6 +484,19 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
                 compat_val = fm.get("compatibility")
                 if compat_val and len(compat_val) > 500:
                     add_error("invalid_frontmatter_compatibility", "SKILL.md:compatibility", "Frontmatter 'compatibility' exceeds 500 characters.")
+
+            # Version consistency check
+            version_file, version_err = resolve_bounded_path(root_path, "VERSION")
+            if version_err:
+                add_error("path_escapes_package", "VERSION", "VERSION path escapes package root or cannot be safely resolved.")
+            elif version_file is not None and version_file.is_file():
+                try:
+                    ver_text = version_file.read_text(encoding="utf-8").strip()
+                    meta_ver = extract_frontmatter_metadata_version(skill_content)
+                    if meta_ver is None or meta_ver != ver_text:
+                        add_error("version_mismatch", "VERSION", "Package VERSION does not match SKILL.md metadata.version.")
+                except (OSError, UnicodeError):
+                    add_error("version_mismatch", "VERSION", "Package VERSION could not be read as UTF-8 text.")
         except UnicodeDecodeError:
             add_error("utf8_decode_error", "SKILL.md", "SKILL.md could not be decoded as UTF-8.")
         except OSError:
@@ -437,7 +504,7 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
 
     # 4. Check routing.md 13 sections and 9 fields
     routing_file = root_path / "references" / "routing.md"
-    if routing_file.is_file() and not any("routing.md" in f["path"] and f["code"] == "symlink_escapes_package" for f in findings):
+    if routing_file.is_file() and not any("routing.md" in f["path"] and f["code"] in ("symlink_escapes_package", "path_escapes_package") for f in findings):
         try:
             r_content = routing_file.read_text(encoding="utf-8")
             pattern = r"###\s+(\d+)\.\s+`([^`]+)`"
@@ -455,7 +522,8 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
                 for field in ROUTING_SECTION_FIELDS:
                     f_pattern = rf"\*\*{re.escape(field)}:?\*\*:?"
                     if not re.search(f_pattern, chunk):
-                        add_error("routing_field_missing", f"references/routing.md:{sec_name}", f"Section `{sec_name}` missing required field `{field}`.")
+                        section_path = f"references/routing.md:{sec_name}" if sec_name in CANONICAL_TEMPLATES else "references/routing.md"
+                        add_error("routing_field_missing", section_path, f"Routing section missing required field `{field}`.")
         except UnicodeDecodeError:
             add_error("utf8_decode_error", "references/routing.md", "references/routing.md could not be decoded as UTF-8.")
         except OSError:
@@ -467,6 +535,15 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
         for cur_root, dirs, files in os.walk(root_path, followlinks=False):
             dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("__pycache__", "venv", ".venv")]
             cur_root_p = pathlib.Path(cur_root)
+            for directory in dirs[:]:
+                rel_dir = (cur_root_p / directory).relative_to(root_path).as_posix()
+                _, err = resolve_bounded_path(root_path, rel_dir)
+                if err == "symlink_escapes_root":
+                    add_error("symlink_escapes_package", rel_dir, "Directory escapes package root or cannot be safely resolved.")
+                    dirs.remove(directory)
+                elif err:
+                    add_error("path_escapes_package", rel_dir, "Directory escapes package root or cannot be safely resolved.")
+                    dirs.remove(directory)
             for f in files:
                 if f.endswith(".md"):
                     item_p = cur_root_p / f
@@ -529,10 +606,10 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
 
             # Reject Windows absolute links like C:\... or \\UNC even on Linux
             if re.match(r"^[a-zA-Z]:", decoded_target) or decoded_target.startswith(("\\\\", "//")):
-                add_error("absolute_link_rejected", f"{rel_md}:{line_no}", f"Absolute Windows path or drive letter link rejected: {target}")
+                add_error("absolute_link_rejected", f"{rel_md}:{line_no}", "Absolute Windows path or drive letter link rejected.")
                 continue
             if decoded_target.startswith(("/", "\\")):
-                add_error("absolute_link_rejected", f"{rel_md}:{line_no}", f"Absolute path link rejected: {target}")
+                add_error("absolute_link_rejected", f"{rel_md}:{line_no}", "Absolute path link rejected.")
                 continue
 
             clean_target = decoded_target.split("#")[0].split("?")[0].strip()
@@ -544,11 +621,11 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
                 resolved_abs = link_resolved.resolve()
                 resolved_abs.relative_to(root_path)
             except (ValueError, OSError):
-                add_error("link_escapes_package", f"{rel_md}:{line_no}", f"Link '{target}' escapes package root.")
+                add_error("link_escapes_package", f"{rel_md}:{line_no}", "Link destination escapes package root.")
                 continue
 
             if not (resolved_abs.is_file() or resolved_abs.is_dir()):
-                add_error("broken_relative_link", f"{rel_md}:{line_no}", f"Link destination does not exist: {target}")
+                add_error("broken_relative_link", f"{rel_md}:{line_no}", "Link destination does not exist.")
 
     valid = not any(f["severity"] == "error" for f in findings)
     return {
@@ -692,7 +769,7 @@ def validate_contract(
                     add_error("boundary_violation", f"{f_path_loc}.path", f"Baseline path violates boundary: {err}")
                 elif stage != "complete":
                     if resolved_p is None or not resolved_p.is_file():
-                        add_error("file_not_found", f"{f_path_loc}.path", f"Baseline file does not exist: {f_rel}")
+                        add_error("file_not_found", f"{f_path_loc}.path", "Baseline file does not exist.")
                     else:
                         try:
                             actual_hash = compute_sha256(resolved_p)
@@ -700,10 +777,10 @@ def validate_contract(
                                 add_error(
                                     "baseline_changed",
                                     f"{f_path_loc}",
-                                    f"Baseline hash mismatch for {f_rel}: file content changed since baseline.",
+                                    "Baseline file content changed since the recorded hash.",
                                 )
                         except OSError:
-                            add_error("file_read_error", f"{f_path_loc}.path", f"Failed to read baseline file: {f_rel}")
+                            add_error("file_read_error", f"{f_path_loc}.path", "Failed to read baseline file.")
     # documents
     docs_data = contract_data.get("documents")
     if not isinstance(docs_data, list):
@@ -728,14 +805,14 @@ def validate_contract(
             d_status = doc.get("status")
 
             if not isinstance(d_kind, str) or d_kind not in CANONICAL_DOC_STEMS:
-                add_error("invalid_document_kind", f"{d_loc}.kind", f"Document kind must be one of the 13 canonical stems, got: {d_kind}")
+                add_error("invalid_document_kind", f"{d_loc}.kind", "Document kind must be one of the 13 canonical stems.")
             elif d_kind in seen_kinds:
                 add_error("duplicate_document_kind", f"{d_loc}.kind", f"Duplicate document kind: {d_kind}")
             else:
                 seen_kinds.add(d_kind)
 
             if not isinstance(d_status, str) or d_status not in ("current", "draft", "stale", "conflicting"):
-                add_error("invalid_document_status", f"{d_loc}.status", f"Document status must be current|draft|stale|conflicting, got: {d_status}")
+                add_error("invalid_document_status", f"{d_loc}.status", "Document status must be current|draft|stale|conflicting.")
             else:
                 if d_status in ("stale", "conflicting"):
                     add_error("disallowed_document_status", f"{d_loc}.status", f"Document status '{d_status}' is rejected across all stages.")
@@ -749,7 +826,7 @@ def validate_contract(
                 if err:
                     add_error("boundary_violation", f"{d_loc}.path", f"Document path violates boundary: {err}")
                 elif resolved_p is None or not resolved_p.is_file():
-                    add_error("file_not_found", f"{d_loc}.path", f"Document file does not exist: {d_path}")
+                    add_error("file_not_found", f"{d_loc}.path", "Document file does not exist.")
 
     # acceptance_criteria
     ac_data = contract_data.get("acceptance_criteria")
@@ -778,7 +855,7 @@ def validate_contract(
             if not isinstance(ac_id, str) or not ac_id.strip():
                 add_error("invalid_acceptance_criterion_id", f"{ac_loc}.id", "Acceptance criterion ID must be a non-blank string.")
             elif ac_id in known_ac_ids:
-                add_error("duplicate_acceptance_criterion_id", f"{ac_loc}.id", f"Duplicate acceptance criterion ID: {ac_id}")
+                add_error("duplicate_acceptance_criterion_id", f"{ac_loc}.id", "Duplicate acceptance criterion ID.")
             else:
                 known_ac_ids.add(ac_id)
 
@@ -942,7 +1019,7 @@ def validate_contract(
                     if err:
                         add_error("boundary_violation", f"{ev_loc}.reference", f"Evidence reference violates boundary: {err}")
                     elif resolved_p is None or not resolved_p.is_file():
-                        add_error("file_not_found", f"{ev_loc}.reference", f"Evidence file does not exist: {e_ref}")
+                        add_error("file_not_found", f"{ev_loc}.reference", "Evidence file does not exist.")
 
     if stage == "complete":
         if not isinstance(ev_data, list) or len(ev_data) == 0:
@@ -1032,13 +1109,13 @@ def main() -> None:
             root_path = pathlib.Path(__file__).resolve().parent.parent
 
         if not root_path.is_dir():
-            sys.stderr.write(f"Error: Specified package root is not a directory: {root_path}\n")
+            sys.stderr.write("Error: Specified package root is not a directory.\n")
             sys.exit(2)
 
         try:
             res = validate_package(root_path)
-        except OSError as e:
-            sys.stderr.write(f"OS error reading package: {e}\n")
+        except OSError:
+            sys.stderr.write("OS error reading package.\n")
             sys.exit(2)
 
         output_result(res, args.format)
@@ -1048,12 +1125,12 @@ def main() -> None:
         proj_root_raw = pathlib.Path(args.project_root)
         try:
             proj_root = proj_root_raw.resolve()
-        except OSError as e:
-            sys.stderr.write(f"Error: Cannot resolve project root: {e}\n")
+        except OSError:
+            sys.stderr.write("Error: Cannot resolve project root.\n")
             sys.exit(2)
 
         if not proj_root.is_dir():
-            sys.stderr.write(f"Error: Project root is not a directory: {args.project_root}\n")
+            sys.stderr.write("Error: Project root is not a directory.\n")
             sys.exit(2)
 
         contract_file_raw = pathlib.Path(args.file)
@@ -1064,28 +1141,28 @@ def main() -> None:
 
         try:
             if not contract_file_path.is_file():
-                sys.stderr.write(f"Error: Contract file does not exist or is not a file: {args.file}\n")
+                sys.stderr.write("Error: Contract file does not exist or is not a file.\n")
                 sys.exit(2)
-        except OSError as e:
-            sys.stderr.write(f"Error accessing contract file: {e}\n")
+        except OSError:
+            sys.stderr.write("Error accessing contract file.\n")
             sys.exit(2)
 
         try:
             raw_text = contract_file_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as e:
-            sys.stderr.write(f"Error reading contract file: {e}\n")
+        except (OSError, UnicodeDecodeError):
+            sys.stderr.write("Error reading contract file.\n")
             sys.exit(2)
 
         try:
             contract_data = parse_strict_json(raw_text)
-        except (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError) as e:
-            sys.stderr.write(f"Error parsing contract JSON: {e}\n")
+        except (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError):
+            sys.stderr.write("Error parsing contract JSON: malformed JSON, duplicate keys, or unsupported values.\n")
             sys.exit(2)
 
         try:
             res = validate_contract(contract_data, proj_root, args.stage)
-        except OSError as e:
-            sys.stderr.write(f"OS error validating contract: {e}\n")
+        except OSError:
+            sys.stderr.write("OS error validating contract.\n")
             sys.exit(2)
 
         output_result(res, args.format)

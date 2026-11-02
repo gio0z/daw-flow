@@ -65,6 +65,8 @@ Every claim in a verification report must bind to an explicit check command and 
 2. **Check:** The exact deterministic command executed (including arguments and working directory).
 3. **Actual:** The exact observed output, exit code, or response artifact. Never summarize with "verified" or "works" without showing the command output.
 
+Declare the expected exit code or response status, as applicable, and behavioral assertions before execution. Negative probes may expect a nonzero exit or an error response; they pass only when that exact expected rejection and its output are observed. Never revise an expectation merely to make a failed check pass.
+
 ### Rule 2: Fresh Failing Scenario (Before & After)
 
 - When verifying bugfixes, capture the failing test/probe _before_ the fix (or inspect historical user logs).
@@ -121,8 +123,8 @@ Observe and record:
 
 Categorize every item in the verification matrix into one of four states:
 
-1. **Passed:** Deterministic command succeeded (exit code 0), and observed output matches expected acceptance criteria.
-2. **Failing:** Command executed but exited non-zero, or output violated acceptance criteria.
+1. **Passed:** Observed exit code or response status and output match the declared acceptance criteria. For example, an invalid-argument probe may pass with its expected exit code 2; a test runner normally requires exit code 0.
+2. **Failing:** Command executed but its exit code, response status, output, or side effects violated the declared expectations.
 3. **Blocked:** Check could not run due to missing environment, absent credentials, or uninstalled dependencies.
 4. **Unexercised:** Check was skipped, omitted, or only simulated via mock.
 
@@ -169,6 +171,7 @@ Every completion of `daw-verify` delivers a structured handoff payload adhering 
       {
         "claim": "CLI exits with code 2 on missing required arguments.",
         "check_command": "scripts/route.py",
+        "expected_exit_code": 2,
         "exit_code": 2,
         "status": "passed",
         "observed_output": "Usage: scripts/route.py REQUEST [--format text|json] ...",
@@ -177,6 +180,7 @@ Every completion of `daw-verify` delivers a structured handoff payload adhering 
       {
         "claim": "SessionSerializer round-trips token_version without data loss.",
         "check_command": "pytest tests/auth/test_session_serializer.py",
+        "expected_exit_code": 0,
         "exit_code": 0,
         "status": "passed",
         "observed_output": "2 passed in 0.04s",
@@ -203,7 +207,7 @@ _(Note: `status: "pass"` indicates that the verification stage checks have been 
 Verification is complete when:
 
 1. Every Acceptance Criterion in the task contract has a corresponding `claim` with an executed `check` and recorded `observed_output`.
-2. All exercised tests have passed with exit code 0.
+2. All exercised checks meet their declared exit-code, response-status, output, and side-effect expectations. Test runners normally exit 0; negative probes may require a specific nonzero exit or rejection response.
 3. There are zero unacknowledged failures or silently skipped tests.
 4. Any `Blocked` or `Unexercised` items are explicitly justified in `limitations`.
 5. No dry-runs are recorded as deployment/migration proofs.
