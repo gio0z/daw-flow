@@ -1,11 +1,11 @@
 # Master Blueprint: [Feature / System Name]
 
-> **Fill-in Guidance:** Fill this template using verified repository terms. Existing equivalent architecture or planning docs may be linked or referenced directly. The 13 specification types represent an available matrix, NOT a mandatory creation bundle. Mark N/A with rationale for unneeded documents. Do not fabricate architecture decisions, milestones, or approvals. Unresolved items that represent material gaps block only impacted execution paths, not unrelated work.
+> **Fill-in Guidance:** Fill this template using verified repository terms and observable facts. Equivalent existing architecture or planning docs may be linked or referenced directly. The 13 specification types represent an available matrix, NOT a mandatory creation bundle. Mark N/A with rationale for unneeded documents. Do not fabricate architecture decisions, milestones, or approvals. Distinguish user requirements and observed source facts from author-proposed defaults using a concise provenance ledger or explicit labels. Unresolved items that represent material gaps block only impacted execution paths, not unrelated work.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Name / Role]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Bounded component, service, or repository area]
-> **Source Documents / Revision:** [Commit SHA, PR #, or path@rev]
+> **Source Documents / Revision:** [Actual observed commit SHA, file SHA-256, issue link, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Explicit operational or technical assumptions]
 > **Open Decisions:** [Material questions — block impacted execution paths until resolved]
 > **Acceptance Criteria IDs:** [AC-01, AC-02, ...]

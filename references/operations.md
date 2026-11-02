@@ -2,8 +2,14 @@
 
 This reference defines operational protocols for deterministic AI execution: preflight safety checks, fail-closed human/provider approvals, approval invalidation rules, immutable release rollback, tool reuse policies, semantic acceptance verification, secret redaction, and opt-in background maintenance.
 
-Article Reference: Rama Digital — _Agentic Tapi Deterministic Workflow AI Agent_ (https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent).
-_Advice separation note:_ Core article advice establishes the architectural principle of generative cognitive planning paired with deterministic, script-driven tool execution and verification gates. Local operational additions in this reference define explicit fail-closed authorization boundaries, release-snapshot rollback mechanics, and proactive background maintenance boundaries for multi-tenant and local workstation environments.
+Operational scope pairs generative cognitive planning with deterministic, script-driven tool execution and verification gates, alongside explicit fail-closed authorization boundaries, release-snapshot rollback mechanics, and proactive background maintenance boundaries for multi-tenant and local workstation environments.
+
+### Self-Contained Execution & Risk Gating Invariants
+
+- **No External Skill Gate:** High-risk operations fail closed strictly on missing human/provider approvals, missing operational credentials or permissions, unverified preflight checks, missing immutable rollback targets, or inadequate semantic evidence—NEVER because of the presence or absence of a specific named external skill.
+- **Direct Execution vs. Delegation:** An agent may fulfill required operational capabilities directly or delegate to an appropriate subagent. The absence of an external registry or named skill package is never a blocker for reachable, authorized tasks.
+- **Direct Module Invocation Governance:** When any internal module (`skills/daw-*/SKILL.md` or sibling symlinks) is invoked directly rather than through the root router, it MUST execute the Governance Loader Sequence: load root `SKILL.md` §4/§6, `references/routing.md` §5, and this document's preflight and approval rules before performing mutations. Safe read-only intake and inspection proceed without mutation blocks.
+- **Subordination to Host Policy:** All actions remain subordinate to host environment security boundaries, sandboxing, and approval policies. The workflow never performs global tool uninstallation, system-wide configuration alterations, or unauthorized environmental overrides.
 
 ---
 
@@ -41,9 +47,10 @@ AI agents generate, read, draft, and synthesize; they **never** authorize high-i
 
 ### Strict Operational Principles
 
-- **Documentation is Not Authorization:** The existence of a signed-off document or an approved plan does not waive the requirement for explicit user confirmation at the exact point of execution risk.
+- **Documentation is Not Authorization:** The existence of a signed-off document, pull request link, issue number, or approved plan does not waive the requirement for explicit, interactive user confirmation at the exact point of execution risk. Structural references are not operational authorization.
 - **Reviewed Inactive Draft vs. Apply/Publish/Auto-Trigger:** Drafting or editing a specification, script, or configuration file in an inactive, non-executing state is bounded design work. However, files that can be auto-loaded, picked up by daemon watchers, published externally, or executed against live systems require explicit confirmation before apply, deploy, publish, or triggering.
-- **Fail-Closed Default:** If human confirmation or provider authorization is unavailable, unverified, expires, or cannot be queried (e.g., headless session, non-interactive CI, missing UI dialog), execution MUST halt immediately with a clean abort status. Never proceed on assumption or silence.
+- **Fail-Closed Default:** If human confirmation or provider authorization is unavailable, unverified, expires, or cannot be queried (e.g., headless session, non-interactive CI, missing UI dialog), execution MUST halt immediately with a clean abort status (`status: "blocked"`). Never proceed on assumption, silence, or vague verbal assent.
+- **Unknown Risk / Unknown Scope Block:** If risk level, target environment, or mutation boundaries cannot be definitively verified from observable facts before mutating actions, execution must halt as `blocked` before any filesystem or system mutation. Safe read-only intake and assessment remain unblocked.
 - **High-Impact Point-of-Risk Triggers:** Explicit interactive confirmation is REQUIRED before:
   - Shared or production database schema changes (DDL, drops, migrations, destructive updates). Contrast with disposable, isolated local test fixtures created within an already authorized test run.
   - Production deployments, DNS updates, or network/routing cutovers.

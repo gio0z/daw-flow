@@ -1,11 +1,11 @@
 # Quality Assurance & Semantic Verification Matrix: [Feature / System]
 
-> **Fill-in Guidance:** Fill this template using verified test cases, executable reproduction steps, and observable semantic evidence. Equivalent existing test suites or test reports may be linked directly. Routine bugfixes and minor patches do NOT require a full new `qa.md`; routine changes can reuse existing test suites, reproduction scripts, or an inline verification record. Mark N/A with rationale when covered by existing test suites. Negative verification must prove semantic denial and zero data leakage appropriate to the actual interface (e.g. exit code, permission exception, or HTTP status per system design). Do not fabricate test passes or mock output traces. Unresolved test criteria block only impacted verification sign-off. Never include secret values or credentials in test logs or templates.
+> **Fill-in Guidance:** Fill this template using verified test cases, executable reproduction steps, and observable semantic evidence. Equivalent existing test suites or test reports may be linked directly. Routine bugfixes and minor patches do NOT require a full new `qa.md`; routine changes can reuse existing test suites, reproduction scripts, or an inline verification record. Mark N/A with rationale when covered by existing test suites. Negative verification must prove semantic denial and zero data leakage appropriate to the actual interface (e.g. exit code, permission exception, or HTTP status per system design). Do not fabricate test passes, empirical screen-reader compatibility claims, or mock output traces. Unresolved test criteria block only impacted verification sign-off. Never include secret values or credentials in templates.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [QA Engineer / Test Lead]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Semantic verification, negative testing, cross-tenant isolation, regression tests]
-> **Source Documents / Revision:** [PRD, FRD, git commit SHA]
+> **Source Documents / Revision:** [Actual observed PRD, FRD, git commit SHA, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Test database isolation, deterministic seed data, sandbox credentials]
 > **Open Decisions:** [Material test coverage gaps — block verification sign-off until resolved]
 > **Acceptance Criteria IDs:** [QA-01, QA-02, ...]

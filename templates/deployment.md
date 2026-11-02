@@ -1,11 +1,11 @@
 # Deployment & Release Specification: [Service / Release]
 
-> **Fill-in Guidance:** Fill this template using verified release mechanisms and immutable artifact digests. Equivalent existing release PRs or deployment configs may be linked directly. Mark N/A with rationale if the change has no deployment impact (e.g. documentation, local tooling). Pre-deployment backup is N/A for stateless services or releases without state/schema mutation. Human approvals must use system references only (Change Ticket # / Review ID; never copy secret tokens or credentials). Post-deployment log inspection is scoped by relevant service, release time window, and expected severity thresholds, not an unbounded check across all logs. Unresolved release items block deployment execution only. Never record secret values or credentials in templates or evidence logs.
+> **Fill-in Guidance:** Fill this template using verified release mechanisms and immutable artifact digests. Equivalent existing release PRs or deployment configs may be linked directly. Mark N/A with rationale if the change has no deployment impact (e.g. documentation, local tooling). Pre-deployment backup is N/A for stateless services or releases without state/schema mutation. Human approvals must use system references only (Change Ticket # / Review ID; never copy secret tokens or credentials). Post-deployment log inspection is scoped by relevant service, release time window, and expected severity thresholds, not an unbounded check across all logs. Distinguish verified infrastructure facts from author-proposed release defaults using a concise provenance ledger or explicit labels. Unresolved release items block deployment execution only. Never record secret values or credentials in templates.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Release Engineer / DevOps Lead]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Target environment, immutable artifacts, migrations, release verification]
-> **Source Documents / Revision:** [FRD, runbook.md, git commit SHA / tag]
+> **Source Documents / Revision:** [Actual observed FRD, runbook.md, git commit SHA, tag, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Cluster capacity, target infrastructure health, network routing]
 > **Open Decisions:** [Material deployment blockers — block release execution until settled]
 > **Acceptance Criteria IDs:** [DEP-01, DEP-02, ...]

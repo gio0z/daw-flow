@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "suite": "deterministic-agentic-workflow",
+  "modules": {
+    "daw-design": {
+      "path": "skills/daw-design/SKILL.md",
+      "description": "System architecture, technical requirements & specification design"
+    },
+    "daw-plan": {
+      "path": "skills/daw-plan/SKILL.md",
+      "description": "Structured task planning, phase breakdowns & risk assessment"
+    },
+    "daw-debug": {
+      "path": "skills/daw-debug/SKILL.md",
+      "description": "Root cause analysis, reproduction & failure diagnostics"
+    },
+    "daw-build": {
+      "path": "skills/daw-build/SKILL.md",
+      "description": "Implementation, code editing & minimal change construction"
+    },
+    "daw-review": {
+      "path": "skills/daw-review/SKILL.md",
+      "description": "Two-stage code review, boundary compliance & security audit"
+    },
+    "daw-verify": {
+      "path": "skills/daw-verify/SKILL.md",
+      "description": "Verification, testing, behavioral validation & evidence checks"
+    },
+    "daw-workspace": {
+      "path": "skills/daw-workspace/SKILL.md",
+      "description": "Isolated workspace/worktree setup & lifecycle management"
+    },
+    "daw-ask": {
+      "path": "skills/daw-ask/SKILL.md",
+      "description": "Read-only advisory, guidance & architecture consultation"
+    }
+  },
+  "routes": {
+    "bootstrap": {
+      "documentation_only": true,
+      "read_only": false,
+      "stages": ["daw-design", "daw-plan"],
+      "allow_unclear_requirements": true,
+      "evaluates_workspace": false
+    },
+    "adopt": {
+      "documentation_only": true,
+      "read_only": false,
+      "stages": ["daw-design", "daw-plan"],
+      "allow_unclear_requirements": true,
+      "evaluates_workspace": false
+    },
+    "feature": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+      "stages_unclear": [
+        "daw-design",
+        "daw-plan",
+        "daw-build",
+        "daw-review",
+        "daw-verify"
+      ],
+      "evaluates_workspace": true
+    },
+    "bugfix": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": [
+        "daw-debug",
+        "daw-plan",
+        "daw-build",
+        "daw-review",
+        "daw-verify"
+      ],
+      "evaluates_workspace": true
+    },
+    "patch": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": ["daw-build", "daw-verify"],
+      "evaluates_workspace": true
+    },
+    "review": {
+      "documentation_only": false,
+      "read_only": true,
+      "stages": ["daw-review"],
+      "evaluates_workspace": false
+    },
+    "ask": {
+      "documentation_only": false,
+      "read_only": true,
+      "stages": ["daw-ask"],
+      "evaluates_workspace": false
+    }
+  }
+}

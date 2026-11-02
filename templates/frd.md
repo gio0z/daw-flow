@@ -1,11 +1,11 @@
 # Functional Requirements Document (FRD): [Feature / Component]
 
-> **Fill-in Guidance:** Fill this template using existing repository patterns and domain conventions. Equivalent existing technical contracts or schemas may be linked directly. Mark N/A with rationale if not applicable. Do not force generic REST or HTTP API schemas if implementing internal modules, CLI scripts, or data pipelines. Do not invent speculative schemas. Unresolved technical questions block only impacted engineering components.
+> **Fill-in Guidance:** Fill this template using existing repository patterns and domain conventions. Equivalent existing technical contracts or schemas may be linked directly. Mark N/A with rationale if not applicable. Do not force generic REST or HTTP API schemas if implementing internal modules, CLI scripts, or data pipelines. Do not invent speculative schemas; expected input shape does not equal enforced schema (record missing validation explicitly). Distinguish user requirements and observed source facts from author-proposed engineering defaults using a concise provenance ledger or explicit labels. Unresolved technical questions block only impacted engineering components.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Lead Engineer / Systems Architect]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Bounded modules, schema boundaries, CLI commands, or API endpoints]
-> **Source Documents / Revision:** [PRD, design doc, or specification@rev]
+> **Source Documents / Revision:** [Actual observed PRD, design doc, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Runtime environment, language version, database engine capabilities]
 > **Open Decisions:** [Material engineering trade-offs — block impacted execution paths until settled]
 > **Acceptance Criteria IDs:** [FRD-01, FRD-02, ...]

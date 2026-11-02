@@ -1,11 +1,11 @@
 # Technology Stack & Architecture Decision: [Feature / Service]
 
-> **Fill-in Guidance:** Fill this template using verified repository conventions and established libraries. Equivalent existing architecture decision records (ADRs) may be linked directly. Mark N/A with rationale if no new technical dependencies or architectural shifts are involved. Default rule: prefer existing repository stack; do not introduce new dependencies without evidence. Unresolved tech stack questions block only impacted technical dependencies.
+> **Fill-in Guidance:** Fill this template using verified repository conventions and established libraries. Equivalent existing architecture decision records (ADRs) may be linked directly. Mark N/A with rationale if no new technical dependencies or architectural shifts are involved. Default rule: prefer existing repository stack; do not introduce new dependencies without evidence. Distinguish observed stack facts from author-proposed dependencies or defaults using a concise provenance ledger or explicit labels. Unresolved tech stack questions block only impacted technical dependencies.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Lead Architect / Principal Engineer]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Runtime stack, dependencies, framework choices, database additions]
-> **Source Documents / Revision:** [FRD, RFC, or architecture spec@rev]
+> **Source Documents / Revision:** [Actual observed FRD, RFC, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Deployment platform, existing library compatibility, runtime constraints]
 > **Open Decisions:** [Material technical selections — block adding unapproved dependencies]
 > **Acceptance Criteria IDs:** [TECH-01, TECH-02, ...]

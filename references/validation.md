@@ -62,7 +62,7 @@ _Note: CLI syntax errors handled directly by `argparse` print standard error tex
 The validator is deliberately bounded and **fail-closed**:
 
 1. **Approval Presence vs. Runtime Authorization:** The validator verifies structural presence and field equality (`action`, `target`, `revision`, `scope`) of an opaque approval reference. It **never** authenticates human signatures, verifies external identity providers, or grants runtime execution permission.
-2. **Hash Integrity vs. Live Git History:** Baseline file verification confirms that recorded SHA-256 digests match file contents on disk at validation time. Revision strings are treated as opaque identifiers; the validator does **not** query Git history, verify commit existence, or validate branch heads.
+2. **Hash Integrity vs. Live Git History:** Baseline file verification confirms that recorded SHA-256 digests match file contents on disk at preflight validation time (`plan` and `execute` stages). At `complete`, the validator enforces historical baseline structure, field schema, and project boundary containment without requiring historical baseline files to remain unchanged or exist on disk (permitting legitimate modifications, renames, and deletions). Revision strings are treated as opaque identifiers; the validator does **not** query Git history, verify commit existence, or validate branch heads.
 3. **Evidence Existence vs. Semantic Truth:** The validator confirms evidence reference files exist within `--project-root` and correspond to declared Acceptance Criteria IDs. It **never** executes evidence references, verifies command outputs, or proves test suite semantic truth.
 4. **No Risk Inference:** The validator enforces schema requirements for declared `risk` (`"low"` or `"high"`), but does **not** classify or infer risk levels from code diffs or objectives.
 5. **Read-Only Behavior:** The validator strictly reads files; it never writes files, never spawns subprocesses (no Git CLI or shell execution), and never connects to network endpoints.
@@ -137,7 +137,7 @@ When running `validate.py package`, the following checks are enforced:
    - All internal Markdown links (`[label](path)`) must resolve to existing files within the package root. Remote (`http://`, `https://`, `mailto:`) and in-page anchor (`#...`) links are permitted. Links attempting traversal outside the package root are rejected.
    - Markdown code fences (` ``` ` or `~~~`) must be properly balanced.
 5. **Routing Reference Structure:**
-   - `references/routing.md` must contain 13 sections for the 13 document types, each including the mandatory structural labels: `Trigger`, `Inputs & Prerequisites`, `Primary Skill`, `Conditional Skills`, `Template Link`, `Output Contract`, `Exit Criterion`, `Downstream Handoff`, and `Stop / Replan Trigger`.
+   - `references/routing.md` must contain 13 sections for the 13 document types, each including the mandatory structural labels: `Trigger`, `Inputs & Prerequisites`, `Required Capability`, `Conditional Capabilities`, `Template Link`, `Output Contract`, `Exit Criterion`, `Downstream Handoff`, and `Stop / Replan Trigger`.
 
 ---
 
@@ -169,12 +169,13 @@ Captures pre-mutation state.
 - `revision` (_string, required_): Non-blank VCS commit hash, snapshot tag, or opaque working tree revision ID. (Used for context binding, not verified via Git).
 - `files` (_array of objects, required_):
   - Each entry:
-    - `path` (_string, required_): Project-root-relative path to an existing file. Must not escape root.
+    - `path` (_string, required_): Project-root-relative path to a baseline file. Must not escape project root.
     - `sha256` (_string, required_): 64-character lowercase hexadecimal SHA-256 digest of the file contents.
   - Stage rules:
-    - `plan`: Empty `files` array is permitted but triggers a `baseline_unverified` warning.
-    - `execute` & `complete`: At least 1 file entry is required universally; an empty `files` array triggers a validation error.
-  - Mismatch: If any file's current on-disk SHA-256 does not match, a `baseline_changed` error is emitted.
+    - `plan`: Empty `files` array is permitted but triggers a `baseline_unverified` warning. If present, every referenced file must exist within `--project-root` and match its recorded SHA-256 digest.
+    - `execute`: At least 1 file entry is required universally; an empty `files` array triggers a validation error (`empty_baseline_files`). Every referenced file must exist within `--project-root` and match its recorded SHA-256 digest on disk. If any file's current on-disk SHA-256 does not match or a file is missing, a `baseline_changed` or `baseline_file_missing` error is emitted.
+    - `complete`: At least 1 file entry is required universally; an empty `files` array triggers a validation error (`empty_baseline_files`). Baseline entries must be structurally valid (valid syntax, 64-char lowercase hex digest, non-escaping bounded path). However, live on-disk existence and hash equality are **not** re-checked at completion, allowing legitimate mutations, renames, or deletions of pre-mutation files. (Completion validity is established by passed evidence artifacts covering all acceptance criteria).
+  - Mismatch: During `plan` and `execute`, if any file's current on-disk SHA-256 does not match, a `baseline_changed` error is emitted.
 
 #### 2. `documents` (array of objects)
 
@@ -205,17 +206,18 @@ Defines the exact action to be executed.
 - `action` (_string, required_): Non-blank action descriptor (e.g., `"refactor"`, `"delete"`, `"migrate"`, `"deploy"`).
 - `target` (_string, required_): Non-blank target entity or component name.
 - `revision` (_string, required_): Must match `baseline.revision` exactly.
-- `scope` (_array of strings, required_): Non-empty list of unique non-blank strings defining target subsystems or files.
+- `scope` (_array of strings, required_): Non-empty array of unique non-blank strings defining target subsystems or files.
 
-#### 5. `approval` (object, optional)
+#### 5. `approval` (object, conditionally required)
 
-Records captured explicit user confirmation.
+Records user authorization for high-risk mutations before execution and completion.
 
-- `reference` (_string, required_): Non-blank opaque reference (e.g., ticket number, session interaction ID, PR review ID). **MUST NOT contain secrets, tokens, or credentials.**
-- `action` (_string, required_): Must match `operation.action`.
-- `target` (_string, required_): Must match `operation.target`.
-- `revision` (_string, required_): Must match `operation.revision`.
-- `scope` (_array of strings, required_): Must match `operation.scope` elements exactly (order-independent set equality).
+- Structure:
+  - `action` (_string, required_): Must match `operation.action`.
+  - `target` (_string, required_): Must match `operation.target`.
+  - `revision` (_string, required_): Must match `baseline.revision`.
+  - `scope` (_array of strings, required_): Non-empty array of non-blank unique strings, evaluated regardless of operation scope validity. Must exactly match the set of paths in `operation.scope` with no duplicates.
+  - `reference` (_string, required_): Opaque non-blank token (e.g., issue/PR link, signed token, or human approval log reference). **MUST NOT contain secrets, tokens, or credentials.**
 - Stage rules:
   - If `operation.risk` is `"high"` and stage is `"execute"` or `"complete"`, `approval` is **mandatory**. Omission produces a `missing_approval` error.
   - If `approval` is provided at any stage (even for `"low"` risk), all binding fields (`action`, `target`, `revision`, `scope`) must match `operation` exactly. Mismatches produce a `binding_mismatch` error.
@@ -230,6 +232,89 @@ Records verifiable artifacts demonstrating AC satisfaction.
   - `reference` (_string, required_): Project-root-relative path to an existing evidence artifact file (e.g., log file, test report, diff output). File must exist within project root.
   - `summary` (_string, required_): Non-blank description of observed output.
 - Stage rules:
-  - `plan`: Evidence array is optional; typically empty.
-  - `execute`: Evidence may be partially populated. Any non-`passed` status is reported.
-  - `complete`: Every declared acceptance criterion MUST have exactly one `evidence` entry with `status: "passed"`. Any missing, duplicate, or unpassed criterion produces an error.
+  - `plan` & `execute`: `evidence` array is optional. If present, entries may have any valid status (`"passed"`, `"failed"`, `"blocked"`, `"unexercised"`), and referenced files must exist on disk.
+- `complete`: `evidence` array is **mandatory**. Every declared acceptance criterion MUST have exactly one `evidence` entry with `status: "passed"`, and all referenced files must exist on disk. Any missing, duplicate, unpassed criterion (including `"unexercised"`, `"failed"`, or `"blocked"`), non-array evidence payload, or non-string/unhashable `criterion_id` produces deterministic validation error findings without runtime traceback.
+
+---
+
+## 6. Suite Integrity Check (`scripts/route.py --check-suite`)
+
+Complementary to `validate.py package` (which performs purely structural validation of package assets and templates), `scripts/route.py --check-suite` validates the declarative suite manifest (`references/suite-manifest.json`) and verifies that all 8 bundled internal execution modules exist within the suite root without path traversal escapes.
+
+### CLI Invocation Examples
+
+```bash
+SUITE_DIR="/path/to/suite"
+
+# Human-readable text format (default)
+python3 "$SUITE_DIR/scripts/route.py" --check-suite
+
+# Structured JSON output envelope
+python3 "$SUITE_DIR/scripts/route.py" --check-suite --format json
+
+# Explicit suite root
+python3 "$SUITE_DIR/scripts/route.py" --check-suite --root "$SUITE_DIR" --format json
+```
+
+### Exit Codes
+
+- `0`: Suite manifest valid and all 8 bundled modules present (`status: "ready"`).
+- `1`: One or more required modules missing or corrupted (`status: "blocked"`).
+- `2`: Manifest malformed, unparseable JSON, or schema violation (`status: "error"`).
+
+### Payload Bounds & Parsing Invariants
+
+- **Size Bounds:** Enforces 1 MiB limit on request and manifest payloads; 256 KiB limit on module definitions.
+- **Strict Types:** Rejects non-finite numbers (`NaN`, `Infinity`), boolean substitutions for integers, and duplicate keys with exit code 2.
+- **Secret Redaction:** Diagnostics redact unexpected values to prevent credential leakage.
+
+### Illustrative JSON Output Envelope (Actual CLI Output)
+
+```json
+{
+  "schema_version": 1,
+  "status": "ready",
+  "stages": [],
+  "reasons": [
+    "Suite manifest and all declared modules exist and are structurally valid."
+  ],
+  "blockers": [],
+  "constraints": {
+    "read_only": false,
+    "documentation_only": false,
+    "interactive_approval_required": false,
+    "authorization_granted": false
+  },
+  "limitations": [
+    "Routing resolution is deterministic based on declared manifest policy.",
+    "Resolution does not grant runtime authorization for high-risk operations."
+  ]
+}
+```
+
+### Illustrative JSON Output Envelope (Blocked - Missing Module)
+
+```json
+{
+  "schema_version": 1,
+  "status": "blocked",
+  "stages": [],
+  "reasons": ["One or more declared modules are missing or invalid."],
+  "blockers": [
+    {
+      "code": "MODULE_MISSING",
+      "message": "Module file not found: skills/daw-plan/SKILL.md"
+    }
+  ],
+  "constraints": {
+    "read_only": false,
+    "documentation_only": false,
+    "interactive_approval_required": false,
+    "authorization_granted": false
+  },
+  "limitations": [
+    "Routing resolution is deterministic based on declared manifest policy.",
+    "Resolution does not grant runtime authorization for high-risk operations."
+  ]
+}
+```

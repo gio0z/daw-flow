@@ -1,12 +1,12 @@
 # Visual Design System & Tokens: [Feature / Surface]
 
-> **Fill-in Guidance:** Fill this template using existing repository design tokens and component libraries. Equivalent existing design files or token definitions may be linked directly. New design tokens are permitted when explicitly requested or required by new feature requirements; document them with technical rationale rather than claiming a fabricated upstream design source. Honor the repository or project's required accessibility standard (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified). Mark N/A with rationale if the change has no visual styling impact. Unresolved visual questions block only impacted visual/frontend implementation. Never include secret values or credentials.
+> **Fill-in Guidance:** Fill this template using existing repository design tokens and component libraries. Equivalent existing design files or token definitions may be linked directly. New design tokens are permitted when explicitly requested or required by new feature requirements; document them with technical rationale rather than claiming a fabricated upstream design source. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, headless services), mark web WCAG styling conformance as N/A and document platform-appropriate proposed visual/formatting conventions (e.g. ANSI colors, terminal formatting); never claim empirical screen-reader or platform compatibility absent observed tests. Mark N/A with rationale if the change has no visual styling impact. Unresolved visual questions block only impacted visual/frontend implementation. Never include secret values or credentials.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Design Engineer / Frontend Engineer]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Visual surfaces, design tokens, styling primitives, theme extensions]
-> **Source Documents / Revision:** [Figma/token source, PRD, or design system ref@rev]
-> **Target Accessibility Baseline:** [WCAG 2.2 AA default, or WCAG 2.2 AAA if project/user specified — never downgrade]
+> **Source Documents / Revision:** [Actual observed Figma/token source, PRD, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
+> **Target Accessibility Baseline:** [For applicable web: WCAG 2.2 AA default, or WCAG 2.2 AAA if project/user specified — never downgrade; for non-web CLI/backend: N/A web conformance with platform-specific proposed formatting criteria — never claim empirical compatibility absent tests]
 > **Assumptions:** [Existing styling framework (e.g. Tailwind, CSS variables), theme mode support]
 > **Open Decisions:** [Material visual questions — block impacted visual implementation only]
 > **Acceptance Criteria IDs:** [DES-01, DES-02, ...]

@@ -1,11 +1,11 @@
 # Product Requirements Document (PRD): [Feature Name]
 
-> **Fill-in Guidance:** Fill this template using verified product outcomes and observable acceptance criteria. Equivalent existing specs or feature briefs may be reused directly. Mark N/A with rationale if not applicable (e.g. pure refactors or internal bugfixes). Do not invent user personas, market stats, UI flows for non-UI features, or speculative acceptance criteria. Non-UI features (CLI, backend, workers) must focus on programmatic actors and operational outcomes. Unresolved questions block only impacted feature paths.
+> **Fill-in Guidance:** Fill this template using verified product outcomes and observable acceptance criteria. Equivalent existing specs or feature briefs may be reused directly. Mark N/A with rationale if not applicable (e.g. pure refactors or internal bugfixes). Do not invent user personas, market stats, UI flows for non-UI features, or speculative acceptance criteria. Non-UI features (CLI, backend, workers) must focus on programmatic actors and operational outcomes. Distinguish user requirements and observed source facts from author-proposed defaults using a concise provenance ledger or explicit labels. Unresolved questions block only impacted feature paths.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Product Manager / Tech Lead]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Product surface: CLI, API, Service, or User Interface]
-> **Source Documents / Revision:** [Source issue, BRD, or document@rev]
+> **Source Documents / Revision:** [Actual observed source issue, BRD, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [User capability, data availability, or platform baseline]
 > **Open Decisions:** [Material product questions — block impacted feature paths until settled]
 > **Acceptance Criteria IDs:** [PRD-01, PRD-02, ...]

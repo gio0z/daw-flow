@@ -1,11 +1,11 @@
 # Wireframe & Layout Specification: [Interface / Surface]
 
-> **Fill-in Guidance:** Fill this template for user interfaces, visual CLI layouts, or terminal dashboards. Equivalent existing UI mocks or Figma frame links may be referenced directly. Mark N/A with rationale if the change has no visual or layout interface (e.g. backend service, batch worker, internal API). Visual states (empty, loading, populated, partial, error) are required only when applicable to the surface; mark unneeded states as N/A with rationale rather than inventing unnecessary UI elements. Do not invent decorative graphics, branding elements, or speculative UI states. Unresolved layout questions block only impacted layout implementation. Never include secret values or credentials in templates.
+> **Fill-in Guidance:** Fill this template for user interfaces, visual CLI layouts, or terminal dashboards. Equivalent existing UI mocks or Figma frame links may be referenced directly. Mark N/A with rationale if the change has no visual or layout interface (e.g. backend service, batch worker, internal API). Visual states (empty, loading, populated, partial, error) are required only when applicable to the surface; mark unneeded states as N/A with rationale rather than inventing unnecessary UI elements. Do not invent decorative graphics, branding elements, or speculative UI states. Distinguish user requirements from author-proposed layout defaults using a concise provenance ledger or explicit labels. Unresolved layout questions block only impacted layout implementation. Never include secret values or credentials in templates.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [UX Designer / Frontend Engineer]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Screens, modal flows, views, or CLI terminal screens]
-> **Source Documents / Revision:** [PRD, design.md, or spec@rev]
+> **Source Documents / Revision:** [Actual observed PRD, design.md, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Target viewports, rendering engine, terminal/browser capabilities]
 > **Open Decisions:** [Material layout questions — block impacted layout coding until resolved]
 > **Acceptance Criteria IDs:** [WIRE-01, WIRE-02, ...]

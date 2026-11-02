@@ -1,11 +1,11 @@
 # Engineering Delivery Roadmap: [Initiative Name]
 
-> **Fill-in Guidance:** Fill this template using verified technical dependencies, milestone sequence, and observable exit criteria. Equivalent existing tracking issues or project boards may be referenced directly. Mark N/A with rationale for single-iteration bugfixes or routine patches. Milestones are domain-neutral; do not assume every initiative involves database migrations or backend systems. Base milestones strictly on completion of verified gates, not fabricated calendar release dates. Unresolved sequencing questions block dependent delivery phases only. Never record secret values or credentials in templates.
+> **Fill-in Guidance:** Fill this template using verified technical dependencies, milestone sequence, and observable exit criteria. Equivalent existing tracking issues or project boards may be referenced directly. Mark N/A with rationale for single-iteration bugfixes or routine patches. Milestones are domain-neutral; do not assume every initiative involves database migrations or backend systems. Base milestones strictly on completion of verified gates, not fabricated calendar release dates. Distinguish user-requested delivery targets from author-proposed phasing using a concise provenance ledger or explicit labels. Unresolved sequencing questions block dependent delivery phases only. Never record secret values or credentials in templates.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Engineering Lead / Program Manager]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Feature lifecycle, phasing, technical milestones, release gates]
-> **Source Documents / Revision:** [BRD, PRD, blueprint.md@rev]
+> **Source Documents / Revision:** [Actual observed BRD, PRD, blueprint.md, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Team availability, platform stability, upstream component releases]
 > **Open Decisions:** [Material sequencing questions — block dependent milestones until resolved]
 > **Acceptance Criteria IDs:** [ROAD-01, ROAD-02, ...]

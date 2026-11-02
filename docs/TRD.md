@@ -7,38 +7,35 @@
 ```
 [Agent System / Caller / CI Runner]
                |
-               v
- [scripts/validate.py CLI Entrypoint]
-      |                        |
-      v                        v
-[check: package]         [check: contract]
-      |                        |
-      +---> Path Resolution    +---> Path Resolution (Project Root Boundary)
-      +---> Symlink Escape     +---> Symlink Escape Verification
-      +---> Frontmatter Subset +---> Strict JSON Parser (_strict_json_object_pairs_hook)
-      +---> Markdown Link/URI  +---> Schema & Stage Enforcement (plan | execute | complete)
-      +---> Template Inventory +---> Baseline File Hash (SHA-256) Check
-                               +---> Operation / Approval Binding Verification
-                               +---> Evidence Artifact Path Verification
-                                       |
-                                       v
-                     [Structured Diagnostic Output]
-                     (Exit 0: clean/warning, Exit 1: violation, Exit 2: usage/JSON syntax)
-                     (Format: text stdout/stderr or JSON stdout envelope)
+       +-------+-------+
+       |               |
+       v               v
+ [scripts/route.py]  [scripts/validate.py]
+       |               |
+       +-> REQUEST     +-> package check
+       +-> --check-    +-> contract check
+           suite       |
+       |               v
+       v     [Task Contract Verification]
+ [Suite Routing Engine]
+   - Declarative Policy (references/suite-manifest.json)
+   - Strict JSON Schema & Enum Validation
+   - Root Boundary Containment & Module Resolution
+   - Dynamic Stage Pipeline Calculation (daw-*)
+   - Constraint Flags (read_only, approval_required)
+   - Structural Suite Verification (--check-suite)
 ```
 
 ---
 
 ### 1. Architectural Overview & System Design
 
-The Deterministic Agentic Workflow system is an offline, read-only, zero-dependency validation suite and documentation specification implemented in Python 3.10+ standard library. The core operational component is `scripts/validate.py`, which provides structural, boundary, and integrity verification for two independent operational surfaces:
+The Deterministic Agentic Workflow system is an offline, read-only, zero-dependency validation suite, routing engine, and documentation specification implemented in Python 3.10+ standard library. The core operational components are:
 
-1. **Agent Skill Package (`package` check):** Verifies the internal structural integrity of the workflow package itself, including YAML frontmatter scalar metadata, canonical template existence, routing table cross-references, URI schemes, and local markdown hyperlink targets.
-2. **Task Contract (`contract` check):** Verifies machine-readable task execution contracts (`task-contract.json`) that bind operational planning, baseline file hashes, risk-tiered user approval references, and empirical evidence artifacts before, during, and after agent filesystem modifications.
-
-The tool strictly avoids external package manager dependencies (e.g., PyPI packages, wheels, or virtualenvs), background daemons, network communication, and database engines.
-
----
+1. **Suite Route Engine (`scripts/route.py`):** Provides declarative routing computation from structured JSON input requests against `references/suite-manifest.json`, dynamically selecting stages from the 8 specialized modular skills (`skills/daw-*`). Also provides `--check-suite` structural verification of the bundled suite.
+2. **Agent Skill Package Validator (`scripts/validate.py package`):** Verifies the internal structural integrity of the workflow package itself, including YAML frontmatter scalar metadata, canonical template existence, routing table cross-references, URI schemes, and internal markdown link resolution.
+3. **Task Contract Lifecycle Validator (`scripts/validate.py contract`):** Enforces a deterministic, three-stage lifecycle contract (`plan` -> `execute` -> `complete`) on task definition files within a project repository.
+4. **Specialized Module Skills (`skills/daw-*`):** Self-contained, deeply specified skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`) containing concrete operational steps and returning clean orchestrator handoffs.
 
 ### 2. Runtime Environment & Target Compatibility
 
@@ -53,11 +50,9 @@ The tool strictly avoids external package manager dependencies (e.g., PyPI packa
 
 ### 3. Command-Line Interface (CLI) Specification
 
-The CLI interface exposes two distinct subcommands with deterministic exit codes and standard error reporting.
+#### Subcommand 1: `validate.py package`
 
-#### Subcommand 1: `package`
-
-Validates skill package layout and content invariants.
+Verifies skill package integrity, structural files, markdown links, and templates.
 
 ```bash
 python3 scripts/validate.py package [--root SKILL_DIR] [--format text|json]
@@ -66,7 +61,7 @@ python3 scripts/validate.py package [--root SKILL_DIR] [--format text|json]
 - `--root SKILL_DIR`: Base directory of the skill package. Defaults to the resolved parent directory of `scripts/` (the repository root).
 - `--format text|json`: Output serialization format. Defaults to `text`.
 
-#### Subcommand 2: `contract`
+#### Subcommand 2: `validate.py contract`
 
 Validates a task execution contract file against a target project workspace.
 
@@ -79,11 +74,31 @@ python3 scripts/validate.py contract FILE --project-root DIR [--stage plan|execu
 - `--stage plan|execute|complete`: Contract lifecycle validation stage. Defaults to `plan`.
 - `--format text|json`: Output serialization format. Defaults to `text`.
 
+#### Subcommand 3: `route.py REQUEST`
+
+Evaluates a structured JSON routing request file against the declarative manifest policy.
+
+```bash
+python3 scripts/route.py REQUEST_FILE [--root SUITE_ROOT] [--format text|json]
+```
+
+- `REQUEST_FILE`: Path to a JSON file containing the route request.
+- `--root SUITE_ROOT`: Base directory of the suite package (defaults to resolved parent of `scripts/`).
+- `--format text|json`: Output serialization format. Defaults to `text`.
+
+#### Subcommand 4: `route.py --check-suite`
+
+Performs structural consistency validation of the manifest, declared module paths, and routing policy.
+
+```bash
+python3 scripts/route.py --check-suite [--root SUITE_ROOT] [--format text|json]
+```
+
 #### Exit Codes & Contracts
 
-- **Exit 0 (Success):** Validation succeeded. In JSON mode, `valid: true`. Warnings may be present in `findings` but do not block progression.
-- **Exit 1 (Validation Error):** Validation failed due to one or more structural, boundary, schema, or invariant violations. In JSON mode, `valid: false`.
-- **Exit 2 (CLI / JSON Syntax Error):** Execution halted prior to domain validation due to invalid CLI argument usage, missing mandatory flags, unreadable input files, malformed JSON, or duplicate JSON keys.
+- **Exit 0 (Success / Ready):** Validation succeeded, or route calculation produced status `ready`. In JSON mode, `valid: true` or `status: "ready"`.
+- **Exit 1 (Validation Error / Needs-Input):** Validation failed due to violations, or route calculation produced status `needs-input` or `blocked`.
+- **Exit 2 (CLI / JSON Syntax Error):** Execution halted prior to domain validation due to invalid CLI argument usage, missing mandatory flags, unreadable input files, malformed JSON, duplicate JSON keys, or manifest schema violation.
 
 ---
 
@@ -102,18 +117,18 @@ All file path parameters (contracts, baseline files, markdown link targets, evid
 
 Evidence references recorded under `evidence[].reference` in task contracts point to project-local log files, test output dumps, or diffs. The validator verifies path containment and physical file existence on disk, but treats file contents as strictly unparsed, untrusted data. The validator never executes scripts or evals payloads found within evidence artifacts.
 
-#### 4.3 Opaque Approval References
+#### 4.3 Opaque Approval References & High-Risk Constraints
 
 Approval data recorded under `approval` captures an opaque reference string (`reference`) alongside matching operation descriptors (`action`, `target`, `revision`, `scope`).
 
 - Approval references represent external human or ticket confirmations (e.g., issue numbers, session tokens, audit hashes).
 - Approval captures contain no authentication credentials, API keys, or operational permissions.
 - The validator ensures binding consistency between `operation` and `approval`, but does not verify third-party authorization infrastructure.
+- The route engine flags high-risk operations by setting `constraints.interactive_approval_required: true` and `constraints.authorization_granted: false`. Routing never simulates runtime approval or grants execution tokens.
 
 #### 4.4 Diagnostic Redaction & Information Safety
 
-Diagnostics emitted to stdout or stderr are bounded to static error codes, schema field locations, and relative file paths. Diagnostic messages never echo file contents, environment variables, or potential secret payloads.
-
+Diagnostics emitted to stdout or stderr are bounded to static error codes, schema field locations, and relative file paths. Diagnostic messages never echo file contents, environment variables, or potential secret payloads. Unknown fields in route requests or contracts are reported without echoing arbitrary value contents.
 ---
 
 ### 5. Data Formats & Parsing Invariants
@@ -144,24 +159,25 @@ The package validator scans markdown documents (`SKILL.md`, `references/*.md`, `
 
 A task contract (`task-contract.json`) progresses through three distinct lifecycle stages:
 
-| Rule / Field                  | `plan` Stage          | `execute` Stage       | `complete` Stage                |
-| :---------------------------- | :-------------------- | :-------------------- | :------------------------------ |
-| `task_id`, `version`, `title` | Mandatory             | Mandatory             | Mandatory                       |
-| `acceptance_criteria`         | Mandatory (non-empty) | Mandatory (non-empty) | Mandatory (non-empty)           |
-| `baseline.revision`           | Mandatory             | Mandatory             | Mandatory                       |
-| `baseline.files[].sha256`     | Verified if present   | Verified if present   | Verified if present             |
-| `operation` descriptors       | Mandatory             | Mandatory             | Mandatory                       |
-| `approval` for `risk: high`   | Optional              | **Mandatory**         | **Mandatory**                   |
-| `approval` for `risk: low`    | Optional              | Optional              | Optional                        |
-| `evidence` artifact records   | Optional              | Optional              | **Mandatory** (All ACs covered) |
-| `evidence` physical files     | Verified if present   | Verified if present   | **Mandatory** (Must exist)      |
-| `evidence[].status`           | Any valid status      | Any valid status      | **Must be `"passed"`**          |
+| Rule / Field                  | `plan` Stage                | `execute` Stage           | `complete` Stage                                    |
+| :---------------------------- | :-------------------------- | :------------------------ | :-------------------------------------------------- |
+| `schema_version`, `objective` | Mandatory                   | Mandatory                 | Mandatory                                           |
+| `acceptance_criteria`         | Mandatory (non-empty)       | Mandatory (non-empty)     | Mandatory (non-empty)                               |
+| `baseline.revision`           | Mandatory                   | Mandatory                 | Mandatory                                           |
+| `baseline.files` array        | Optional (warns if empty)   | **Mandatory (non-empty)** | **Mandatory (non-empty)**                           |
+| `baseline.files[].sha256`     | Verified on disk if present | **Verified on disk**      | Historical syntax/boundary check (no on-disk check) |
+| `operation` descriptors       | Mandatory                   | Mandatory                 | Mandatory                                           |
+| `approval` for `risk: high`   | Optional                    | **Mandatory**             | **Mandatory**                                       |
+| `approval` for `risk: low`    | Optional                    | Optional                  | Optional                                            |
+| `evidence` artifact records   | Optional                    | Optional                  | **Mandatory** (All ACs covered)                     |
+| `evidence` physical files     | Verified if present         | Verified if present       | **Mandatory** (Must exist)                          |
+| `evidence[].status`           | Any valid status            | Any valid status          | **Must be `"passed"`**                              |
 
 ---
 
 ### 7. Regression Strategy & Verification Suite
 
-The repository contains an automated regression suite in `tests/test_validate.py` consisting of 56 unit tests executed via standard Python `unittest`.
+The repository contains an automated unittest regression suite in `tests/test_validate.py` executed via standard Python `unittest`.
 
 #### Test Coverage Categories
 
@@ -186,4 +202,4 @@ The repository contains an automated regression suite in `tests/test_validate.py
 
 ### BLOCKERS
 
-- None. The technical architecture is fully realized in `scripts/validate.py` with zero external dependencies and 100% test passing rate across the 56-test regression suite under Python 3.14.7.
+- None. The technical architecture is fully realized in `scripts/validate.py` with zero external dependencies and passing unittest regression suite under Python 3.10+ standard library.

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "intent": "feature",
+  "requirements": "clear",
+  "risk": "low",
+  "workspace": "in-place"
+}

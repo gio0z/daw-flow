@@ -91,8 +91,8 @@ class TestValidateCLI(unittest.TestCase):
                     f"### {idx}. `{tpl}`\n\n"
                     "- **Trigger:** Initial scoping.\n"
                     "- **Inputs & Prerequisites:** Clean baseline.\n"
-                    "- **Primary Skill:** System Architect.\n"
-                    "- **Conditional Skills:** None.\n"
+                    "- **Required Capability:** System Architecture & Planning.\n"
+                    "- **Conditional Capabilities:** None.\n"
                     f"- **Template Link:** [template](../templates/{tpl})\n"
                     "- **Output Contract:** Canonical specification.\n"
                     "- **Exit Criterion:** Acceptance agreed.\n"
@@ -104,8 +104,8 @@ class TestValidateCLI(unittest.TestCase):
                     f"### {idx}. `{tpl}`\n\n"
                     "- **Trigger**: Initial scoping.\n"
                     "- **Inputs & Prerequisites**: Clean baseline.\n"
-                    "- **Primary Skill**: System Architect.\n"
-                    "- **Conditional Skills**: None.\n"
+                    "- **Required Capability**: System Architecture & Planning.\n"
+                    "- **Conditional Capabilities**: None.\n"
                     f"- **Template Link**: [template](../templates/{tpl})\n"
                     "- **Output Contract**: Canonical specification.\n"
                     "- **Exit Criterion**: Acceptance agreed.\n"
@@ -362,6 +362,19 @@ class TestValidateCLI(unittest.TestCase):
             self.assertEqual(res.returncode, 1)
             payload = json.loads(res.stdout)
             self.assertFalse(payload.get("valid"))
+
+    def test_package_routing_missing_required_capability_field(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+            routing_text = (pkg_root / "references" / "routing.md").read_text(encoding="utf-8")
+            routing_text = routing_text.replace("- **Required Capability**: System Architecture & Planning.\n", "")
+            (pkg_root / "references" / "routing.md").write_text(routing_text, encoding="utf-8")
+
+            res = self.run_cli(["package", "--root", str(pkg_root), "--format", "json"])
+            self.assertEqual(res.returncode, 1)
+            payload = json.loads(res.stdout)
+            self.assertFalse(payload.get("valid"))
+            self.assertTrue(any(f.get("code") == "routing_field_missing" and "Required Capability" in f.get("message", "") for f in payload.get("findings", [])))
 
     # -------------------------------------------------------------------------
     # Contract validation tests (Plan, Execute, Complete)
@@ -790,6 +803,62 @@ class TestValidateCLI(unittest.TestCase):
             self.assertEqual(res.returncode, 1)
             self.assertFalse(json.loads(res.stdout).get("valid"))
 
+    def test_contract_evidence_scalar_or_bool_rejected_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            for bad_evidence in (42, True):
+                contract_data = self.create_contract_dict(
+                    baseline_files=baseline,
+                    evidence=bad_evidence,
+                )
+                contract_file = proj_dir / "contract.json"
+                contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+                res = self.run_cli([
+                    "contract", str(contract_file),
+                    "--project-root", str(proj_dir),
+                    "--stage", "complete",
+                    "--format", "json",
+                ])
+                self.assertEqual(res.returncode, 1)
+                self.assertNotIn("Traceback", res.stderr)
+                payload = json.loads(res.stdout)
+                self.assertFalse(payload.get("valid"))
+                error_codes = [f.get("code") for f in payload.get("findings", [])]
+                self.assertIn("invalid_evidence", error_codes)
+                self.assertIn("missing_complete_evidence", error_codes)
+
+    def test_contract_evidence_unhashable_criterion_id_rejected_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            ev_file = proj_dir / "smoke.log"
+            ev_file.write_text("observed output\n", encoding="utf-8")
+            for bad_id in (["AC-1"], {"id": "AC-1"}):
+                contract_data = self.create_contract_dict(
+                    baseline_files=baseline,
+                    evidence=[{
+                        "criterion_id": bad_id,
+                        "status": "passed",
+                        "reference": "smoke.log",
+                        "summary": "observed",
+                    }],
+                )
+                contract_file = proj_dir / "contract.json"
+                contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+                res = self.run_cli([
+                    "contract", str(contract_file),
+                    "--project-root", str(proj_dir),
+                    "--stage", "complete",
+                    "--format", "json",
+                ])
+                self.assertEqual(res.returncode, 1)
+                self.assertNotIn("Traceback", res.stderr)
+                payload = json.loads(res.stdout)
+                self.assertFalse(payload.get("valid"))
+                error_codes = [f.get("code") for f in payload.get("findings", [])]
+                self.assertIn("invalid_evidence_criterion_id", error_codes)
+                self.assertIn("incomplete_evidence_coverage", error_codes)
     # -------------------------------------------------------------------------
     # Schema integrity, types, duplicate keys, and bounds checks
     # -------------------------------------------------------------------------
@@ -1462,6 +1531,242 @@ class TestValidateCLI(unittest.TestCase):
             self.assertFalse(payload.get("valid"))
             error_findings = [f for f in payload.get("findings", []) if f.get("severity") == "error"]
             self.assertTrue(len(error_findings) > 0, "Expected error findings for unknown contract keys")
+
+    # -------------------------------------------------------------------------
+    # Baseline completion, approval scope, and evidence status regression tests
+    # -------------------------------------------------------------------------
+
+    def test_contract_complete_stage_accepts_edited_and_deleted_baseline_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            ev_file = proj_dir / "test-evidence.log"
+            ev_file.write_text("All tests pass\n", encoding="utf-8")
+            deleted_path = proj_dir / "obsolete.txt"
+            deleted_path.write_text("pre-mutation content\n", encoding="utf-8")
+            baseline.append({
+                "path": "obsolete.txt",
+                "sha256": _sha256(deleted_path.read_bytes()),
+            })
+
+            # Mutate workspace: edit one baseline file and delete another
+            edited_path = proj_dir / baseline[0]["path"]
+            edited_path.write_text("modified content after baseline\n", encoding="utf-8")
+            deleted_path.unlink()
+
+            contract_data = self.create_contract_dict(
+                baseline_files=baseline,
+                acceptance_criteria=[{"id": "AC-1", "criterion": "Passes tests"}],
+                evidence=[{
+                    "criterion_id": "AC-1",
+                    "status": "passed",
+                    "reference": "test-evidence.log",
+                    "summary": "Verified post-mutation behavior",
+                }],
+            )
+            contract_file = proj_dir / "contract.json"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+            # Complete stage must accept legitimate mutations without baseline drift errors
+            res_comp = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "complete",
+                "--format", "json",
+            ])
+            self.assertEqual(res_comp.returncode, 0, msg=f"Complete rejected valid mutated baseline: {res_comp.stdout}")
+            payload_comp = json.loads(res_comp.stdout)
+            self.assertTrue(payload_comp.get("valid"))
+
+            # Execute stage still rejects the workspace drift and missing file
+            res_exec = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "execute",
+                "--format", "json",
+            ])
+            self.assertEqual(res_exec.returncode, 1, msg=f"Execute should have rejected baseline drift: {res_exec.stdout}")
+            payload_exec = json.loads(res_exec.stdout)
+            self.assertFalse(payload_exec.get("valid"))
+            error_codes = [f.get("code") for f in payload_exec.get("findings", []) if f.get("severity") == "error"]
+            self.assertIn("baseline_changed", error_codes)
+            self.assertIn("file_not_found", error_codes)
+
+    def test_contract_complete_stage_still_rejects_malformed_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            ev_file = proj_dir / "test-evidence.log"
+            ev_file.write_text("pass\n", encoding="utf-8")
+            valid_ev = [{
+                "criterion_id": "AC-1",
+                "status": "passed",
+                "reference": "test-evidence.log",
+                "summary": "pass",
+            }]
+
+            cases = [
+                ("bad_digest", [{"path": "nonexistent.py", "sha256": "not-a-valid-sha256-hex"}], "invalid_sha256"),
+                ("traversal_escape", [{"path": "../outside.py", "sha256": "0" * 64}], "boundary_violation"),
+                ("duplicate_path", [
+                    {"path": "src/app.py", "sha256": "0" * 64},
+                    {"path": "src/app.py", "sha256": "1" * 64},
+                ], "duplicate_baseline_path"),
+            ]
+            for label, test_baseline, expected_code in cases:
+                with self.subTest(case=label):
+                    contract_data = self.create_contract_dict(
+                        baseline_files=test_baseline,
+                        evidence=valid_ev,
+                    )
+                    contract_file = proj_dir / f"contract_{label}.json"
+                    contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+                    res = self.run_cli([
+                        "contract", str(contract_file),
+                        "--project-root", str(proj_dir),
+                        "--stage", "complete",
+                        "--format", "json",
+                    ])
+                    self.assertEqual(res.returncode, 1, msg=f"Case {label} did not fail complete: {res.stdout}")
+                    payload = json.loads(res.stdout)
+                    self.assertFalse(payload.get("valid"))
+                    codes = [f.get("code") for f in payload.get("findings", []) if f.get("severity") == "error"]
+                    self.assertIn(expected_code, codes, f"Expected {expected_code} in {codes}")
+
+    def test_contract_approval_scope_variations_and_crash_resilience(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            scope = ["src/app.py", "src/util.py"]
+            base_approval = {
+                "reference": "APP-123",
+                "action": "refactor",
+                "target": "core_module",
+                "revision": "rev-001",
+            }
+
+            # Reordered scope: valid match
+            reordered_app = dict(base_approval, scope=["src/util.py", "src/app.py"])
+            contract_data = self.create_contract_dict(
+                baseline_files=baseline,
+                risk="high",
+                scope=scope,
+                approval=reordered_app,
+            )
+            contract_file = proj_dir / "contract_reordered.json"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            res = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "execute",
+                "--format", "json",
+            ])
+            self.assertEqual(res.returncode, 0, msg=f"Reordered scope failed: {res.stdout}")
+            self.assertTrue(json.loads(res.stdout).get("valid"))
+
+            # Invalid approval scope types / contents must cleanly reject without crash
+            invalid_scope_cases = [
+                ("dict", {"nested": "dict"}, "invalid_approval_scope"),
+                ("nested_dict_in_list", [{"a": 1}], "invalid_approval_scope_item"),
+                ("nested_list_in_list", [["nested"]], "invalid_approval_scope_item"),
+                ("number_in_list", [123], "invalid_approval_scope_item"),
+                ("blank_string_in_list", ["   "], "invalid_approval_scope_item"),
+                ("empty_list", [], "invalid_approval_scope"),
+                ("duplicate_items", ["src/app.py", "src/app.py"], "duplicate_approval_scope"),
+            ]
+            for label, bad_app_scope, expected_code in invalid_scope_cases:
+                with self.subTest(case=label):
+                    bad_app = dict(base_approval, scope=bad_app_scope)
+                    cdata = self.create_contract_dict(
+                        baseline_files=baseline,
+                        risk="high",
+                        scope=scope,
+                        approval=bad_app,
+                    )
+                    cfile = proj_dir / f"contract_bad_scope_{label}.json"
+                    cfile.write_text(json.dumps(cdata), encoding="utf-8")
+                    res = self.run_cli([
+                        "contract", str(cfile),
+                        "--project-root", str(proj_dir),
+                        "--stage", "execute",
+                        "--format", "json",
+                    ])
+                    self.assertEqual(res.returncode, 1, msg=f"Case {label} did not exit 1: {res.stdout}")
+                    self.assertNotIn("traceback", res.stderr.lower())
+                    payload = json.loads(res.stdout)
+                    self.assertFalse(payload.get("valid"))
+                    codes = [f.get("code") for f in payload.get("findings", []) if f.get("severity") == "error"]
+                    self.assertIn(expected_code, codes, f"Expected {expected_code} in {codes}")
+
+            # When operation.scope itself is invalid (e.g. dict or list of dicts), approval scope check must not crash
+            cdata_bad_op = self.create_contract_dict(
+                baseline_files=baseline,
+                risk="high",
+                approval=dict(base_approval, scope=["src/app.py"]),
+            )
+            cdata_bad_op["operation"]["scope"] = [{"not": "a_string"}]
+            cfile_bad_op = proj_dir / "contract_bad_op_scope.json"
+            cfile_bad_op.write_text(json.dumps(cdata_bad_op), encoding="utf-8")
+            res_bad_op = self.run_cli([
+                "contract", str(cfile_bad_op),
+                "--project-root", str(proj_dir),
+                "--stage", "execute",
+                "--format", "json",
+            ])
+            self.assertEqual(res_bad_op.returncode, 1)
+            self.assertNotIn("traceback", res_bad_op.stderr.lower())
+            payload_bad_op = json.loads(res_bad_op.stdout)
+            self.assertFalse(payload_bad_op.get("valid"))
+
+    def test_contract_evidence_unexercised_status_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            ev_file = proj_dir / "evidence.txt"
+            ev_file.write_text("Evidence note\n", encoding="utf-8")
+
+            contract_data = self.create_contract_dict(
+                baseline_files=baseline,
+                acceptance_criteria=[{"id": "AC-1", "criterion": "Passes"}],
+                evidence=[{
+                    "criterion_id": "AC-1",
+                    "status": "unexercised",
+                    "reference": "evidence.txt",
+                    "summary": "Pending verification in subsequent run",
+                }],
+            )
+            contract_file = proj_dir / "contract.json"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+            # Allowed in plan
+            res_plan = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "plan",
+                "--format", "json",
+            ])
+            self.assertEqual(res_plan.returncode, 0, msg=f"Plan should accept unexercised evidence: {res_plan.stdout}")
+            self.assertTrue(json.loads(res_plan.stdout).get("valid"))
+
+            # Allowed in execute
+            res_exec = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "execute",
+                "--format", "json",
+            ])
+            self.assertEqual(res_exec.returncode, 0, msg=f"Execute should accept unexercised evidence: {res_exec.stdout}")
+            self.assertTrue(json.loads(res_exec.stdout).get("valid"))
+
+            # Rejected in complete
+            res_comp = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "complete",
+                "--format", "json",
+            ])
+            self.assertEqual(res_comp.returncode, 1, msg=f"Complete must reject unexercised evidence: {res_comp.stdout}")
+            payload_comp = json.loads(res_comp.stdout)
+            self.assertFalse(payload_comp.get("valid"))
+            codes = [f.get("code") for f in payload_comp.get("findings", []) if f.get("severity") == "error"]
+            self.assertIn("unpassed_evidence_at_complete", codes)
 
 if __name__ == "__main__":
     unittest.main()

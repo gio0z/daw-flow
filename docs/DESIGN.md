@@ -6,47 +6,44 @@
 
 ```
 +-----------------------------------------------------------------------------+
-|                         CLI Dataflow Architecture                           |
+|                      CLI & Engine Dataflow Architecture                     |
 +-----------------------------------------------------------------------------+
 
-      [User / Agent CLI Input]
-                 |
-                 v
-   +---------------------------+
-   |   argparse CLI Parser     |
-   +---------------------------+
-                 |
-        +--------+--------+
-        |                 |
-        v                 v
-   [package]          [contract]
-        |                 |
-        v                 v
- +--------------+  +---------------+
- | ValidatePkg  |  | ValidateContr |
- +--------------+  +---------------+
-        |                 |
-        +--------+--------+
-                 |
-                 v
-     +-----------------------+
-     |   Findings Collector  |
-     | (Severity, Code, Path)|
-     +-----------------------+
-                 |
-        +--------+--------+
-        |                 |
-        v                 v
-   [format: text]    [format: json]
-   (Human-readable)  (Single-envelope stdout)
-        |                 |
-        +--------+--------+
-                 |
-                 v
-       [Deterministic Exit]
-        (0: Clean / Warning)
-        (1: Validation Error)
-        (2: CLI / Syntax Error)
+                          [User / Agent CLI Input]
+                                     |
+                 +-------------------+-------------------+
+                 |                                       |
+                 v                                       v
+   [scripts/validate.py CLI]                [scripts/route.py CLI]
+        |                |                       |             |
+        v                v                       v             v
+   [package]         [contract]              [REQUEST]   [--check-suite]
+        |                |                       |             |
+        v                v                       v             v
+ +--------------+ +---------------+      +----------------+ +----------------+
+ | ValidatePkg  | | ValidateContr |      | RouteEngine    | | SuiteChecker   |
+ +--------------+ +---------------+      +----------------+ +----------------+
+        |                |                       |             |
+        +--------+-------+                       +------+------+
+                 |                                      |
+                 v                                      v
+     +-----------------------+              +-----------------------+
+     |   Findings Collector  |              | Structured Envelope   |
+     | (Severity, Code, Path)|              | (Status, Stages, etc.)|
+     +-----------------------+              +-----------------------+
+                 |                                      |
+        +--------+--------+                    +--------+--------+
+        |                 |                    |                 |
+        v                 v                    v                 v
+   [format: text]    [format: json]       [format: text]    [format: json]
+        |                 |                    |                 |
+        +--------+--------+                    +--------+--------+
+                 |                                      |
+                 v                                      v
+       [Deterministic Exit]                   [Deterministic Exit]
+        (0: Pass / Valid)                      (0: Ready / Sound)
+        (1: Validation Error)                  (1: Needs-Input / Error)
+        (2: CLI / Syntax Error)                (2: CLI / Syntax Error)
 ```
 
 ---
@@ -111,13 +108,12 @@ The JSON mode guarantees that stdout contains exactly one valid, well-formed JSO
     },
     "check": {
       "type": "string",
-      "enum": ["package", "contract"]
+      "enum": ["package", "contract", "check-suite"]
     },
     "valid": {
       "type": "boolean"
     },
     "findings": {
-      "type": "array",
       "items": {
         "type": "object",
         "required": ["severity", "code", "path", "message"],
@@ -164,18 +160,59 @@ The JSON mode guarantees that stdout contains exactly one valid, well-formed JSO
 }
 ```
 
+##### Route Engine JSON Output Schema & Realized Instance:
+
+The route engine emitted envelope guarantees standard keys:
+
+```json
+{
+  "schema_version": 1,
+  "status": "ready",
+  "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+  "reasons": [
+    "Routing intent 'feature' with clear requirements to execution pipeline."
+  ],
+  "blockers": [],
+  "constraints": {
+    "read_only": false,
+    "documentation_only": false,
+    "interactive_approval_required": false,
+    "authorization_granted": false
+  },
+  "limitations": [
+    "Routing calculation only; does not execute stages, evaluate agent identity, or grant runtime authorization.",
+    "Stage selection is derived from declarative policy in references/suite-manifest.json."
+  ]
+}
+```
+
 ---
 
 ### 3. Component Interaction & Dataflow Design
 
-The internal architecture of `scripts/validate.py` follows a linear, pipeline-oriented design pattern with explicit data boundaries:
+The internal architecture of the DAW suite follows a modular, pipeline-oriented design pattern with explicit data boundaries:
 
-#### 3.1 Input Normalization & Parsing
+#### 3.1 Suite Router & Specialized Modular Skills
 
-1. **Argument Parsing (`argparse`):** Validates argument presence, flag compatibility, and command selection.
+1. **Root Router (`SKILL.md`):** Serves as the top-level suite entry point. Reads incoming user intent and coordinates child modules using `scripts/route.py` and `references/suite-manifest.json`. Router does not run bloated flat procedures.
+2. **Specialized Child Skills (`skills/daw-*`):** 8 self-contained skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`) containing concrete operational steps and returning clean orchestrator handoffs.
+3. **Advisory Skill (`daw-ask`):** Acts as an original, objective architecture consultant without persona impersonation or external identity spoofing.
+4. **Sibling Symlink Distribution:** Installed environments mount sibling directories symlinked to bundled `skills/daw-*` directories. Unbundled standalone claims are rejected.
+
+#### 3.2 Route Engine (`scripts/route.py`)
+
+1. **Input Parser & Strict JSON Hook:** Uses custom JSON object pairs hook to reject duplicate keys and verifies mandatory keys (`schema_version`, `intent`, `requirements`, `risk`, `workspace`). Unknown keys and nonstandard types fail immediately with exit code 2.
+2. **Policy Evaluation Engine:** Evaluates declarative rules from `references/suite-manifest.json`. Maps intents (`bootstrap`, `adopt`, `feature`, `bugfix`, `patch`, `review`, `ask`) to appropriate stages.
+3. **Workspace Precedence:** Evaluates `workspace` for mutating intents (`feature`, `bugfix`, `patch`). Prepends `daw-workspace` if `isolated`; proceeds if `in-place`; marks `needs-input` if `unknown`.
+4. **High-Risk Constraint Enforcing:** If `risk` is `high`, marks `constraints.interactive_approval_required: true`. Permanently emits `constraints.authorization_granted: false`.
+5. **Structural Suite Checker (`--check-suite`):** Validates existence of all 8 module skill directories and files within the suite root boundary without circular imports.
+
+#### 3.3 Validation Engine (`scripts/validate.py`)
+
+1. **Argument Parsing (`argparse`):** Validates argument presence, flag compatibility, and command selection (`package` or `contract`).
 2. **Path Containment Setup:** Establishes the authoritative base boundary (either package root or project root).
 3. **Payload Ingestion:**
-   - For `package`: Ingests markdown files through targeted text readers and the scalar YAML frontmatter parser.
+   - For `package`: Ingests markdown files through targeted text readers and scalar YAML frontmatter parser.
    - For `contract`: Ingests JSON using `json.loads(..., object_pairs_hook=_strict_json_object_pairs_hook)`.
 
 #### 3.2 Evaluation Engines
@@ -187,7 +224,7 @@ The internal architecture of `scripts/validate.py` follows a linear, pipeline-or
    - Evaluates markdown link targets, resolving URLs and rejecting unescaped host-specific URI schemes outside code fences.
 2. **Contract Evaluator:**
    - Validates schema structure, type invariants, and non-empty strings.
-   - Computes SHA-256 digests of files listed in `baseline.files` and compares against expected hashes.
+   - Computes SHA-256 digests of files listed in `baseline.files` and compares against expected hashes during `plan` and `execute`; verifies historical syntax, digest formats, and bounded containment at `complete` without requiring live file existence or hash equality.
    - Validates `operation` descriptors and enforces risk-tiered `approval` bindings across lifecycle stages (`plan`, `execute`, `complete`).
    - Verifies `evidence` artifact records against `acceptance_criteria` and confirms referenced files exist within project root.
 

@@ -20,10 +20,10 @@ The design philosophy emphasizes:
 
 ### 2. CLI Command Surface & Invocations
 
-All commands are accessed via `scripts/validate.py` using Python 3.10+:
+All commands are accessed via `scripts/validate.py` and `scripts/route.py` using Python 3.10+:
 
 ```bash
-# General Syntax
+# General Validation Syntax
 python3 scripts/validate.py <subcommand> [options]
 
 # Subcommand 1: Package Validation
@@ -31,6 +31,12 @@ python3 scripts/validate.py package [--root SKILL_ROOT] [--format text|json]
 
 # Subcommand 2: Contract Validation
 python3 scripts/validate.py contract <CONTRACT_FILE> --project-root PROJECT_ROOT --stage plan|execute|complete [--format text|json]
+
+# General Routing Syntax
+python3 scripts/route.py <REQUEST_FILE> [--root SUITE_ROOT] [--format text|json]
+
+# Suite Consistency Verification
+python3 scripts/route.py --check-suite [--root SUITE_ROOT] [--format text|json]
 ```
 
 #### Argument Definitions
@@ -51,8 +57,14 @@ python3 scripts/validate.py contract <CONTRACT_FILE> --project-root PROJECT_ROOT
   - Scope: `contract` subcommand.
   - Required. Lifecycle validation gate to apply (`plan`, `execute`, or `complete`).
 - `--format text|json`:
-  - Scope: Both subcommands.
+  - Scope: All subcommands across `validate.py` and `route.py`.
   - Optional. Default: `text`.
+- `<REQUEST_FILE>`:
+  - Scope: `scripts/route.py`.
+  - Required positional argument (unless `--check-suite` is supplied). Path to JSON route request.
+- `--check-suite`:
+  - Scope: `scripts/route.py`.
+  - Flag. Verifies manifest consistency, bundle containment, and module skill existence.
 
 ---
 
@@ -60,9 +72,9 @@ python3 scripts/validate.py contract <CONTRACT_FILE> --project-root PROJECT_ROOT
 
 The CLI communicates deterministic pass/fail states via numeric process exit codes:
 
-- **`0` (Success):** All structural checks, schemas, boundary constraints, and stage requirements passed with zero critical violations.
-- **`1` (Validation Failure):** One or more violations occurred (e.g., missing files, broken links, invalid JSON, missing contract fields, boundary breaches, hash mismatches).
-- **`2` (Invocation / CLI Error):** Invalid command-line arguments, unknown flags, or non-existent files passed to required CLI parameters.
+- **`0` (Success / Ready):** All structural checks, schemas, boundary constraints, and stage requirements passed with zero critical violations (`valid: true`), or route calculation produced status `ready`.
+- **`1` (Validation Failure / Needs-Input):** One or more violations occurred (e.g., missing files, broken links, invalid JSON, missing contract fields, boundary breaches, hash mismatches), or route calculation requires user clarification / is blocked.
+- **`2` (Invocation / CLI / Syntax Error):** Invalid command-line arguments, unknown flags, non-existent files passed to required CLI parameters, duplicate JSON keys, or malformed JSON payloads.
 
 ---
 
@@ -107,22 +119,63 @@ FAIL: Contract validation failed with 2 finding(s):
 
 ---
 
-### 5. JSON Stream Interface (`--format json`)
+### 5. Routing CLI Stream Interface (`scripts/route.py`)
 
-#### 5.1 Success JSON Envelope (`stdout`)
+#### 5.1 Route Text Output (`stdout`)
+
+```text
+Status: ready
+Stages: daw-plan, daw-build, daw-review, daw-verify
+Reasons:
+  - Routing intent 'feature' with clear requirements to execution pipeline.
+Constraints:
+  - read_only: false
+  - documentation_only: false
+  - interactive_approval_required: false
+  - authorization_granted: false
+Limitations:
+  - Routing calculation only; does not execute stages or grant runtime authorization.
+```
+
+#### 5.2 Route JSON Output (`stdout`)
 
 ```json
 {
-  "status": "PASS",
-  "exit_code": 0,
-  "summary": {
-    "subcommand": "package",
-    "target_root": "/home/regio/projects/deterministic-agentic-workflow",
-    "findings_count": 0
+  "schema_version": 1,
+  "status": "ready",
+  "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+  "reasons": [
+    "Routing intent 'feature' with clear requirements to execution pipeline."
+  ],
+  "blockers": [],
+  "constraints": {
+    "read_only": false,
+    "documentation_only": false,
+    "interactive_approval_required": false,
+    "authorization_granted": false
   },
-  "findings": []
+  "limitations": [
+    "Routing calculation only; does not execute stages, evaluate agent identity, or grant runtime authorization."
+  ]
 }
 ```
+
+---
+
+### 6. Validation JSON Stream Interface (`--format json`)
+
+{
+"status": "PASS",
+"exit_code": 0,
+"summary": {
+"subcommand": "package",
+"target_root": "/home/regio/projects/deterministic-agentic-workflow",
+"findings_count": 0
+},
+"findings": []
+}
+
+````
 
 #### 5.2 Failure JSON Envelope (`stdout`)
 
@@ -149,7 +202,7 @@ FAIL: Contract validation failed with 2 finding(s):
     }
   ]
 }
-```
+````
 
 ---
 

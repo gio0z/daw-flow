@@ -1,11 +1,11 @@
 # Operational Runbook: [Service / Feature]
 
-> **Fill-in Guidance:** Fill this template using verified repository commands, scripts, and parameters. Equivalent existing ops manuals or runbooks may be reused directly. Do not invent executable commands, script paths, CLI flags, or mock "HEALTHY" output strings. Critical operations require explicit human approval by reference only (ticket ID / approval request ID; never include secret values or credentials). Rollback must target an explicit known-good release; database or state restoration snapshot is required ONLY when data recovery is applicable (stateless services roll back artifact without database restoration). Preflight backups require verified integrity and restore-test status (mark N/A for stateless or harmless operations). Unresolved material operational questions block impacted operations only. Never record secret values or credentials in templates or evidence logs.
+> **Fill-in Guidance:** Fill this template using verified repository commands, scripts, and parameters. Equivalent existing ops manuals or runbooks may be reused directly. Do not invent executable commands, script paths, CLI flags, or mock "HEALTHY" output strings. Critical operations require explicit human approval by reference only (ticket ID / approval request ID; never include secret values or credentials). Rollback must target an explicit known-good release; database or state restoration snapshot is required ONLY when data recovery is applicable (stateless services roll back artifact without database restoration). Preflight backups require verified integrity and restore-test status (mark N/A for stateless or harmless operations). Distinguish verified operational facts from author-proposed recovery defaults using a concise provenance ledger or explicit labels. Unresolved material operational questions block impacted operations only. Never record secret values or credentials in templates.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [Site Reliability Engineer / On-Call Lead]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Service operations, preflight gates, fail-closed approval, incident triage, recovery]
-> **Source Documents / Revision:** [FRD, deployment.md, git commit SHA]
+> **Source Documents / Revision:** [Actual observed FRD, deployment.md, git commit SHA, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Access permissions, verified backup schedule, available monitoring tools]
 > **Open Decisions:** [Material operational questions — block impacted deployment/operations only]
 > **Acceptance Criteria IDs:** [OPS-01, OPS-02, ...]

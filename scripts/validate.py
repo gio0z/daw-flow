@@ -40,8 +40,8 @@ CANONICAL_DOC_STEMS = set(t.removesuffix(".md") for t in CANONICAL_TEMPLATES)
 ROUTING_SECTION_FIELDS = (
     "Trigger",
     "Inputs & Prerequisites",
-    "Primary Skill",
-    "Conditional Skills",
+    "Required Capability",
+    "Conditional Capabilities",
     "Template Link",
     "Output Contract",
     "Exit Criterion",
@@ -51,13 +51,13 @@ ROUTING_SECTION_FIELDS = (
 
 PACKAGE_LIMITATIONS = [
     "Structural and link verification only; does not verify semantic quality of instructions.",
-    "External specialist agent availability or installation is not checked or assumed.",
+    "Structural check does not assess capability or host integration availability; no external skills expected.",
 ]
 
 CONTRACT_LIMITATIONS = [
     "Structural verification only; does not authenticate evidence authenticity, runtime safety, or operational authorization.",
     "Approval presence captures an opaque reference only and does not constitute runtime authorization.",
-    "Baseline hashes verify recorded file states at validation time only; revision strings are not verified against VCS history.",
+    "Baseline hashes verify current files only at plan/execute; complete checks historical record structure and boundaries. Revision strings are not verified against VCS history.",
 ]
 
 
@@ -690,20 +690,20 @@ def validate_contract(
                 resolved_p, err = resolve_bounded_path(project_root, f_rel)
                 if err:
                     add_error("boundary_violation", f"{f_path_loc}.path", f"Baseline path violates boundary: {err}")
-                elif resolved_p is None or not resolved_p.is_file():
-                    add_error("file_not_found", f"{f_path_loc}.path", f"Baseline file does not exist: {f_rel}")
-                else:
-                    try:
-                        actual_hash = compute_sha256(resolved_p)
-                        if isinstance(f_hash, str) and actual_hash != f_hash.lower():
-                            add_error(
-                                "baseline_changed",
-                                f"{f_path_loc}",
-                                f"Baseline hash mismatch for {f_rel}: file content changed since baseline.",
-                            )
-                    except OSError:
-                        add_error("file_read_error", f"{f_path_loc}.path", f"Failed to read baseline file: {f_rel}")
-
+                elif stage != "complete":
+                    if resolved_p is None or not resolved_p.is_file():
+                        add_error("file_not_found", f"{f_path_loc}.path", f"Baseline file does not exist: {f_rel}")
+                    else:
+                        try:
+                            actual_hash = compute_sha256(resolved_p)
+                            if isinstance(f_hash, str) and actual_hash != f_hash.lower():
+                                add_error(
+                                    "baseline_changed",
+                                    f"{f_path_loc}",
+                                    f"Baseline hash mismatch for {f_rel}: file content changed since baseline.",
+                                )
+                        except OSError:
+                            add_error("file_read_error", f"{f_path_loc}.path", f"Failed to read baseline file: {f_rel}")
     # documents
     docs_data = contract_data.get("documents")
     if not isinstance(docs_data, list):
@@ -871,23 +871,35 @@ def validate_contract(
             if app_rev != op_revision:
                 add_error("approval_binding_mismatch", "approval.revision", "approval.revision must equal operation.revision.")
 
-            if not isinstance(app_scope, list):
-                add_error("invalid_approval_scope", "approval.scope", "Approval scope must be an array.")
-            elif op_scope is not None:
-                if set(app_scope) != set(op_scope) or len(app_scope) != len(op_scope):
-                    add_error("approval_binding_mismatch", "approval.scope", "approval.scope must exactly match operation.scope.")
+            if not isinstance(app_scope, list) or len(app_scope) == 0:
+                add_error("invalid_approval_scope", "approval.scope", "Approval scope must be a non-empty array of strings.")
+            else:
+                seen_app_scope: set[str] = set()
+                valid_app_scope = True
+                for s in app_scope:
+                    if not isinstance(s, str) or not s.strip():
+                        valid_app_scope = False
+                        break
+                    if s in seen_app_scope:
+                        add_error("duplicate_approval_scope", "approval.scope", "Duplicate scope entry in approval.")
+                    seen_app_scope.add(s)
+                if not valid_app_scope:
+                    add_error("invalid_approval_scope_item", "approval.scope", "Approval scope entries must be non-blank strings.")
+                elif op_scope is not None:
+                    if seen_app_scope != set(op_scope) or len(app_scope) != len(op_scope):
+                        add_error("approval_binding_mismatch", "approval.scope", "approval.scope must exactly match operation.scope.")
     else:
         if op_risk == "high" and stage in ("execute", "complete"):
             add_error("missing_approval", "approval", f"Stage '{stage}' requires an approval object for high-risk operations.")
 
     # evidence (optional)
+    seen_ev_criterion_ids: set[str] = set()
     ev_data = contract_data.get("evidence")
     if ev_data is not None:
         if not isinstance(ev_data, list):
             add_error("invalid_evidence", "evidence", "Field 'evidence' must be an array if present.")
         else:
             add_warning("evidence_unverified", "evidence", "Evidence files verified for presence only; semantic truth and authenticity not evaluated.")
-            seen_ev_criterion_ids: set[str] = set()
             for idx, ev in enumerate(ev_data):
                 ev_loc = f"evidence[{idx}]"
                 if not isinstance(ev, dict):
@@ -915,8 +927,8 @@ def validate_contract(
                 else:
                     seen_ev_criterion_ids.add(c_id)
 
-                if not isinstance(e_stat, str) or e_stat not in ("passed", "failed", "blocked"):
-                    add_error("invalid_evidence_status", f"{ev_loc}.status", "Evidence status must be passed|failed|blocked.")
+                if not isinstance(e_stat, str) or e_stat not in ("passed", "failed", "blocked", "unexercised"):
+                    add_error("invalid_evidence_status", f"{ev_loc}.status", "Evidence status must be passed|failed|blocked|unexercised.")
                 elif stage == "complete" and e_stat != "passed":
                     add_error("unpassed_evidence_at_complete", f"{ev_loc}.status", f"Complete stage requires all evidence to be 'passed', got: {e_stat}")
 
@@ -933,11 +945,10 @@ def validate_contract(
                         add_error("file_not_found", f"{ev_loc}.reference", f"Evidence file does not exist: {e_ref}")
 
     if stage == "complete":
-        if ev_data is None or len(ev_data) == 0:
+        if not isinstance(ev_data, list) or len(ev_data) == 0:
             add_error("missing_complete_evidence", "evidence", "Stage 'complete' requires evidence array covering all acceptance criteria.")
         else:
-            ev_c_ids = {e.get("criterion_id") for e in ev_data if isinstance(e, dict)}
-            missing_acs = known_ac_ids - ev_c_ids
+            missing_acs = known_ac_ids - seen_ev_criterion_ids
             if missing_acs:
                 add_error(
                     "incomplete_evidence_coverage",

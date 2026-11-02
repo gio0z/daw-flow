@@ -1,12 +1,12 @@
 # UI/UX & Interaction Design Specification: [Feature / Surface]
 
-> **Fill-in Guidance:** Fill this template for interactive behaviors, state transitions, and accessibility compliance. Equivalent existing interaction specs or Storybook stories may be referenced directly. Honor the repository or project's required accessibility standard (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified). Mark N/A with rationale if the change is non-interactive (e.g. backend worker, API, data pipeline). Unresolved interaction questions block only impacted UI component work. Never include secret values or credentials.
+> **Fill-in Guidance:** Fill this template for interactive behaviors, state transitions, and accessibility compliance. Equivalent existing interaction specs or Storybook stories may be referenced directly. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, embedded libraries), mark web WCAG conformance as N/A and document platform-specific proposed usability/ergonomics criteria (e.g. terminal contrast, keyboard shortcuts); never claim empirical screen-reader or platform compatibility absent observed tests. Unresolved interaction questions block only impacted UI component work. Never include secret values or credentials.
 
-> **Status:** Draft / Ready for Review / Approved / Superseded
-> **Owner:** [UI/UX Engineer / Product Designer]
+> **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
+> **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Interaction behaviors, accessibility states, keyboard navigation, focus management, micro-interactions]
-> **Source Documents / Revision:** [Wireframe, PRD, design system ref@rev]
-> **Target Accessibility Baseline:** [WCAG 2.2 AA default, or WCAG 2.2 AAA if project/user specified — never downgrade]
+> **Source Documents / Revision:** [Actual observed Wireframe, PRD, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
+> **Target Accessibility Baseline:** [For applicable web: WCAG 2.2 AA default, or WCAG 2.2 AAA if project/user specified — never downgrade; for non-web CLI/backend: N/A web conformance with platform-specific proposed usability criteria — never claim empirical compatibility absent tests]
 > **Assumptions:** [Design system version, baseline browser/device support, input modalities]
 > **Open Decisions:** [Material interaction ambiguities — block impacted UI implementation until resolved]
 > **Acceptance Criteria IDs:** [UIUX-01, UIUX-02, ...]
