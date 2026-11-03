@@ -214,6 +214,9 @@ def run_scenario(
     if arm == "wizard":
         interview_workspace = run_dir / "interview_workspace"
         interview_workspace.mkdir(parents=True, exist_ok=True)
+        # Oracle may read {transcript_file} on its first invocation; create it empty
+        # before any agent or oracle runs so reads of prior turns never hit a missing file.
+        transcript_file.write_text("", encoding="utf-8")
         suite_root = interview_workspace / ".agents/skills/deterministic-agentic-workflow"
         stage_suite(source, suite_root)
         sanitize_staged_suite(suite_root, source, scenario_dir.parent)

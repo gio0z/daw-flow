@@ -67,7 +67,7 @@ The design module governs structural analysis, architectural evaluation, and int
 ### Step 4: Proportional Specification Authoring
 
 1. Author or update only the relevant specifications for the scope.
-2. For canonical documents (`blueprint.md`, `prd.md`, `frd.md`, `architecture.md`, etc.), reuse templates from `../../templates/`.
+2. For canonical documents (`blueprint.md`, `prd.md`, `frd.md`, etc.), reuse templates from `../../templates/`.
 3. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
 
 ### Step 5: Classify Author Decisions vs. Consequential Decisions

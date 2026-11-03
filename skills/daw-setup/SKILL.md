@@ -109,7 +109,7 @@ Exact block format:
 
 ## 4. Output Contract
 
-Every completion of `daw-setup` delivers a structured handoff payload adhering to the canonical suite envelope (`handoff_to: orchestrator`):
+Every completion of `daw-setup` delivers a structured handoff payload adhering to the canonical suite envelope. `setup` is a single-stage terminal route: on `status: "pass"` it returns `handoff_to: null`.
 
 ```json
 {
@@ -137,7 +137,7 @@ Every completion of `daw-setup` delivers a structured handoff payload adhering t
     }
   ],
   "status": "pass",
-  "handoff_to": "orchestrator",
+  "handoff_to": null,
   "details": {
     "target_file": "AGENTS.md",
     "configuration": {

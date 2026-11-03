@@ -8,7 +8,7 @@ compatibility: "Fully self-contained procedural skill; no external dependencies 
 
 The wizard module conducts a structured, interactive specification interview for greenfield projects. It guides an operator from an initial idea through a progressive multi-phase elicitation, generating proportional specification documents grounded in the canonical 13-document matrix.
 
-**Invariant:** Maintain rigorous interview discipline. Ask 1–3 focused questions per turn, propose sensible defaults, adapt depth proportionally to project scale, and record unresolved items in an Open Questions appendix.
+**Invariant:** Maintain rigorous interview discipline. Ask at most 5 focused questions per round, propose sensible defaults, adapt depth proportionally to project scale, and record unresolved items in an Open Questions appendix.
 
 ---
 
@@ -102,7 +102,7 @@ Every completion of `daw-wizard` delivers a structured handoff payload adhering 
   ],
   "acceptance_criteria": [
     {
-      "criterion": "Conducted 6-phase elicitation interview with proportional depth and 1-3 questions per turn",
+      "criterion": "Conducted 6-phase elicitation interview with proportional depth and at most 5 questions per round",
       "status": "pass"
     },
     {

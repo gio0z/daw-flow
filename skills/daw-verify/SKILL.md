@@ -22,7 +22,7 @@ Generative analysis synthesizes test matrix needs and diagnoses failures, but tr
 
 Invoke `daw-verify` when:
 
-- Code, configuration, documentation, or infrastructure changes have been made during a `daw-build` or `daw-patch` stage.
+- Code, configuration, documentation, or infrastructure changes have been made during a `daw-build` stage for feature, bugfix, or patch routes.
 - Pre-handoff verification is required before opening a PR, delivering to user, or marking a milestone complete.
 - A regression sweep is needed across affected packages, CLI endpoints, or API surfaces.
 - Fresh failure evidence must be captured before/after a fix.
@@ -71,9 +71,11 @@ Declare the expected exit code or response status, as applicable, and behavioral
 
 ### Rule 2: Fresh Failing Scenario (Before & After)
 
-- When verifying bugfixes, capture the failing test/probe _before_ the fix (or inspect historical user logs).
-- Apply the fix, then run the exact same check to capture the _passing_ output.
-- **Exception:** If the user reported the failure with output, that observation is already ground truth. Do not rerun the broken state just to see it fail; proceed directly to applying and verifying the fix against that reported case.
+- Parent orchestrator routes implementation to `daw-build`.
+- The verifier consumes existing failing evidence and reruns the same probe after `daw-build` returns; the verifier never edits implementation.
+- For bugfixes, capture the failing test/probe before verification if needed.
+- Run the check against the updated state to capture the passing output.
+- **Exception:** User-reported failures/errors are authoritative ground truth. Never rerun checks solely to reconfirm what the user already observed and reported; proceed directly to executing allowed test execution and probes.
 
 ### Rule 3: No Dry-Run as Deploy Proof
 

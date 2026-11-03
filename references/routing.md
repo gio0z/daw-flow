@@ -11,16 +11,16 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 8 finite intents:
 
-| Precedence | Intent      | Classification Criteria                                                                       | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
-| :--------: | :---------- | :-------------------------------------------------------------------------------------------- | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   **1**    | `review`    | Diff review, security posture audit, boundary compliance check.                               |    Yes    |    No    | `daw-review`                                                                                                                                           |
-|   **2**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                                |    Yes    |    No    | `daw-ask`                                                                                                                                              |
-|   **3**    | `setup`     | Interactive configuration setup, tool command discovery, and repo convention block authoring. |    No     |   Yes    | `daw-setup`                                                                                                                                            |
-|   **4**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                  |    No     |   Yes    | `daw-wizard` -> `daw-design` -> `daw-plan`                                                                                                             |
-|   **5**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                       |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                             |
-|   **6**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, and regression test.                            |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
-|   **7**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes.                          |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
-|   **8**    | `feature`   | New capability or functional evolution requiring plan, build, review, and verification.       |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
+| Precedence | Intent      | Classification Criteria                                                                                 | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
+| :--------: | :---------- | :------------------------------------------------------------------------------------------------------ | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   **1**    | `review`    | Diff review, security posture audit, boundary compliance check.                                         |    Yes    |    No    | `daw-review`                                                                                                                                           |
+|   **2**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                                          |    Yes    |    No    | `daw-ask`                                                                                                                                              |
+|   **3**    | `setup`     | Interactive configuration setup, tool command discovery, and repo convention block authoring.           |    No     |   Yes    | `daw-setup`                                                                                                                                            |
+|   **4**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                            |    No     |   Yes    | `daw-wizard` -> `daw-design` -> `daw-plan`                                                                                                             |
+|   **5**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                                 |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                             |
+|   **6**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, and regression test.                                      |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
+|   **7**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes (requires `requirements: "clear"`). |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
+|   **8**    | `feature`   | New capability or functional evolution requiring plan, build, review, and verification.                 |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
 
 - When user intent is evaluation, code audit, or PR review, `review` takes precedence.
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
@@ -50,17 +50,27 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 
 ### Declarative Intent Stage Mapping
 
-| Intent              | Stage Pipeline                                                            | Constraints / Evaluation                              |
-| :------------------ | :------------------------------------------------------------------------ | :---------------------------------------------------- |
-| `ask`               | `daw-ask`                                                                 | Read-only; ignores risk and workspace.                |
-| `review`            | `daw-review`                                                              | Read-only; ignores risk and workspace.                |
-| `setup`             | `daw-setup`                                                               | Documentation-only; allows unclear requirements.      |
-| `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                | Documentation-only; allows unclear requirements.      |
-| `adopt`             | `daw-design` -> `daw-plan`                                                | Documentation-only; preserves user code.              |
-| `bugfix`            | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`  | Prepends `daw-workspace` if `workspace: "isolated"`.  |
-| `patch`             | `daw-build` -> `daw-verify`                                               | Prepends `daw-workspace` if `workspace: "isolated"`.  |
-| `feature` (clear)   | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                 | Prepends `daw-workspace` if `workspace: "isolated"`.  |
-| `feature` (unclear) | `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` | Requires requirements clarification or design intake. |
+| Intent              | Stage Pipeline                                                            | Constraints / Evaluation                                                               |
+| :------------------ | :------------------------------------------------------------------------ | :------------------------------------------------------------------------------------- |
+| `ask`               | `daw-ask`                                                                 | Read-only; ignores risk and workspace.                                                 |
+| `review`            | `daw-review`                                                              | Read-only; ignores risk and workspace.                                                 |
+| `setup`             | `daw-setup`                                                               | Documentation-only; allows unclear requirements.                                       |
+| `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                | Documentation-only; allows unclear requirements.                                       |
+| `adopt`             | `daw-design` -> `daw-plan`                                                | Documentation-only; preserves user code.                                               |
+| `bugfix`            | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`  | Prepends `daw-workspace` if `workspace: "isolated"`.                                   |
+| `patch`             | `daw-build` -> `daw-verify`                                               | Prepends `daw-workspace` if `workspace: "isolated"`. Requires `requirements: "clear"`. |
+| `feature` (clear)   | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                 | Prepends `daw-workspace` if `workspace: "isolated"`.                                   |
+| `feature` (unclear) | `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` | Requires requirements clarification or design intake.                                  |
+
+### Requirements Clarity Gate
+
+`patch` is pre-diagnosed by definition: its constraints are already well-defined, so requirements clarification is never part of the pipeline.
+
+- `requirements: "unknown"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNKNOWN` (exit code 1).
+- `requirements: "unclear"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNCLEAR` (exit code 1).
+- `requirements: "clear"` → unchanged `daw-build` -> `daw-verify`.
+
+`bugfix` keeps its investigation entry point (`daw-debug`) for `unknown`/`unclear` requirements; no other intent is gated on requirements clarity.
 
 ### Invocation Commands:
 

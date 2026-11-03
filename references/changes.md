@@ -1,5 +1,20 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-03: Skill Instruction Clarity and Oracle History
+
+- Reviewed the root skill and all ten modules; aligned wizard question pacing to at most five per round, debugging stop thresholds to two consecutive falsified hypotheses without narrowing, and planning document persistence with established project conventions.
+- Removed the nonexistent canonical `architecture.md` document and stale `daw-patch` module references. Clarified that implementation belongs to `daw-build`, not the verifier, and improved illustrative review evidence and workspace authorization criteria.
+- Initialize wizard transcripts before the first oracle call. History-aware oracles receive an empty file initially and prior completed questions and answers on subsequent turns.
+- Verified 140 unit tests, package and suite integrity checks, all 12 JSON examples across 11 skill files, and a public CLI history-aware oracle smoke spanning two interview rounds, specification output, and fixture acceptance. This verifies runner behavior and instruction consistency, not model compliance or interview quality.
+
+## 2026-11-03: Workflow Gate and Handoff Corrections
+
+- Block patch routes with unknown or unclear requirements before build dispatch; retain clear patch and investigative bugfix behavior.
+- Verify `.worktrees/` as a directory before its first creation, so directory-only ignore rules are recognized.
+- Make module handoffs follow the active route: documentation-only plans and setup terminate with `null`, patches proceed to verification, and feature/bugfix builds proceed to review. Failed or blocked stages do not advance.
+- Remove hidden requirement details from all bundled off-topic oracle responses and resolve the documented oracle executable before entering a disposable interview workspace.
+- Verified 139 unit tests, package and suite integrity checks, actual routing rejection/acceptance cases, first-worktree creation in a disposable repository, all three off-topic oracle responses, and a two-turn benchmark plumbing run with the documented oracle argv. Handoff instruction checks do not establish model compliance or elicitation quality.
+
 ## 2026-11-02: Installer Migration and Benchmark Correctness Fixes
 
 - Excluded hidden scenarios, acceptance scripts, and evaluator tests from staged wizard interview suites without changing source assets; staging is not an OS sandbox.

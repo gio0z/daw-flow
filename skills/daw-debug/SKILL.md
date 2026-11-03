@@ -169,7 +169,7 @@ Immediately halt debugging and return control to the parent orchestrator if:
 
 - **Contradictory Ground Truth:** Observed runtime facts directly contradict user-provided environmental guarantees.
 - **Destructive Mutation Required:** Reproduction or investigation would require destructive changes to production data, credentials, or untracked repository changes.
-- **Deep Thrashing Threshold Reached:** Three hypotheses tested without reducing the search space, indicating incorrect boundary assumptions or unobserved external state.
+- **Deep Thrashing Threshold Reached:** Two consecutive hypotheses falsified without narrowing the boundary (see Step 4 Anti-Thrashing), indicating incorrect boundary assumptions or unobserved external state.
 
 ---
 

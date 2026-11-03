@@ -2,7 +2,9 @@
 
 These tests exercise the runner and oracle plumbing using isolated fake agents
 and a self-contained temporary fixture scenario. They do not depend on external
-network access, LLM APIs, or scenarios under references/wizard-bench/.
+network access or LLM APIs. One oracle test runs the real reference oracle
+against the bundled scenarios under references/wizard-bench/ to check that
+off-topic questions disclose no hidden requirement.
 """
 
 from __future__ import annotations
@@ -41,6 +43,21 @@ if "Use daw-wizard" in prompt:
         q_dir = workspace / ".daw-interview"
         q_dir.mkdir(parents=True, exist_ok=True)
         (q_dir / "questions.md").write_text("1. What should we build?\\n")
+    elif action == "history_two_rounds":
+        if prompt.count("## Turn") >= 4:
+            # Turn 3: two completed rounds seen, write specs without asking.
+            specs_dir = workspace / "docs" / "specs"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "requirements.md").write_text("Spec: entrypoint is entry.py, output is SUCCESS\\n")
+        else:
+            q_dir = workspace / ".daw-interview"
+            q_dir.mkdir(parents=True, exist_ok=True)
+            if "## Turn" in prompt:
+                # Turn 2: first answer seen, ask a second distinct question.
+                (q_dir / "questions.md").write_text("2. Which output string confirms success?\\n")
+            else:
+                # Turn 1: ask first question.
+                (q_dir / "questions.md").write_text("1. What is the entrypoint file and output?\\n")
     else:
         if action == "secret_check":
             staged_suite = workspace / ".agents/skills/deterministic-agentic-workflow"
@@ -77,6 +94,39 @@ else:
     else:
         # Brief arm or missing specs: guesses wrongly
         (workspace / "wrong_app.py").write_text("print('UNKNOWN')\\n")
+"""
+
+HISTORY_READING_ORACLE_CODE = """import json
+import sys
+from pathlib import Path
+
+scenario_file, questions_file, transcript_file, state_file = sys.argv[1:5]
+transcript = Path(transcript_file)
+if not transcript.is_file():
+    raise FileNotFoundError(f"transcript missing on oracle invocation: {transcript_file}")
+history = transcript.read_text(encoding="utf-8")
+state_path = Path(state_file)
+turn = int(state_path.read_text(encoding="utf-8")) if state_path.is_file() else 1
+state_path.write_text(str(turn + 1), encoding="utf-8")
+question = "What is the entrypoint file and output?"
+answer = "The program must be entry.py and printing SUCCESS."
+if turn == 1:
+    if history.strip():
+        sys.stderr.write(f"Expected empty transcript on first oracle call, got: {history!r}\\n")
+        sys.exit(3)
+elif turn == 2:
+    if question not in history or answer not in history:
+        sys.stderr.write(f"Expected turn 1 question and answer in transcript, got: {history!r}\\n")
+        sys.exit(4)
+scenario = json.loads(Path(scenario_file).read_text(encoding="utf-8"))
+questions = Path(questions_file).read_text(encoding="utf-8")
+for requirement in scenario.get("hidden_requirements", []):
+    keywords = [w for w in requirement["text"].lower().split() if len(w) > 3]
+    if any(w in questions.lower() for w in keywords):
+        print(requirement["answer"])
+        break
+else:
+    print(scenario.get("out_of_scope_answer", "Out of scope."))
 """
 
 FAKE_JUDGE_CODE = """import json
@@ -232,16 +282,18 @@ class WizardBenchTests(unittest.TestCase):
         runs: int = 1,
         timeout: float = 10.0,
         scenario: str = "all",
+        oracle_cmd: list[str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], dict | None]:
         agent_cmd = [sys.executable, str(self.agent_script), "{prompt_file}", "{workspace}", action]
-        oracle_cmd = [
-            sys.executable,
-            str(ORACLE),
-            "--scenario",
-            "{scenario_file}",
-            "--questions",
-            "{questions_file}",
-        ]
+        if oracle_cmd is None:
+            oracle_cmd = [
+                sys.executable,
+                str(ORACLE),
+                "--scenario",
+                "{scenario_file}",
+                "--questions",
+                "{questions_file}",
+            ]
 
         cmd = [
             sys.executable,
@@ -313,6 +365,40 @@ class WizardBenchTests(unittest.TestCase):
         self.assertTrue((run_dir / "docs/requirements.md").is_file())
         self.assertTrue((run_dir / "build_workspace/entry.py").is_file())
         self.assertTrue((run_dir / "acceptance.stdout.txt").is_file())
+
+    def test_history_reading_oracle_gets_empty_then_prior_turn_transcript(self) -> None:
+        """Two-round interview with an oracle reading {transcript_file} each call: first empty, then turn 1 Q/A."""
+        oracle_script = self.root / "history_oracle.py"
+        oracle_script.write_text(HISTORY_READING_ORACLE_CODE, encoding="utf-8")
+        state_file = self.root / "oracle_calls.txt"
+        oracle_cmd = [
+            sys.executable,
+            str(oracle_script),
+            "{scenario_file}",
+            "{questions_file}",
+            "{transcript_file}",
+            str(state_file),
+        ]
+
+        output = self.root / "out_history_oracle"
+        proc, summary = self.run_bench(
+            output, arm="wizard", action="history_two_rounds", oracle_cmd=oracle_cmd
+        )
+        self.assertEqual(proc.returncode, 0, f"Benchmark runner failed:\n{proc.stderr}")
+        self.assertIsNotNone(summary)
+
+        # Exactly two oracle invocations, both observing the expected history.
+        self.assertEqual(state_file.read_text(encoding="utf-8"), "3")
+
+        run_dir = output / "fixture-scenario-wizard-001"
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["turns_used"], 3)
+        self.assertEqual(result["question_count"], 2)
+        self.assertEqual(result["pass_rate"], 1.0)
+        checks = {c["check"]: c["status"] for c in result["checks"]}
+        self.assertEqual(checks, {"entry_exists": "pass", "prints_success": "pass"})
+
 
     def test_brief_arm_workspace_has_no_specs_no_suite_and_acceptance_fails(self) -> None:
         """Brief arm: build workspace contains no docs/specs and no suite; acceptance fails => pass_rate < 1."""
@@ -587,6 +673,24 @@ class WizardBenchTests(unittest.TestCase):
             proc_unrelated.stdout.strip(),
             "That is out of scope for this tool.",
         )
+
+    def test_reference_oracle_off_topic_discloses_no_hidden_requirement(self) -> None:
+        """Real reference oracle: off-topic question leaks no hidden artifact, option, or subcommand."""
+        cases = [
+            ("bookmark-manager", "What is the entrypoint file name?", "python3 bookmarks.py", ["bookmarks.json", "add", "search"]),
+            ("expense-tracker", "What is the entrypoint script called?", "python3 expenses.py", ["expenses.csv", "summary"]),
+            ("log-analyzer", "What entrypoint filename is required?", "python3 logparser.py", ["--min-status", "--json", "Common Log Format"]),
+        ]
+        for scenario_id, on_topic, expected_entrypoint, leaked in cases:
+            scenario_file = REPO_ROOT / "references/wizard-bench" / scenario_id / "scenario.json"
+            cmd = [sys.executable, str(ORACLE), "--scenario", str(scenario_file)]
+
+            on_topic_reply = subprocess.run(cmd, input=on_topic, text=True, capture_output=True).stdout
+            self.assertIn(expected_entrypoint, on_topic_reply)
+
+            off_topic_reply = subprocess.run(cmd, input="quantum banana zebra?", text=True, capture_output=True).stdout
+            for leak in leaked:
+                self.assertNotIn(leak, off_topic_reply, f"{scenario_id}: off-topic reply leaked {leak!r}")
 
 
 if __name__ == "__main__":

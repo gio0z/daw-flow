@@ -93,7 +93,13 @@ When the orchestrator delegates tasks across multiple subagents:
 
 ## 4. Output Contract
 
-Every completion of `daw-build` delivers a structured handoff payload adhering to the canonical suite envelope. Rich build facts, test strategies, and clean cutover status are preserved under `details`:
+Every completion of `daw-build` delivers a structured handoff payload adhering to the canonical suite envelope. Rich build facts, test strategies, and clean cutover status are preserved under `details`.
+
+**Handoff Selection:** Choose `handoff_to` from the active route only; the handoff is advisory metadata for the parent orchestrator and `daw-build` never invokes another module directly.
+
+- **`patch` route:** `daw-build` precedes `daw-verify`. On `status: "pass"`, recommend `daw-verify`.
+- **`feature` / `bugfix` routes:** The active route places `daw-review` before `daw-verify`. On `status: "pass"`, recommend `daw-review` — never skip review to reach verification.
+- **Halted (`status: "fail"` or `"blocked"`):** Return `handoff_to: null`. A stopped or failed build stage never advances the pipeline.
 
 ```json
 {
@@ -122,6 +128,7 @@ Every completion of `daw-build` delivers a structured handoff payload adhering t
   "status": "pass",
   "handoff_to": "daw-review",
   "details": {
+    "route": "feature",
     "modified_files": [
       {
         "path": "src/auth/serializer.py",
@@ -209,20 +216,18 @@ When direct invocation attempts high-risk modifications (such as production auth
 
 ## 6. Stop / Replan Protocols
 
-Immediately halt construction and escalate to the parent orchestrator if:
+Immediately halt construction, return `handoff_to: null`, and escalate to the parent orchestrator if:
 
 - **Interface Mismatch / Missing Dependency:** An expected upstream interface, type definition, or internal service contract is missing, ambiguous, or incompatible with the build plan.
 - **File Ownership Conflict:** Implementing the required change requires modifying a file currently assigned to or locked by a concurrent sibling agent.
 - **Red Phase Non-Reproducibility:** The failing behavioral test passes without code changes (flaky or invalid test specification), or fails due to an intractable environment error outside the build scope.
-- **Scope Creep / Missing Architectural Guidance:** Meeting the acceptance criteria requires modifying core database schemas, changing public API contracts, or refactoring unassigned subsystems.
 
 ---
 
 ## 7. Handoff
 
-Upon exit:
+Upon exit, return the Build Handoff report to the parent orchestrator with the advisory `handoff_to` selected per the Handoff Selection rules in §4: `daw-verify` for the `patch` route, `daw-review` for `feature` / `bugfix`, and `null` when halted. The parent decides dispatch; `daw-build` never invokes another module directly.
 
-- Yield the Build Handoff report to the parent orchestrator for end-to-end integration verification and dispatch to `daw-review`.
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`

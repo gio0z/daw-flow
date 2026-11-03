@@ -127,5 +127,5 @@
       ]
     }
   ],
-  "out_of_scope_answer": "That is out of scope. We only need the core CLI commands: add, list, and summary with CSV persistence."
+  "out_of_scope_answer": "That is outside the scope of this project."
 }

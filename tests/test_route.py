@@ -214,6 +214,65 @@ class TestRouteSuite(unittest.TestCase):
         res = route.resolve_route(req, root=self.suite_root)
         self.assertEqual(res["status"], "ready")
 
+    def test_patch_requires_clear_requirements(self):
+        # Clear patch -> unchanged build/verify pipeline
+        req = make_request(intent="patch", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-build", "daw-verify"])
+
+        # Unknown patch requirements -> needs-input, no stages
+        req = make_request(intent="patch", requirements="unknown", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "needs-input")
+        self.assertEqual(res["stages"], [])
+        self.assertEqual([b["code"] for b in res["blockers"]], ["REQUIREMENTS_UNKNOWN"])
+
+        # Unclear patch requirements -> needs-input, no stages, distinct diagnostic
+        req = make_request(intent="patch", requirements="unclear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "needs-input")
+        self.assertEqual(res["stages"], [])
+        self.assertEqual([b["code"] for b in res["blockers"]], ["REQUIREMENTS_UNCLEAR"])
+
+        # Bugfix keeps investigation for unknown/unclear requirements
+        for clarity in ("unknown", "unclear"):
+            req = make_request(intent="bugfix", requirements=clarity, risk="low", workspace="in-place")
+            res = route.resolve_route(req, root=self.suite_root)
+            self.assertEqual(res["status"], "ready")
+            self.assertEqual(res["stages"][0], "daw-debug")
+
+        # No generic gate: ask/bugfix unclear still route
+        req = make_request(intent="ask", requirements="unclear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+
+    def test_cli_patch_requirements_gate_exit_codes(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        req_file = self.suite_root / "request.json"
+        cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root)]
+
+        req_file.write_text(
+            json.dumps(make_request(intent="patch", requirements="unclear", risk="low", workspace="in-place")),
+            encoding="utf-8",
+        )
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 1)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["status"], "needs-input")
+        self.assertEqual(data["stages"], [])
+        self.assertEqual([b["code"] for b in data["blockers"]], ["REQUIREMENTS_UNCLEAR"])
+
+        req_file.write_text(
+            json.dumps(make_request(intent="patch", requirements="unknown", risk="low", workspace="in-place")),
+            encoding="utf-8",
+        )
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 1)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["status"], "needs-input")
+        self.assertEqual([b["code"] for b in data["blockers"]], ["REQUIREMENTS_UNKNOWN"])
+
     def test_risk_and_approval_invariants(self):
         # Read-only intent with unknown risk -> ignored
         req = make_request(intent="review", requirements="clear", risk="unknown", workspace="in-place")

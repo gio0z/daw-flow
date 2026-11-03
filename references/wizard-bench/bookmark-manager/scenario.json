@@ -124,5 +124,5 @@
       ]
     }
   ],
-  "out_of_scope_answer": "That is out of scope. We only need `bookmarks.py` with `add` and `search` subcommands backed by `bookmarks.json`."
+  "out_of_scope_answer": "That is outside the scope of this project."
 }

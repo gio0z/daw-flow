@@ -72,20 +72,25 @@ Each scenario is evaluated across two arms:
 
 ### Invocation
 
+Resolve the reference oracle before starting the runner; oracle commands execute from the disposable interview workspace, not this repository:
+
 ```bash
+ORACLE_PATH="$(pwd)/scripts/wizard_oracle.py"
 python3 scripts/wizard_bench.py \
   --agent-command '["/path/to/agent-adapter", "{prompt_file}", "{workspace}"]' \
-  --oracle-command '["python3", "scripts/wizard_oracle.py", "--scenario", "{scenario_file}", "--questions", "{questions_file}"]' \
+  --oracle-command "[\"python3\", \"$ORACLE_PATH\", \"--scenario\", \"{scenario_file}\", \"--questions\", \"{questions_file}\"]" \
   --judge-command '["/path/to/judge-adapter", "{scenario_file}", "{transcript_file}", "{specs_dir}"]' \
   --output-dir /tmp/daw-wizard-bench-001 \
   --arm both --runs 3 --max-turns 6 --agent-label "client/version; model"
 ```
 
-Command placeholders (`{prompt_file}`, `{workspace}`, `{suite_root}`, `{scenario_file}`, `{questions_file}`, `{transcript_file}`, `{specs_dir}`) are substituted by the runner without shell expansion.
+Command placeholders (`{prompt_file}`, `{workspace}`, `{suite_root}`, `{scenario_file}`, `{questions_file}`, `{transcript_file}`, `{specs_dir}`) are substituted by the runner without shell expansion. `{transcript_file}` always exists: the runner creates it empty at the start of the interview, before any agent or oracle call, so an oracle may read it on its first invocation; on the first turn it is empty, and on later turns it holds the questions and answers of the prior completed turns.
 
 ### Reference oracle (`wizard_oracle.py`)
 
 The suite provides `scripts/wizard_oracle.py`, a deterministic, zero-dependency reference oracle for testing and CI. It extracts questions from markdown lists, computes stopword-filtered keyword overlap against hidden scenario requirements, and returns the requirement's answer if the overlap meets the threshold, or `out_of_scope_answer` otherwise.
+
+**Off-topic policy**: `out_of_scope_answer` is a neutral refusal that discloses no hidden requirement. A question matching no requirement (for example, an unrelated query) must not reveal entrypoint names, storage formats, commands, options, or other hidden constraints; supplying such detail there would leak the evaluation fixture and defeat IRE measurement. Keep the refusal minimal and free of new requirements. Requirements that do match keywords must still return their full expected answer.
 
 **Note**: `wizard_oracle.py` is a deterministic, low-fidelity stand-in. In production evaluations, an LLM oracle (ReqElicitGym style) is recommended via `--oracle-command` to parse diverse semantic phrasing.
 

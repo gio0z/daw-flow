@@ -85,7 +85,7 @@ The workflow routes incoming tasks using an explicit finite intent decision hier
 4. **Bootstrap (`bootstrap`):** Greenfield project specification from a brief or prompt in an empty or new directory. Begins with an interactive requirements interview via `daw-wizard`, then generates core specification documents and planning breakdown. Dispatches to `daw-wizard` -> `daw-design` -> `daw-plan` (documentation-only).
 5. **Adopt (`adopt`):** Reverse-engineering and specification authoring for an existing codebase with missing or partial documentation. Dispatches to `daw-design` -> `daw-plan` (documentation-only; preserves user code).
 6. **Bugfix (`bugfix`):** Diagnosing, reproducing, and resolving an existing defect or test failure. Dispatches to `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
-7. **Patch (`patch`):** Minimal, pre-diagnosed fix or surgical change with well-defined constraints. Dispatches to `daw-build` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
+7. **Patch (`patch`):** Minimal, pre-diagnosed fix or surgical change with well-defined constraints. Requires `requirements: "clear"`; unknown or unclear requirements yield `needs-input` with no stages. Dispatches to `daw-build` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
 8. **Feature (`feature`):** Multi-step functional change or new capability. If requirements are clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. If requirements are unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. Prepends `daw-workspace` if workspace is isolated.
 
 ### Routing Execution API & Manifest Policy
@@ -100,7 +100,7 @@ _(Always invoke using the explicitly resolved script path `$SUITE_ROOT/scripts/r
 
 The request requires classified input facts (`schema_version`, `intent`, `requirements`, `risk`, `workspace`):
 
-- If requirements are unknown for `bootstrap` or `feature`, or if workspace is unknown for mutating intents (`feature`, `bugfix`, `patch`), or if risk is unknown for mutating intents (`feature`, `bugfix`, `patch`), the engine returns `status: "needs-input"` with explicit blockers.
+- If requirements are unknown for `bootstrap` or `feature`, requirements are unknown or unclear for `patch`, or if workspace is unknown for mutating intents (`feature`, `bugfix`, `patch`), or if risk is unknown for mutating intents (`feature`, `bugfix`, `patch`), the engine returns `status: "needs-input"` with explicit blockers.
 - In shell-less or Python-less environments, agents may evaluate `references/suite-manifest.json` manually, but must explicitly disclose that the deterministic resolver script was unexercised.
 
 ---

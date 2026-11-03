@@ -113,5 +113,5 @@
       ]
     }
   ],
-  "out_of_scope_answer": "That is out of scope. We only need `logparser.py` analyzing Common Log Format files with `--min-status` and `--json` options."
+  "out_of_scope_answer": "That is outside the scope of this project."
 }

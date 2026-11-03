@@ -422,7 +422,7 @@ def resolve_route(
     needs_input = False
 
     if requirements == "unknown":
-        if intent in ("bootstrap", "feature"):
+        if intent in ("bootstrap", "feature", "patch"):
             needs_input = True
             reasons.append(f"Requirements unknown for {intent}; detailed input required before planning stages.")
             blockers.append({"code": "REQUIREMENTS_UNKNOWN", "message": f"Requirements are unknown for intent '{intent}'."})
@@ -430,6 +430,11 @@ def resolve_route(
             reasons.append("Requirements unknown for adopt: proceeding with source observation and intake.")
         else:
             reasons.append(f"Requirements unknown for {intent}: proceeding without blocking initial investigation.")
+    elif requirements == "unclear" and intent == "patch":
+        # Patch is pre-diagnosed with well-defined constraints; unclear requirements contradict that premise.
+        needs_input = True
+        reasons.append("Requirements unclear for patch; patch requires pre-diagnosed, well-defined constraints.")
+        blockers.append({"code": "REQUIREMENTS_UNCLEAR", "message": "Requirements must be clear ('clear') for intent 'patch'."})
 
     interactive_approval_required = False
     if read_only:

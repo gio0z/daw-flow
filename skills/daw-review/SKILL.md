@@ -132,8 +132,8 @@ Every completion of `daw-review` delivers a structured handoff payload adhering 
   ],
   "evidence": [
     {
-      "reference": "tests/auth/test_session_serializer.py",
-      "summary": "Verified behavioral tests execute and prove round-trip session versioning"
+      "reference": "pytest tests/auth/test_session_serializer.py",
+      "summary": "pytest tests/auth/test_session_serializer.py exited 0 (2 passed)"
     }
   ],
   "status": "pass",

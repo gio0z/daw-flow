@@ -21,7 +21,7 @@ The planning module converts design specifications, architectural requirements, 
 
 ### Non-Goals & Invariants
 
-- **No Document Sprawl:** Do not force creation of persistent `tasks.md` or tracker files unless requested. Outputting the structured plan in the handoff response is sufficient for standard tasks.
+- **No Document Sprawl:** Do not force creation of persistent `tasks.md` or tracker files unless requested by the user or required by established project conventions. Returning the structured plan in the stage payload is sufficient for standard tasks.
 - **Concrete Scope:** Every task must specify exact file paths, operations, and verification commands.
 - **Disjoint File Ownership:** Parallel tasks must have non-overlapping file sets to prevent conflicting edits or race conditions.
 - **No Unwanted Commits or Git Hooks:** Planning never runs git commits, pushes, or alters hooks.
@@ -80,7 +80,13 @@ Format the plan into the standard output schema. Provide the plan directly in th
 
 ## 4. Output Contract
 
-Every completion of `daw-plan` delivers a structured handoff payload adhering to the canonical suite envelope. Rich task breakdowns, dependencies, and verification commands are preserved under `details`:
+Every completion of `daw-plan` delivers a structured handoff payload adhering to the canonical suite envelope. Rich task breakdowns, dependencies, and verification commands are preserved under `details`.
+
+**Handoff Selection:** Choose `handoff_to` from the active route only; never invoke another module directly.
+
+- **`bootstrap` / `adopt` routes (documentation-only):** `daw-plan` is the terminal stage. Return `handoff_to: null` even when `status: "pass"`. Never recommend `daw-build`; planning completion ends the pipeline.
+- **`feature` / `bugfix` routes (implementation):** Read the active route's ordered stages from the router plan and recommend the stage immediately following `daw-plan`. Never skip a stage or jump past review.
+- **Halted (`status: "fail"` or `"blocked"`):** Return `handoff_to: null`; the parent decides replan or routing.
 
 ```json
 {
@@ -106,6 +112,7 @@ Every completion of `daw-plan` delivers a structured handoff payload adhering to
   "status": "pass",
   "handoff_to": "daw-build",
   "details": {
+    "route": "feature",
     "execution_mode": "Sequential",
     "tasks": [
       {
@@ -149,17 +156,22 @@ _(Note: `status: "pass"` indicates that planning phase criteria have been satisf
 
 ## 6. Stop / Replan Triggers
 
-- **Missing Interface:** If an architectural contract is missing or undefined during decomposition, halt planning and route back to `daw-design`.
+These are advisory recommendations to the parent orchestrator; `daw-plan` does not invoke another module directly.
+
+- **Missing Interface:** If an architectural contract is missing or undefined during decomposition, halt planning (`status: "blocked"`, `handoff_to: null`) and recommend `daw-design` to the parent.
 - **Ownership Collision:** If concurrent tasks overlap on the same file, serialize them or extract shared parts into a prerequisite task.
-- **Task Failure in Execution:** If a task verification gate fails, route to `daw-debug` or replan that specific slice.
+- **Task Failure in Execution:** If a task verification gate fails, halt and recommend `daw-debug` or replan that specific slice to the parent.
 
 ---
 
 ## 7. Handoff Protocol
 
-- **To Execution Agents (`daw-build` / Task Subagents):** Dispatch tasks in dependency order with file ownership and AC.
-- **To `daw-review`:** Hand off for two-stage specification compliance and code review after implementation verification passes.
-- **To `daw-debug`:** Route when task verification fails during implementation.
-- **To Orchestrator:** Return structured plan payload; orchestrator executes subagent dispatch.
+All handoffs are advisory metadata returned to the parent orchestrator; `daw-plan` never invokes another module directly and never dispatches subagents itself.
+
+Select `handoff_to` from the active route:
+
+- **`bootstrap` / `adopt`:** Terminal. Return `handoff_to: null` with `status: "pass"`; do not recommend `daw-build`.
+- **`feature` / `bugfix`:** Recommend the stage immediately after `daw-plan` in the active route's ordered stages (the next stage in the router plan), preserving review/verify ordering. Do not skip stages.
+- **Halted (`fail` / `blocked`) or verification failure during planning:** Return `handoff_to: null`; report the blocker and let the parent route to `daw-debug` or replan.
 
 _Reference Link:_ See [Shared Routing Contract](../../references/routing.md) and [Changes Lifecycle Guide](../../references/changes.md).

@@ -93,7 +93,7 @@ When an isolated worktree is authorized:
    - **In-Repo Directory:** E.g., `.worktrees/<branch-name>`. MUST be verified as ignored before creation:
      ```bash
      # Check if already ignored
-     git check-ignore -q .worktrees
+     git check-ignore -q .worktrees/
      ```
      If not ignored and local exclude modification is authorized:
      ```bash
@@ -102,7 +102,7 @@ When an isolated worktree is authorized:
      # Inspect and update exclude file if verified not ignored
      test -f "$EXCLUDE_FILE" && grep -qxF ".worktrees/" "$EXCLUDE_FILE" || echo ".worktrees/" >> "$EXCLUDE_FILE"
      # Verify it is now recognized as ignored
-     git check-ignore -q .worktrees
+     git check-ignore -q .worktrees/
      ```
      Do NOT modify global git configurations (`~/.gitconfig` or global ignores) or repository `.gitignore` without explicit instruction.
 2. **Unique Branch Naming:**
@@ -144,7 +144,7 @@ For standard tasks running in the active working tree:
 
 1. Verify explicit authorization for isolated worktree.
 2. Determine target path:
-   - If inside repository (e.g., `.worktrees/<name>`), verify it is ignored using `git check-ignore -q .worktrees`. If not ignored and authorized, add `.worktrees/` to `$(git rev-parse --git-path info/exclude)` and re-verify without error.
+   - If inside repository (e.g., `.worktrees/<name>`), verify it is ignored using `git check-ignore -q .worktrees/`. If not ignored and authorized, add `.worktrees/` to `$(git rev-parse --git-path info/exclude)` and re-verify without error.
    - If outside repository (e.g., `../<repo>-<name>`), ignore check is not needed.
 3. Create worktree off the current commit:
    ```bash
@@ -189,7 +189,7 @@ Every completion of `daw-workspace` delivers a structured handoff payload adheri
       "status": "pass"
     },
     {
-      "criterion": "Confirm zero destructive git operations (no reset, stash, or clean)",
+      "criterion": "Confirm no unauthorized branch switching, discarding, stashing, or deletion",
       "status": "pass"
     }
   ],
