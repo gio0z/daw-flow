@@ -1,8 +1,8 @@
 # Operations, Execution, Verification & Maintenance Reference
 
-This reference defines operational protocols for deterministic AI execution: preflight safety checks, fail-closed human/provider approvals, approval invalidation rules, immutable release rollback, tool reuse policies, semantic acceptance verification, secret redaction, and opt-in background maintenance.
+This reference defines operational protocols for deterministic AI execution: preflight safety checks, fail-closed human/provider approvals, approval invalidation rules, immutable release rollback, tool reuse policies, semantic acceptance verification, secret redaction, opt-in background maintenance, and harness-native persistent worker graph contracts.
 
-Operational scope pairs generative cognitive planning with deterministic, script-driven tool execution and verification gates, alongside explicit fail-closed authorization boundaries, release-snapshot rollback mechanics, and proactive background maintenance boundaries for multi-tenant and local workstation environments.
+Operational scope pairs generative cognitive planning with deterministic, script-driven tool execution and verification gates, alongside explicit fail-closed authorization boundaries, release-snapshot rollback mechanics, proactive background maintenance boundaries for multi-tenant and local workstation environments, and session-bounded worker retention scoped to the owning workflow.
 
 ### Self-Contained Execution & Risk Gating Invariants
 
@@ -174,6 +174,81 @@ Maintenance agents that monitor systems, audit logs, or patch security advisorie
    - **Approval-Only (Always):** Production restarts, database indexing or compaction, configuration changes, schema migrations, and code modifications affecting core logic.
 
 5. **Kill-Switch, Ownership & Reporting:**
-   - Every background maintenance loop must have a clear named owner and an immediate disable mechanism (environment variable, flag, or kill-switch file).
-   - Every maintenance action must emit a structured audit log (with secrets redacted) and generate a human-reviewable report detailing observations, actions taken, and verification results.
-   - If an unexpected condition or verification failure occurs during maintenance: **Stop immediately, alert the owner, and return to the planning layer.** Never attempt unapproved self-directed system restructuring.
+   Every background maintenance loop must have a clear named owner and an immediate disable mechanism (environment variable, flag, or kill-switch file).
+   Every maintenance action must emit a structured audit log (with secrets redacted) and generate a human-reviewable report detailing observations, actions taken, and verification results.
+   If an unexpected condition or verification failure occurs during maintenance: Stop immediately, alert the owner, and return to the planning layer. Never attempt unapproved self-directed system restructuring.
+
+## Persistent Worker Graphs (Harness-Native)
+
+Persistent here means a harness can continue a completed worker with its identity and
+conversation retained during the owning workflow session. DAW supplies instructions,
+not a scheduler, backing store, daemon, or automatic recovery after process loss.
+Idle/parked workers need not run continuously. Session history alone does not prove
+that continuation is supported or that a workflow can resume after a crash.
+
+### Capability Discovery & Fallback
+
+At ordinary workflow intake, the parent MUST discover applicable harness capabilities
+from exposed tools/documentation (or reuse still-applicable observed discovery). When
+the task already warrants delegation and corrective rounds, completed-worker retention
+is the default if supported, unless the user opts out. No persistence keyword, extra
+confirmation, or prior `daw-setup` invocation is required. Small direct tasks remain
+direct; never add workers or review stages merely to use retention. The active route
+is unchanged. This default is optional persistence, not a requirement: unavailable or
+failed continuation uses the explicit fresh-worker handoff below unless the user
+explicitly requires retention. These are agent instructions, not runtime enforcement.
+
+Inspect exposed harness tools/documentation for spawning, continuation after completion,
+result delivery, independent reviewers, interactive approval, and lifecycle/resource
+limits. Messaging a running worker or keeping a batch pool alive does not establish
+completed-worker continuation. Do not enable global settings to obtain a capability.
+When retention is optional and unavailable, report it and use a fresh worker with an
+explicit handoff; never describe that as persistent reuse. If retention is required,
+return `blocked`. Missing required approval also blocks the action; self-review must
+never be presented as independent review.
+
+### Parent-Owned Graph & Dispatch
+
+1. **Register roles and dependencies:** The parent tracks node/task identity, role,
+   harness worker ID, current round, artifact revision (hash or immutable snapshot),
+   mandatory inputs, write ownership, and accepted evidence in its existing plan or
+   handoff artifacts. This is workflow bookkeeping, not a new required JSON schema.
+   Keep builder and independent read-only reviewer distinct; parallel writers need
+   disjoint ownership or an explicit integration boundary. Do not retain secrets in
+   messages or handoff artifacts.
+2. **Dispatch eligible work:** Start only nodes whose mandatory inputs are accepted
+   for the current revision. Send the assigned scope, revision, criteria and allowed
+   tools. Resume the same worker only in the same role when continuation is supported;
+   reread current sources/constraints and perform proportional preflight on resumption.
+   Retained context never extends permissions or authorizes a new scope.
+3. **Accept results, not narratives:** Match the worker, task, round and revision to
+   the current dispatch. Reject/report stale, duplicate, cancelled or failed-transport
+   results and unsupported success claims; do not treat them as accepted evidence.
+   A canonical stage `pass` advances only after its criteria and evidence are checked.
+   Join all mandatory current-revision inputs before downstream dispatch; an earlier
+   successful sibling cannot hide a failed, missing or still-running dependency.
+4. **Control feedback at the parent:** On a correctable `fail`, send concrete findings
+   to the retained builder, then send the corrected artifact to the retained reviewer.
+   Advance the artifact revision and invalidate affected downstream review/verification
+   passes. Bind high-risk approvals to the exact current action, target, revision and
+   scope; previous approval is not inherited by a corrective round. `blocked` holds
+   affected nodes while independent authorized work may continue. Follow the active
+   route and existing review/debug retry and stop/replan rules; retention grants no
+   extra attempts. The parent schedules successive rounds, never module-to-module
+   recursion or a cyclic dependency inside an acyclic DAG/batch helper.
+5. **Stop explicitly:** Report actual harness time/cost/iteration limits where exposed;
+   do not invent hard enforcement. On stagnation, exhausted allowed retries, missing
+   prerequisites or an operational bound, preserve evidence and stop/replan without
+   claiming completion. A failed executed criterion remains `fail`; missing prerequisites
+   remain `blocked`. At completion/stop record the final revision and pending work,
+   disable further dispatch and cancel only workflow-owned running work when needed.
+   Late output cannot restart the graph. End-to-end completion requires the active
+   route's final criteria and actual current-revision verification, not a worker exit.
+
+### Optional OMP Mapping
+
+When exposed by the host, `task` creates workers, `write agent://ID` continues a retained
+idle/parked worker, and results arrive automatically; use `wait` only when blocked.
+Observe successful continuation before relying on it. A drained `workpool` is not a
+retained worker graph. Other harnesses may expose different tools or no continuation;
+apply the capability/fallback rules above rather than requiring OMP commands.

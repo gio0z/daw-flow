@@ -44,6 +44,7 @@ Before writing or modifying code:
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before mutating any files or writing code, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Standard local file construction requires no production credentials.
+   - On same-role worker continuation, reread current source and scope, apply only authorized corrections, and return evidence for the current artifact revision to the parent. Never dispatch the next module yourself. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
 
 ---
 

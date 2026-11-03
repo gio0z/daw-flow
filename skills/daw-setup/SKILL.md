@@ -41,6 +41,8 @@ The setup module initializes or updates Deterministic Agentic Workflow (DAW) con
    - Before executing phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6).
    - Before any file mutation, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Unknown risk, ambiguous scope, or missing confirmation must immediately transition to `blocked` before writing to disk.
+   - Discover worker spawning, continuation after completion, parallel result delivery, independent review, interactive approval, and lifecycle limits from exposed harness tools/documentation. Running-only messaging is not persistence; do not change global settings to obtain it. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
+   - Setup can record capability hints, but is not a prerequisite for automatic worker selection: ordinary workflow intake performs lightweight discovery when needed, reusing observations only while applicable. No persistence keyword or additional confirmation is required.
 
 ---
 

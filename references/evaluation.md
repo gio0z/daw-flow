@@ -113,3 +113,37 @@ When `--judge-command` is omitted, judge metrics are explicitly marked as `"ungr
 - **CLI exit codes**: The runner CLI returns exit code 0 when all runs complete grading normally (even when implementations fail acceptance checks with fractional pass rates). The CLI returns exit code 1 when infrastructure fails (runner crash or `grading_failed`), when an agent crashes/times out, when an interview terminates with `interview_turn_limit` or `interview_failed`, or when an invoked `--judge-command` fails.
 - The deterministic keyword oracle cannot interpret creative paraphrasing or multi-part complex questions.
 - Results are identified with `--agent-label` and suite hash metadata. Human review of interview transcripts and specifications remains essential to audit reasoning quality.
+
+## Persistent Worker Graph Pilot
+
+This opt-in manual protocol exercises the [harness-native graph contract](operations.md#persistent-worker-graphs-harness-native).
+The existing `evaluate.py` cases do not exercise retained worker identity. Passing their
+plumbing checks is not evidence that a model follows this graph protocol.
+
+1. **Prepare an isolated fixture:** In a disposable local directory, create an argparse
+   CLI accepting two integer operands and printing `add(left, right)`. Seed `add` with
+   `return abs(left) + abs(right)`. Record revision `r0` and its hash. Parent executes
+   `python3 calculator.py -2 -3`: expected signed result `-5`, defective result `5`.
+2. **Dispatch baseline roles:** Spawn a builder with eventual write ownership of that
+   file, initially inspection-only; let it complete. Spawn an independent read-only
+   reviewer against the signed-add contract; expect a concrete sign-loss finding on
+   `r0`. Record both actual worker IDs and the task/round/revision of each dispatch.
+3. **Continue the builder:** Once baseline review completes, send its findings to the
+   same completed builder ID, authorizing only `return left + right`. Read the actual
+   artifact, record `r1` and its hash, and invalidate affected `r0` downstream evidence.
+   If continuation fails, record it; explicit fresh-worker fallback proves replacement,
+   not continuity of the failed worker. Required persistence instead returns `blocked`.
+4. **Continue the reviewer:** Send `r1` to the same independent reviewer ID. Require a
+   fresh source read and revision-specific result, not repetition of a prior pass.
+   Parent rejects transport failures, unsupported claims and mismatched revisions;
+   worker completion alone is not acceptance.
+5. **Verify and close:** Parent executes actual CLI cases `(-2,-3) -> -5`, `(-4,1) -> -3`,
+   `(0,0) -> 0`, `(5,-7) -> -2`, and `(2,3) -> 5`. Record argv, expected/actual output,
+   exit status, current artifact hash, reviewer evidence and final workflow outcome.
+   Complete only after all mandatory current inputs pass; leave no pending dispatch.
+
+Record artifacts outside the source suite without credentials. This demonstrates only
+observed session continuation and behavior, not durable recovery, hard scheduler
+enforcement, or broad model quality. The additional stale-result, unavailable-capability,
+join and stop scenarios in [behavior scenarios](../tests/behavior-scenarios.md#persistent-worker-graph-scenarios)
+remain unexercised until their own observations are collected.

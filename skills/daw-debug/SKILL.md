@@ -47,6 +47,7 @@ Before initiating systematic debugging, collect or establish:
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before running any state-changing reproduction command, script, or environment action, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before executing commands. Read-only diagnostic reads require no production credentials.
+   - When a corrected artifact is re-diagnosed on a retained same-role worker, reread the current sources and reproduce against the current revision; an earlier diagnosis is not evidence for it. The existing anti-thrashing threshold (two consecutive falsified hypotheses) and stop/replan rules still bound retries. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
 
 ---
 

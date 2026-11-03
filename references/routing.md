@@ -428,6 +428,8 @@ Every execution module returns a JSON object adhering to this structure:
 7. **`handoff_to` (string or null, required):**
    - Name of the recommended next canonical execution module (e.g., `"daw-verify"`, `"daw-review"`), or `null` if the pipeline has concluded or halted.
    - **Advisory Invariant:** `handoff_to` is purely advisory metadata returned to the parent orchestrator. Modules MUST NOT directly invoke child modules or recursively dispatch routing.
+   - Parent-controlled corrective rounds may resume retained workers without changing the active route or allowing module recursion. See the [persistent worker graph contract](operations.md#persistent-worker-graphs-harness-native): only accepted current-revision results satisfy dependencies, and a correction invalidates affected downstream passes. Canonical outer outcomes remain `pass`, `fail`, and `blocked`; graph bookkeeping belongs in existing plan artifacts or optional `details`, not new outer statuses.
+
 8. **`details` (object, required):**
    - Module-specific domain payload (e.g. diagnostics, test summaries, review findings, workspace branches). Details preserve rich information but remain subordinate to the outer `status`.
 

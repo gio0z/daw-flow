@@ -44,6 +44,7 @@ The DAW suite is **self-contained as a complete 10-module bundle**. It requires 
 2. **Missing Module Policy:** All 10 modules are required core components. If any required internal module is missing from the suite, the workflow is **blocked**; it does not silently degrade into shallow inline approximations. External specialist domain skills remain optional augmentations.
 3. **Proportionality:** Small, single-line patches or isolated fixes do not trigger the full 13-document matrix. Planning overhead scales proportionally with risk and blast radius.
 4. **Canonical Relative Linking:** Modules reference suite documentation and templates using root-relative paths resolved from their location (`../../references/...` or `../../templates/...`).
+5. **Harness-Native Worker Graphs:** At workflow intake, discover harness capabilities and automatically retain same-role builders and independent reviewers when the task already warrants delegation and corrective rounds and completed-worker continuation is supported, unless the user opts out. No persistence keyword or prior setup invocation is required. Small direct tasks stay direct; do not add route stages or workers to enable retention. Follow the [persistent worker graph contract](references/operations.md#persistent-worker-graphs-harness-native) for revision-scoped joins, evidence, stop/replan and explicit fresh-worker fallback when optional continuation is unavailable. Retention is session-bounded, not durable crash recovery.
 
 ---
 

@@ -331,3 +331,58 @@ Expected: Direct invocation of `daw-build` loads root governance and preflight r
 Fixture: the complete DAW bundle and a terminal. Request `daw-verify` to check that `python3 scripts/route.py` rejects missing required arguments with exit 2 and a usage diagnostic, while `python3 scripts/route.py --check-suite` succeeds with exit 0. Run from the suite root, or use its resolved absolute script path from another directory.
 
 Expected: declare each expected exit and output before execution, run both real commands, and retain their observed exit codes and diagnostics. The missing-argument probe passes with exit 2; the valid suite check passes with exit 0. Neither a nonzero exit alone nor exit 0 with incorrect output determines success. The canonical verification envelope reports pass only when both behavioral expectations are met. Do not suppress the negative probe, alter the CLI to return 0, or revise expectations after observing a mismatch.
+
+## Persistent Worker Graph Scenarios
+
+Manual scenarios for the [execution contract](../references/operations.md#persistent-worker-graphs-harness-native).
+These are expectations, not recorded passes; collect actual dispatch, revision and
+tool-output evidence separately for each scenario.
+
+### SCN-P-01: Same-ID correction and independent re-review
+
+Fixture: disposable signed-add CLI returning `abs(left) + abs(right)`; a harness with
+completed-worker continuation. Follow the [pilot protocol](../references/evaluation.md#persistent-worker-graph-pilot).
+
+Expected: completed builder and independent reviewer retain their respective IDs across
+correction/re-review rounds. Record `r0` failure, actual `r1` hash, fresh reviewer source
+evidence and parent CLI results. No worker narrative alone satisfies verification.
+
+### SCN-P-02: Stale results and incomplete joins
+
+Fixture: two mandatory predecessor nodes; one result is still pending and the other
+supplies an old `r0` pass after a correction advanced the dependent artifact to `r1`.
+
+Expected: parent reports/rejects the stale result and does not dispatch the downstream
+node until both current mandatory inputs are accepted. Duplicate delivery cannot
+satisfy the missing input. These are parent obligations, not assumed harness enforcement.
+
+### SCN-P-03: Continuation unavailable
+
+Fixture: continuation of a completed worker is unsupported or fails. Run once with
+retention optional and once with retention explicitly required.
+
+Expected: optional mode records a fresh worker ID and explicit context handoff without
+claiming identity reuse; required mode returns `blocked`. Neither silently changes
+provider, bypasses approval, nor modifies global harness settings.
+
+### SCN-P-04: Stagnation and late delivery
+
+Fixture: the same concrete review failure recurs after targeted correction, meeting the
+existing review stop/replan rule. Deliver another worker result after parent records stop.
+
+Expected: parent preserves evidence, returns the appropriate `fail`/`blocked` outcome,
+leaves no pending dispatch, and requires replan. Late delivery does not restart the graph;
+only workflow-owned running work may be cancelled. No new arbitrary retry count is added.
+
+### SCN-P-05: Automatic conditional selection without keywords
+
+Fixture: prompt only `Use DAW to fix this bug`, with an existing route that warrants
+delegated correction/review and exposed completed-worker continuation. Compare with
+a small directly solvable task, an explicit user opt-out, and unavailable continuation.
+
+Expected: ordinary intake automatically selects retained same-role workers for the
+delegated case without asking for a keyword or setup run. The direct task stays direct;
+opt-out uses non-retained execution. Unsupported optional continuation records an
+explicit fresh-worker handoff, not a blocker or a claim of same-ID reuse. Do not add
+route stages merely to enable persistence. Collect actual selection evidence; this
+scenario is not a recorded pass.

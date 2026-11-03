@@ -99,6 +99,18 @@ The DAW suite is **self-contained as a complete 10-module bundle**. It does not 
 
 > **Missing Module Policy:** All 10 modules are strictly required. If any required internal module is missing from the suite, execution is **blocked**. The workflow does not silently fall back to shallow inline approximations. External specialist skills remain optional domain augmentations.
 
+### Harness-Native Persistent Worker Graphs
+
+Worker reuse is automatic for tasks that already need delegated corrective rounds when
+the harness supports completed-worker continuation, unless you opt out. No special
+keyword or setup invocation is needed; small direct tasks stay direct. The same builder
+and independent reviewer are retained across corrective rounds. DAW defines graph
+dependencies, revision-scoped evidence, and stop/replan rules; the harness supplies worker
+lifecycle and execution. Worker retention is session-bounded, not a durable scheduler or
+automatic crash recovery. Unsupported retention is reported explicitly, never simulated
+by silently replacing workers. See the [execution contract](references/operations.md#persistent-worker-graphs-harness-native)
+and [behavioral pilot protocol](references/evaluation.md#persistent-worker-graph-pilot).
+
 ---
 
 ## 3. Finite Intent Precedence & Route Engine API
@@ -193,6 +205,8 @@ Default greenfield projects author the 6-doc core set (`blueprint`, `prd`, `frd`
 - **`references/routing.md`**: Complete routing policy, intent precedence, handoff schemas, and manifest specifications.
 - **`references/installation.md`**: Distribution models, nested bundle layout, and portable sibling symlink discovery.
 - **`references/validation.md`**: Detailed validator contracts for `route.py --check-suite` and `validate.py`.
+- **`references/operations.md`**: Preflight safety, fail-closed approvals, rollback, verification/audit rules, and the harness-native persistent worker graph contract.
+- **`references/evaluation.md`**: Reproducible task evaluation, the wizard benchmark, and the manual persistent worker graph pilot.
 - **`references/changes.md`**: Suite change history and architecture evolution log.
 - **`tests/behavior-scenarios.md`**: Reusable behavior test scenarios for verifying agent compliance.
 

@@ -54,6 +54,7 @@ Do NOT invoke `daw-verify` for:
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - Before running test commands, scripts, or operational verifications, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Verification uses read-only tests and non-destructive probes. High-risk live testing, load tests, or external service calls require interactive approval per operations.md §2; halt with `status: "blocked"` if unapproved. Local unit/integration suites require no production credentials.
+   - For worker graphs, verify actual behavior on the current artifact revision and require accepted current evidence from every mandatory dependency. Retained conversation, worker exit, or an earlier revision's pass is not proof. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
 
 ---
 

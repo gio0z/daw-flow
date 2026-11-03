@@ -32,7 +32,7 @@
   - [`references/suite-manifest.json`](references/suite-manifest.json): Authoritative suite manifest, module locations, route definitions, and schema definitions.
   - [`references/validation.md`](references/validation.md): Authoritative validator CLI reference, exit codes, and JSON task-contract schema.
   - [`references/routing.md`](references/routing.md): 13-document specification matrix, trigger conditions, specialist routing, and handoff protocols.
-  - [`references/operations.md`](references/operations.md): Operational execution invariants, fail-closed boundaries, baseline hashing, and rollback evidence.
+  - [`references/operations.md`](references/operations.md): Operational execution invariants, fail-closed boundaries, baseline hashing, rollback evidence, and the harness-native persistent worker graph contract.
   - [`references/installation.md`](references/installation.md): Environment discovery paths, packaging layout, sibling symlink distribution, and skill registration.
   - [`references/task-contract.example.json`](references/task-contract.example.json): Canonical JSON task-contract example envelope.
   - [`references/route-request.example.json`](references/route-request.example.json): Canonical JSON route request example envelope.

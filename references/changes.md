@@ -1,5 +1,37 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-03: Automatic Conditional Worker Retention
+
+- Make completed-worker retention the intake default for tasks that already warrant
+  delegated corrective rounds when the harness supports it, unless the user opts out.
+  No persistence keyword or prior setup invocation is required; small direct tasks and
+  existing route stages remain unchanged. Unsupported optional continuation uses an
+  explicit fresh-worker handoff; explicitly required retention still fails closed.
+- Verified 140 unit tests, package integrity with zero findings, and suite inspection.
+  A fresh read-only agent applied the policy correctly to supported delegation, direct
+  work, optional fallback, opt-out, and required-but-unavailable retention. This was a
+  policy-selection smoke, not end-to-end automatic worker dispatch or model-limit proof.
+
+## 2026-11-03: Harness-Native Persistent Worker Graphs
+
+- Define parent-owned worker graphs with same-role session retention, revision-scoped
+  dependency joins, independent review, explicit fallback, and existing stop/replan rules.
+  This is a skill execution contract, not a new scheduler or durable crash recovery.
+- Integrate harness capability discovery and correction-round guidance into setup,
+  planning, build, review, verification and debugging; extend the operations scope
+  statement and the AGENTS reference inventory to name the contract. Preserve canonical
+  `pass`/`fail`/`blocked` envelopes and the read-only router/validator boundaries.
+- Add a manual graph pilot protocol and behavioral scenarios; existing evaluator fixtures
+  do not establish persistent-worker identity reuse or model compliance.
+- Observed an OMP parked-worker revival, then a disposable two-round signed-add pilot:
+  the same replacement builder corrected the artifact and the same reviewer rechecked it;
+  five actual CLI cases passed. An earlier builder was explicitly replaced during the
+  pilot, and unsupported stalled-review claims were rejected.
+  Cross-restart recovery and the additional manual edge scenarios were not exercised.
+- Verified 140 unit tests, package integrity with zero findings, suite inspection, and
+  actual feature-route CLI output. These checks do not prove automatic enforcement or
+  persistent-worker support on other harnesses.
+
 ## 2026-11-03: Skill Instruction Clarity and Oracle History
 
 - Reviewed the root skill and all ten modules; aligned wizard question pacing to at most five per round, debugging stop thresholds to two consecutive falsified hypotheses without narrowing, and planning document persistence with established project conventions.

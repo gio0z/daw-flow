@@ -45,6 +45,8 @@ The planning module converts design specifications, architectural requirements, 
   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
   - Before performing any state mutations or file writes, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
   - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Planning and task decomposition require no production credentials.
+  - For worker graphs, the parent records role-to-worker IDs, mandatory dependencies, write ownership, rounds and artifact revisions in the existing plan/handoff. Reuse is same-role only and introduces no required configuration keys. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
+  - Select retained workers automatically for already-justified delegated corrective rounds when the harness supports completed-worker continuation, unless the user opts out. Do not add delegation or review stages for retention; unsupported optional retention uses an explicit fresh-worker handoff, not a blocker.
 
 ## 3. Operational Steps
 

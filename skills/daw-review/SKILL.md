@@ -43,6 +43,7 @@ Before conducting a code review:
 5. **Mandatory Governance Loading:**
    - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
    - `daw-review` is strictly read-only and never performs file mutations. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
+   - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
 
 ---
 
