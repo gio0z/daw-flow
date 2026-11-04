@@ -134,6 +134,7 @@ def is_valid_historical_suite(root: Path) -> bool:
 
 
 def ensure_valid_bundle(root: Path, allow_historical: bool = False) -> None:
+    root = Path(root).expanduser().resolve()
     if not validate.validate_package(root)["valid"]:
         raise InstallError("Package or suite validation failed; no installation was applied.")
     findings = route.check_suite(root)
@@ -141,6 +142,7 @@ def ensure_valid_bundle(root: Path, allow_historical: bool = False) -> None:
         findings = []
     if findings:
         raise InstallError("Package or suite validation failed; no installation was applied.")
+
 
 def ignore_copy(directory: str, names: list[str]) -> list[str]:
     return [name for name in names if name in IGNORED or name.endswith((".pyc", ".pyo"))]
@@ -180,6 +182,7 @@ def validate_receipt_aliases(aliases: object) -> bool:
 
 
 def inspect_installation(skills_dir: Path) -> dict | None:
+    skills_dir = Path(skills_dir).expanduser().resolve()
     bundle = skills_dir / SUITE
     if not exists(bundle):
         return None
@@ -207,7 +210,7 @@ def inspect_installation(skills_dir: Path) -> dict | None:
         alias = skills_dir / module
         if not alias.is_symlink() or os.readlink(alias) != str(alias_path(module)):
             raise InstallError("A module alias was changed or removed; preserving local work.")
-        if alias.resolve() != bundle / "skills" / module:
+        if alias.resolve() != (bundle / "skills" / module).resolve():
             raise InstallError("A module alias resolves outside its owned target.")
     return receipt
 
@@ -249,6 +252,7 @@ def staging_area(skills_dir: Path, prefix: str):
 
 
 def install(skills_dir: Path, update: bool, no_aliases: bool, dry_run: bool) -> dict:
+    skills_dir = Path(skills_dir).expanduser().resolve()
     entries = source_entries()
     bundle = skills_dir / SUITE
     if bundle == SOURCE or SOURCE.is_relative_to(bundle):
@@ -320,6 +324,7 @@ def install(skills_dir: Path, update: bool, no_aliases: bool, dry_run: bool) -> 
 
 
 def uninstall(skills_dir: Path, dry_run: bool) -> dict:
+    skills_dir = Path(skills_dir).expanduser().resolve()
     previous = inspect_installation(skills_dir)
     if previous is None:
         raise InstallError("No managed installation exists in this skills directory.")

@@ -24,16 +24,19 @@ class InstallTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="daw-install-test-")
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
-        self.skills = self.base / "project" / ".agents" / "skills"
-        self.env = dict(os.environ, HOME=str(self.base / "home"), USERPROFILE=str(self.base / "home"), PYTHONDONTWRITEBYTECODE="1")
+        raw_base = Path(self.temp.name)
+        real_base = raw_base / "real"
+        real_base.mkdir()
+        logical_base = raw_base / "logical"
         try:
-            probe = self.base / "link-probe"
-            probe.symlink_to(self.base, target_is_directory=True)
-            probe.unlink()
+            logical_base.symlink_to(real_base, target_is_directory=True)
+            self.base = logical_base
             self.symlinks = True
         except OSError:
+            self.base = raw_base
             self.symlinks = False
+        self.skills = self.base / "project" / ".agents" / "skills"
+        self.env = dict(os.environ, HOME=str(self.base / "home"), USERPROFILE=str(self.base / "home"), PYTHONDONTWRITEBYTECODE="1")
 
     def cli(self, action="install", *extra, source=ROOT, custom=True):
         argv = [sys.executable, str(source / "scripts" / "install.py"), action]
@@ -60,7 +63,7 @@ class InstallTests(unittest.TestCase):
         for module in MODULES:
             alias = self.skills / module
             self.assertTrue(alias.is_symlink())
-            self.assertEqual(alias.resolve(), bundle / "skills" / module)
+            self.assertEqual(alias.resolve(), (bundle / "skills" / module).resolve())
             self.assertTrue((alias.resolve().parents[1] / "references" / "operations.md").is_file())
         self.assertTrue((bundle / "templates" / "security.md").is_file())
         self.assertTrue((bundle / "LICENSE").is_file())
@@ -135,7 +138,7 @@ class InstallTests(unittest.TestCase):
         result = self.cli("install", "--update", source=source)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((bundle / "VERSION").read_text(), "0.2.0\n")
-        self.assertEqual((self.skills / "daw-build").resolve(), bundle / "skills" / "daw-build")
+        self.assertEqual((self.skills / "daw-build").resolve(), (bundle / "skills" / "daw-build").resolve())
         self.assertEqual(self.cli("status").returncode, 0)
 
     def test_uninstall_removes_only_owned_installation(self):
@@ -163,7 +166,7 @@ class InstallTests(unittest.TestCase):
         result = self.cli("uninstall")
         self.assertEqual(result.returncode, 1)
         self.assertTrue(bundle.is_dir())
-        self.assertEqual(alias.resolve(), foreign)
+        self.assertEqual(alias.resolve(), foreign.resolve())
 
     def test_no_aliases_preserves_complete_root_dispatch(self):
         result = self.cli("install", "--no-aliases")
@@ -182,7 +185,7 @@ class InstallTests(unittest.TestCase):
                 with self.subTest(agent=agent, scope=scope):
                     result = self.cli("install", "--agent", agent, "--scope", scope, "--project-root", str(project), "--dry-run", custom=False)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertEqual(Path(json.loads(result.stdout)["skills_dir"]), expected)
+                    self.assertEqual(Path(json.loads(result.stdout)["skills_dir"]), expected.resolve())
         self.assertFalse(project.exists())
 
     def test_invalid_source_aborts_without_destination_writes(self):
@@ -229,7 +232,7 @@ class InstallTests(unittest.TestCase):
             return real_rename(path, target)
 
         def fail_alias_removal(path, *args, **kwargs):
-            if path.parent == self.skills and path.name == "daw-ask":
+            if path.parent.resolve() == self.skills.resolve() and path.name == "daw-ask":
                 raise PermissionError("alias removal failure")
             return real_unlink(path, *args, **kwargs)
 
@@ -283,11 +286,11 @@ class InstallTests(unittest.TestCase):
         result = self.cli("install")
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
-        self.assertIn(str(lock), payload.get("error", ""))
+        self.assertIn(str(lock.resolve()), payload.get("error", ""))
         self.assertIn("delete that file and retry", payload.get("error", ""))
         non_json = subprocess.run([sys.executable, str(ROOT / "scripts" / "install.py"), "install", "--skills-dir", str(self.skills)], cwd=self.base, env=self.env, capture_output=True, text=True)
         self.assertNotEqual(non_json.returncode, 0)
-        self.assertIn(str(lock), non_json.stderr)
+        self.assertIn(str(lock.resolve()), non_json.stderr)
     def setup_true_historical_eight_payload(self, manifest_module_override=None):
         if not self.symlinks:
             self.skipTest("Directory symlinks unavailable; root-only installation is tested separately")

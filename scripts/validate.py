@@ -119,14 +119,14 @@ def resolve_bounded_path(root_dir: pathlib.Path, rel_path_str: str) -> tuple[pat
         if candidate.is_symlink():
             try:
                 resolved = candidate.resolve()
-                resolved.relative_to(root_dir)
+                resolved.relative_to(root_dir.resolve())
             except (ValueError, OSError):
                 return None, "symlink_escapes_root"
             return resolved, None
         else:
             try:
                 resolved = candidate.resolve()
-                resolved.relative_to(root_dir)
+                resolved.relative_to(root_dir.resolve())
             except (ValueError, OSError):
                 return None, "path_escapes_root"
             return resolved, None
@@ -381,6 +381,7 @@ def extract_frontmatter_metadata_version(content: str) -> str | None:
 
 
 def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
+    root_path = root_path.resolve()
     findings: list[dict[str, str]] = []
 
     def add_error(code: str, path: str, message: str) -> None:

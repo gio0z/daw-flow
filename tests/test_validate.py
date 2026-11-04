@@ -1914,6 +1914,29 @@ class TestValidateCLI(unittest.TestCase):
         finally:
             sys.path = sys_path
 
+    def test_package_accessed_via_symlinked_ancestor(self):
+        sys_path = sys.path[:]
+        try:
+            sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+            import validate
+            with tempfile.TemporaryDirectory() as tmpdir:
+                base_path = pathlib.Path(tmpdir)
+                real_parent = base_path / "real"
+                real_parent.mkdir()
+                pkg_dir = self.create_minimal_package_fixture(real_parent)
+                link_parent = base_path / "linked"
+                try:
+                    os.symlink(real_parent, link_parent, target_is_directory=True)
+                except (OSError, NotImplementedError):
+                    self.skipTest("Symlinks not permitted in this environment")
+                aliased_pkg = link_parent / pkg_dir.name
+                res = validate.validate_package(aliased_pkg)
+                error_codes = {f["code"] for f in res["findings"] if f.get("severity") == "error"}
+                self.assertEqual(error_codes, set(), f"Unexpected errors for aliased package: {error_codes}")
+                self.assertTrue(res["valid"])
+        finally:
+            sys.path = sys_path
+
     def test_package_version_consistency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             pkg_dir = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
