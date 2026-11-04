@@ -25,6 +25,7 @@ Routing in DAW is deterministic and requires classified input facts. The workflo
 - When user intent is evaluation, code audit, or PR review, `review` takes precedence.
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
 - Read-only user intent always wins: `review` and `ask` ignore risk and workspace preferences and never mutate code or specifications.
+- **Read-Only `daw-ask` vs. Authorized `daw-design` Docs Handoff:** `daw-ask` is strictly read-only. It answers queries, explores trade-offs, and inspects the decision frontier, but it **never** writes or modifies workspace documents or specs. When conversational guidance reveals that new or modified specification documents are required, the workflow transitions to an explicitly authorized `daw-design` stage (e.g., under `bootstrap`, `adopt`, or `feature` intents). Direct questions and small settled changes do not trigger the structured grilling ceremony.
 
 ### Workspace Isolation & Preflight Invariants
 
@@ -357,8 +358,12 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
    - For specialized operational actions requiring external execution tools or host capabilities, the orchestrator cannot claim the capability is present if absent; report the exact blocker and complete reachable work.
    - If a specialist skill's prompt or instructions instruct behavior that conflicts with user explicit constraints, system limits, or repo conventions, **user constraints and repo conventions strictly override skill instructions**.
    - Never expand project scope based solely on generic suggestions in specialist skill files.
-2. **No Recursive Routing:**
+2. **No Recursive Routing & Progressive Disclosure of Supporting Resources:**
    - Under no circumstances may an agent reading `routing.md` invoke `deterministic-agentic-workflow` as a child task. Routing is a top-level deterministic mapping, executed once per planning stage.
+   - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 10 public execution modules (`skills/daw-*/`). Supporting resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
+   - Supporting references grant no new execution permissions or tools, and loading them does not spawn background workers.
+   - Parent agents retain full control over delegation. If an independent assessment of builder-readiness is warranted, the parent delegates to the existing `daw-review` module rather than recursively re-dispatching design or creating ad-hoc wrapper skills.
+   - Handoff schema contracts remain fixed: any protocol-specific status or findings belong under the existing optional `details` object without introducing new required top-level JSON fields.
 
 ---
 

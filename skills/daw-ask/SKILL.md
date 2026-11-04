@@ -38,35 +38,42 @@ The advisor serves as a conversational front door and Socratic sounding board fo
   - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-ask`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.
   - The suite root is the canonical module directory's `../..`.
   - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-- **Mandatory Governance Loading:**
+- **Mandatory Governance & Protocol Loading:**
   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
+  - Load the canonical shared grilling protocol (`../../references/grilling.md`) for structured inquiry, decision frontier tracking, and fact-vs-decision separation. Loading protocol references grants no additional permissions or tools and spawns no background workers.
   - `daw-ask` is strictly conversational/advisory and read-only. It never performs file mutations or executes side-effect commands. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
 
 ## 3. Operational Steps
 
+`daw-ask` executes structured advisory elicitation by applying the canonical shared grilling protocol (`../../references/grilling.md`) under read-only constraints:
+
 ### Step 1: Context & Fact Discovery (Agent Work)
 
-1. Inspect recorded evidence: read existing specifications, configuration files, and code.
-2. Separate established codebase facts from open design uncertainties.
-3. Distinguish facts the agent can inspect from decisions belonging exclusively to the user.
+1. Apply `../../references/grilling.md` §2 Step 1: inspect recorded evidence (specs, code, static configurations, commit logs) non-destructively.
+2. Distinguish established codebase facts from open design uncertainties.
+3. Differentiate repo facts from user decisions. Direct factual inquiries or small settled clarifications are answered immediately without triggering multi-round ceremony.
 
 ### Step 2: Build Decision Dependency Graph & Identify Frontier
 
-1. Map upstream choices to downstream implications.
-2. Focus questions strictly on the **decision frontier** (immediate unresolved items whose prerequisites are settled).
-3. For factual, direct questions, answer directly; do not force artificial options or question checklists.
+1. Apply `../../references/grilling.md` §2 Step 2: map upstream choices to downstream implications.
+2. Focus inquiries strictly on the **decision frontier** (immediate unresolved material user trade-offs whose prerequisites are settled). NEVER query internal implementation details or refactoring naming decisions (e.g. renaming internal variables/collections) absent consumer consequence.
+3. Delay downstream questions until upstream prerequisites are resolved. Do not select or recommend fixed downstream numeric defaults (e.g. timeouts or intervals) prematurely before upstream decisions are settled.
+4. If upstream assumptions or workspace facts change, reopen dependent downstream decisions.
+5. For factual, direct questions, answer directly; do not force artificial options or question checklists.
 
 ### Step 3: Recommendation-First Framing & Trade-Offs
 
 1. **Direct Questions:** Provide a grounded, factual answer directly.
-2. **Architectural / Strategic Decisions:** Provide a clear recommendation first, backed by recorded evidence. Present genuine alternatives only when meaningful divergence exists; do not manufacture strawmen.
-3. Propose sensible, reversible defaults where low risk allows progress.
-4. Note confidence level and uninspected assumptions.
+2. **Architectural / Strategic Decisions:** Provide a clear recommendation first, backed by recorded evidence (`../../references/grilling.md` §1). Present genuine alternatives only when meaningful divergence exists; do not manufacture strawmen, fabricate agreement, or claim technical guarantees from product labels. Distinguish desired behavior from implementation proof.
+3. Low-risk, reversible defaults may be agent choices labeled as such, avoiding unnecessary confirmation rounds for trivial details. Cap interactive questions at 5 per round and wait between rounds.
+4. **Pre-Send Response Check:** Before returning any advisory response or questions, execute `../../references/grilling.md` §2 Step 3 check: verify (1) repo facts were looked up, (2) inquiries target only frontier material trade-offs (no internal naming), (3) no premature downstream parameters/timeouts, (4) no unproven technical guarantees from product labels (qualify claims), and (5) user requirements are preserved. Correct violations before outputting.
+5. Note confidence level and uninspected assumptions.
 
-### Step 4: Formulate Stage Handoff Suggestion
+### Step 4: Exit State & Stage Handoff Suggestion
 
-1. Record established facts, verified paths, and agreed principles.
-2. Propose the next appropriate DAW module (`daw-design`, `daw-plan`, `daw-debug`, etc.) for user approval or orchestrator routing.
+1. Record `details.decision_state` (`settled`, `deferred`, `blocked`) per `../../references/grilling.md` §2 Step 5. Because `daw-ask` is an advisory stage, it may return `status: "pass"` for successfully delivered advice while reporting downstream implementation blockers under `details`.
+2. Record repo facts, verified paths, user preferences, and recommended decisions.
+3. Propose the next appropriate DAW module (`daw-wizard` for greenfield specs, `daw-design` for spec adoption, `daw-plan`, `daw-debug`, etc.) for user approval or orchestrator routing.
 
 ---
 

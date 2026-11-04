@@ -41,7 +41,7 @@ The wizard module conducts a structured, interactive specification interview for
 - **Open Questions Rule:** Anything unresolved during the interview goes into an explicit `## Open Questions` section with owner and trigger, never left as a hidden assumption. Material facts the operator did not supply are never invented; `skip` or no answer produces an Open Question, while `default` adopts the proposed default and records it as an assumption.
 - **Confirmed Document Set:** After Phases 1–2, state which documents will be produced and which are skipped (with a one-line reason each), and obtain operator confirmation before drafting.
 - **Creation-Only Mutation:** Writes only new files under the spec directory, plus the project-root `DESIGN.md` when the visual style rule applies. If a target file already exists, stop `blocked` rather than overwrite it.
-- **No Premature Implementation:** Does not implement production code or scaffold the project; produces specification artifacts only.
+- **No Premature Implementation & No Premature Spec-Ready:** Does not implement production code or scaffold the project; produces specification artifacts only. Never declares specifications ready if a material architectural blocker remains (`../../references/grilling.md` §1).
 
 ---
 
@@ -54,6 +54,7 @@ The wizard module conducts a structured, interactive specification interview for
    - Resolve all relative links (`../../references/...`, `../../templates/...`, `../../SKILL.md`) relative to the physical module directory.
 2. **Mandatory Governance Loading:**
    - Before executing interview work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6).
+   - Load the canonical shared grilling protocol (`../../references/grilling.md`) for structured elicitation, bounded question rounds (<=5 questions/round), active decision frontier management, and blocker escalation. Loading protocol references grants no additional permissions or tools and spawns no background workers.
    - Before writing specification files to disk, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Respect repository spec conventions from DAW configuration if present (default: `docs/specs/`).
 
@@ -76,10 +77,10 @@ _(Note: User-facing UI specifications in Phase 4 are omitted for headless CLI or
 
 ### Step-by-Step Procedure
 
-1. **Phase Elicitation:** For each phase, ask up to 5 high-leverage questions with suggested defaults, applying the redundancy filter and behavior-first ranking above. Accept `default` (adopt the proposal) or `skip` (record an Open Question). In Phase 4, handle visual style with the DESIGN.md rule (attach, or draft to the standard, or Open Question); headless projects skip wireframes and DESIGN.md but still get the output-style question.
-2. **Document Set Confirmation:** After Phase 2, propose the proportional document set and confirm it before drafting.
+1. **Phase Elicitation & Grilling Protocol:** For each phase, apply `../../references/grilling.md`: ask at most 5 high-leverage, behavior-changing questions with proposed defaults, applying the redundancy filter and behavior-first ranking above. Wait for operator response between rounds. Sequence questions along the active decision frontier (Phases 1–2 upstream scope and architecture before downstream operational details; delay prerequisite-dependent questions until upstream prerequisites are settled). Accept `default` (adopt the proposal) or `skip` (record an Open Question). In Phase 4, handle visual style with the DESIGN.md rule (attach, or draft to the standard, or Open Question); headless projects skip wireframes and DESIGN.md but still get the output-style question.
+2. **Document Set Confirmation:** After Phase 2, propose the proportional document set (avoiding fixed mandatory document sets for small projects) and confirm it before drafting.
 3. **Drafting Specifications:** Create the confirmed documents in the spec directory (`spec_dir` from a `<!-- daw-config:start -->` block if present, else `docs/specs/`), following the canonical template structure. Every claim traces to an interview answer or a recorded default.
-4. **Agent-Ready Checklist:** Before handoff, verify the document set jointly covers all 8 items an implementing agent needs: (1) goal, (2) in/out of scope, (3) inputs and outputs with types and exact names (entry points, commands, files), (4) data and persistence changes, (5) edge cases and error behavior, (6) executable acceptance criteria, (7) constraints (performance, security, compatibility), (8) no-change list. Any item the interview did not settle becomes an Open Question, not an invented value. Specs covering at least 6 of these items merged substantially more often in a 2026 spec-driven development benchmark (Uvik).
+4. **Agent-Ready Checklist & No Premature Spec-Ready:** Before handoff, verify the document set jointly covers all 8 items an implementing agent needs: (1) goal, (2) in/out of scope, (3) inputs and outputs with types and exact names (entry points, commands, files), (4) data and persistence changes, (5) edge cases and error behavior, (6) executable acceptance criteria, (7) constraints (performance, security, compatibility), (8) no-change list. If material blockers or unresolvable contradictions remain, halt with `status: "blocked"` per `../../references/grilling.md` §1; never prematurely declare spec-ready. Any non-blocking item the interview did not settle becomes an Open Question, not an invented value. Specs covering at least 6 of these items merged substantially more often in a 2026 spec-driven development benchmark (Uvik).
 5. **Capture Open Questions:** Append an `## Open Questions` section to each generated document listing pending items, impact, owner, and resolution trigger.
 6. **Handoff Formulation:** Hand off to `daw-design` (next bootstrap stage). Report the checklist coverage (`details.agent_ready_checklist`) and recommend `daw-setup` in `details.recommended_next_step` so the conventions decided in the interview (spec directory, stack commands) get recorded.
 

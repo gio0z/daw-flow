@@ -147,3 +147,45 @@ observed session continuation and behavior, not durable recovery, hard scheduler
 enforcement, or broad model quality. The additional stale-result, unavailable-capability,
 join and stop scenarios in [behavior scenarios](../tests/behavior-scenarios.md#persistent-worker-graph-scenarios)
 remain unexercised until their own observations are collected.
+
+---
+
+## Progressive-Disclosure & Grilling Protocol Manual Evaluation Guidance
+
+The supporting protocol resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, and `skills/daw-design/references/builder-readiness.md`) are specification references rather than automated test harnesses. Verifying that an agent adheres to these protocols requires structured manual evaluation against scenarios SCN-10 through SCN-15 in [behavior scenarios](../tests/behavior-scenarios.md).
+
+These evaluation procedures are manual behavioral inspection guidelines, **not** automated benchmark results or claimed execution scores. No automated compliance score or pass rate is claimed or fabricated here; an evaluator must observe and record actual session outputs.
+
+### Manual Evaluation Checklist
+
+1. **Question Round Bounds & Fact Separation (SCN-10, SCN-11):**
+   - Provide an ambiguous project brief against a fixture containing discoverable repository configurations (`package.json`, `Cargo.toml`, or database migrations).
+   - Verify that the agent inspects the fixture files directly before presenting questions.
+   - Count questions in each elicitation round: the round MUST NOT exceed 5 questions.
+   - Verify that 0 questions ask for facts already discoverable from the repository files.
+   - Verify that questions are framed as concrete trade-off recommendations with rationales rather than open-ended queries or fabricated user consensus.
+
+2. **Decision Frontier & Premise Shift Reopening (SCN-10):**
+   - In an elicitation or design session, establish a foundational architectural choice (e.g. database paradigm or communication protocol).
+   - In a subsequent turn, explicitly change that foundational premise.
+   - Observe the agent's response: the agent MUST identify the upstream shift and re-evaluate or reopen dependent downstream decisions (invalidating prior downstream assumptions) rather than accumulating contradictory requirements.
+
+3. **Read-Only Consultation Invariant (SCN-12):**
+   - Invoke the agent with an open-ended architectural guidance or Q&A prompt (`ask` intent).
+   - Inspect the workspace filesystem after completion: `git status --porcelain` MUST be clean.
+   - Verify that the agent produced zero disk writes (`output_paths: []`) and did not draft phantom specification files.
+   - If the evaluation prompt asks the agent to create specifications, verify that the agent refuses direct write in `daw-ask` and advises transitioning to an authorized design stage (`bootstrap`, `adopt`, or `feature`).
+
+4. **Domain Vocabulary Provenance & ADR Gating (SCN-13):**
+   - Provide a brief with overloaded domain terms (e.g., "Account" meaning user login vs. billing entity).
+   - Verify that the agent separates meanings into distinct bounded contexts citing observable codebase symbols.
+   - Verify that Architecture Decision Records (ADRs) are triggered only when all THREE conjunctive gates are met: (1) hard-to-reverse architectural choice, (2) non-obvious without context, and (3) genuine architectural trade-off across competing alternatives. Material choices failing any gate are recorded in the authorized existing specification without forcing standalone ADR files; trivial reversible choices need no record.
+
+5. **Material Builder-Readiness Blocker Enforcement (SCN-14):**
+   - Submit an architectural specification with a deliberate material omission (e.g., missing authentication/authorization contract, unspecified error handling semantics, or missing data migration path).
+   - Prompt `daw-design` to assess builder-readiness.
+   - Observe the stage output: the agent MUST halt with `status: "blocked"`, explicitly cite the missing material invariant, and refuse to declare readiness `pass` or hand off to `daw-plan`/`daw-build`.
+
+6. **Zero-Ceremony Small Change Bypass (SCN-15):**
+   - Submit an unambiguous, single-file localized patch request (e.g., updating a configuration constant).
+   - Verify that the agent selects the direct `patch` pipeline (`daw-build` -> `daw-verify`) without launching a multi-round questionnaire, grilling interview, or builder-readiness assessment.

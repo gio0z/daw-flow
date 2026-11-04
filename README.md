@@ -84,6 +84,14 @@ See [installation and compatibility](references/installation.md) for exact paths
 
 The DAW suite is **self-contained as a complete 10-module bundle**. It does not depend on external workflow frameworks (like Superpowers or external registries). However, all 10 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
 
+### Progressive-Disclosure Supporting Protocols
+
+The 10 public modules remain the only standalone discoverable and executable workflow units. Supporting protocols are scoped reference resources (`.md`), **not** separate sub-skills, registered routes, child commands, or runtime layers:
+
+- **Shared Grilling Protocol (`references/grilling.md`):** A canonical bounded-round elicitation protocol used by `daw-wizard`, `daw-ask`, and `daw-design`. It enforces structured question rounds, distinguishes agent-researched repo facts from user decisions, tracks the active decision dependency frontier, offers grounded recommendations rather than fabricated consensus, and halts on material blockers without demanding ceremony for direct questions or minor changes.
+- **Domain Modeling Resource (`skills/daw-design/references/domain-modeling.md`):** Design-owned guidance on ubiquitous language, bounded contexts, domain invariants, and entities to deepen `blueprint.md` and related specs.
+- **Builder-Readiness Gate (`skills/daw-design/references/builder-readiness.md`):** Design-owned preflight qualification ensuring requirements, interface contracts, and invariants are concrete and unblocked before handing off to `daw-plan` and `daw-build`.
+
 | Module            | Location                        | Role                                                                   |
 | :---------------- | :------------------------------ | :--------------------------------------------------------------------- |
 | **daw-design**    | `skills/daw-design/SKILL.md`    | System architecture, requirements authoring, 13-doc specification.     |
@@ -202,13 +210,16 @@ Default greenfield projects author the 6-doc core set (`blueprint`, `prd`, `frd`
 
 ## 6. References & Documentation Links
 
+- **`references/grilling.md`**: Canonical shared grilling and elicitation protocol (bounded rounds, decision frontier, fact vs. decision separation).
 - **`references/routing.md`**: Complete routing policy, intent precedence, handoff schemas, and manifest specifications.
 - **`references/installation.md`**: Distribution models, nested bundle layout, and portable sibling symlink discovery.
 - **`references/validation.md`**: Detailed validator contracts for `route.py --check-suite` and `validate.py`.
 - **`references/operations.md`**: Preflight safety, fail-closed approvals, rollback, verification/audit rules, and the harness-native persistent worker graph contract.
-- **`references/evaluation.md`**: Reproducible task evaluation, the wizard benchmark, and the manual persistent worker graph pilot.
+- **`references/evaluation.md`**: Reproducible task evaluation, the wizard benchmark, the manual persistent worker graph pilot, and supporting protocol evaluation guidance.
 - **`references/changes.md`**: Suite change history and architecture evolution log.
 - **`tests/behavior-scenarios.md`**: Reusable behavior test scenarios for verifying agent compliance.
+
+---
 
 ## 7. Development & Behavioral Evaluation
 

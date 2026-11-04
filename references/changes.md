@@ -1,5 +1,29 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-04: On-Demand Interview and Design Protocols
+
+- Share bounded grilling through one supporting reference used directly by ask, wizard,
+  and design; retain ten public modules and nonrecursive, parent-controlled dispatch.
+- Add design-owned domain-modeling and builder-readiness references with explicit write
+  scope, vocabulary provenance, conjunctive ADR qualification, and material blocker checks.
+- Add six manual behavioral scenarios and evaluation guidance. Structural gates and real
+  temporary installation confirmed all three resources ship without new module aliases.
+- Behavioral probes exercised direct factual answers, authorized updates to an existing
+  vocabulary file, and blocked design readiness. Advisory probes exposed premature expiry
+  choices and unsupported concurrency guarantees; the protocol now includes a pre-send
+  response check. Prompt instructions are not enforcement or a model reliability guarantee.
+
+## 2026-11-04: Canonical Package and Installer Roots
+
+- Resolve package and installation roots before containment, ownership, and alias-target
+  comparisons so symlinked ancestors and platform path aliases use the same identity.
+- Exercise installer transactions through a symlinked temporary ancestor and add a
+  package-validation regression for that layout. Preserve traversal rejection, rollback
+  backups, and ownership checks; compare canonical destinations in platform fixtures.
+- Verified 141 unit tests, package integrity with zero findings, suite inspection, and
+  real install/status/package-validation/update/uninstall CLI operations through an aliased
+  temporary root on Linux. Native macOS and Windows verification remains pending CI.
+
 ## 2026-11-03: Automatic Conditional Worker Retention
 
 - Make completed-worker retention the intake default for tasks that already warrant

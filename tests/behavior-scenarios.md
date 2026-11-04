@@ -19,6 +19,12 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-07`    | Repeated Adoption Idempotency                       | Natural invocation on adopted repo                | Codebase with full specs         | `Adopt`           | 0 created, N reused; hashes preserved unless material discrepancy found.                             |
 | `SCN-08`    | Stateless / No-Registry Low-Risk Progress           | Natural prompt for typo / localized fix           | Complete DAW; no external skills | `patch`           | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.       |
 | `SCN-09`    | High-Risk Operation Missing Access / Approval Block | Prompt for prod deploy / DB wipe without approval | Any fixture                      | Fail-Closed Block | Fails closed strictly due to missing human approval and access; no registry or skill presence helps. |
+| `SCN-10`    | Decision Frontier Prerequisites & Dependent Reopen  | Trade-off prompt with upstream shift              | Architectural spec in progress   | `Clarify`         | Respects dependency frontier; reopens dependent downstream decisions when upstream premise changes.  |
+| `SCN-11`    | Grounded Codebase Research (Facts Not Asked)        | Natural invocation on existing repo               | Multi-file existing codebase     | `Adopt`/`Design`  | Discovers codebase facts directly from workspace; 0 questions for discoverable repository facts.     |
+| `SCN-12`    | Read-Only Consultation Without Document Generation  | Conversational Q&A / architecture guidance        | Repository with code & specs     | `Ask`             | Strictly read-only; 0 files created or modified; surfaces trade-offs without writing phantom docs.   |
+| `SCN-13`    | Domain Glossary Clash, Provenance & ADR Qualify     | Architecture spec with overloaded domain terms    | Repo with established schemas    | `Design`          | Disambiguates clashes by bounded context; requires all 3 conjunctive ADR gates; no forced paths.     |
+| `SCN-14`    | Material Builder-Readiness Blocker Halts Pipeline   | Hand off incomplete specification to builder      | Spec with unspecified auth seam  | Blocked Gate      | Halts fail-closed with status `blocked`; never passes builder-readiness with open material blocker.  |
+| `SCN-15`    | Direct Question & Small Settled Change No Ceremony  | Natural prompt for direct localized patch         | Repository with localized task   | `patch`           | Executes direct surgical change immediately; 0 multi-round grilling ceremony or interview loops.     |
 
 ---
 
@@ -267,6 +273,135 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
   - Zero destructive commands executed.
   - Zero production mutation triggered.
   - Fail-closed halt message clearly cites missing approval, access, and rollback prerequisites.
+
+---
+
+### SCN-10: Decision Frontier Prerequisites & Dependent Reopening
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-frontier`.
+  - Populate with a service specification where storage engine selection is under active consideration.
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to design our multi-region data replication and backup architecture.
+  Initially assume embedded SQLite; then in the next round we decide to switch to multi-region distributed PostgreSQL.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent maps the architectural decision dependency tree. It recognizes that replication topology and backup mechanisms are downstream of the foundational persistence engine.
+  2. The agent addresses foundational storage prerequisites first rather than soliciting downstream configuration details prematurely.
+  3. When the user changes the upstream choice from embedded SQLite to distributed PostgreSQL, the agent identifies the upstream premise change and reopens dependent downstream decisions (invalidating single-node file backup assumptions, replacing them with connection pooling, replica lag tolerance, and failover requirements).
+  4. Bounded rounds: Maximum 5 questions per round; grounded recommendations provided rather than fabricated consensus.
+- **Content Invariants & Verification:**
+  - Upstream decision dependency frontier strictly respected.
+  - Downstream invalidation and decision reopening explicitly recorded when upstream inputs change.
+  - Zero phantom consensus or accumulated contradictory requirements.
+
+---
+
+### SCN-11: Grounded Codebase Research (Facts Not Asked)
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-facts-research`.
+  - Populate with an existing multi-file repository containing `package.json` (Node 20, TypeScript, Prisma, Vitest) and an existing database schema file.
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to design a notification dispatch service for this repository.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent inspects existing repository files (`package.json`, schema, configuration, source layout) before asking any questions.
+  2. The agent discovers runtime facts directly: language (TypeScript), runtime (Node 20), data access layer (Prisma), and test framework (Vitest).
+  3. When formulating questions to the user, the agent restricts queries strictly to business intent, delivery channels (email, SMS, push), SLA/retry expectations, and ungrounded preferences.
+  4. The agent asks ZERO questions regarding facts that are already discoverable from the repository files.
+- **Content Invariants & Verification:**
+  - Exactly 0 user questions asking for discoverable workspace facts.
+  - All asked questions concern business requirements, architectural trade-offs, or unobservable preferences.
+
+---
+
+### SCN-12: Read-Only Consultation Without Document Generation
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-readonly-ask`.
+  - Populate with an existing application codebase and existing documentation in `docs/specs/`.
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to explain the database connection pooling behavior and evaluate Redis vs. an in-memory LRU cache.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent classifies the intent as `ask` (precedence 2, read-only).
+  2. The agent reads and analyzes workspace files, tracing connection pooling configurations and usage patterns.
+  3. The agent delivers structured conversational analysis, explaining current behavior and surfacing concrete trade-offs on the decision frontier.
+  4. The agent writes ZERO files to disk (`output_paths: []`). It does NOT draft phantom specifications, modify existing documents, or generate workspace artifacts.
+  5. If the user inquiry or trade-off evaluation identifies downstream blockers or material specification gaps, `daw-ask` completes with stage-scoped `status: "pass"` (its read-only analytical objective is satisfied) while noting in `details` that specification authoring requires explicit user authorization for a subsequent `daw-design` stage.
+- **Content Invariants & Verification:**
+  - `git status --porcelain` in the fixture remains completely clean (zero modifications, zero new files).
+  - Stage handoff canonical status is `pass` with `output_paths: []`.
+  - Downstream design blockers or handoffs do not invalidate stage-scoped read-only pass.
+
+---
+
+### SCN-13: Domain Glossary Clash, Entity Provenance & ADR Qualification
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-domain-glossary`.
+  - Populate with a codebase where `auth.accounts` represents user credentials and `billing.subscriptions` represents paying customer organizations, but a user brief ambiguously refers to "account tier upgrades".
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to author a design specification for account tier upgrades.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent extracts entity definitions from actual repository symbols and database schemas, documenting concrete entity provenance (`auth.accounts` vs. `billing.subscriptions`).
+  2. The agent identifies the semantic overload on the term "Account" and explicitly separates the concepts into bounded contexts rather than synthesizing fictional terminology.
+  3. The agent evaluates Architecture Decision Record (ADR) qualification using all THREE conjunctive gates: (a) hard-to-reverse architectural choice, (b) non-obvious without context, and (c) genuine architectural trade-off across competing alternatives.
+  4. Material choices failing any gate are recorded in the authorized existing specification without forcing standalone ADR files; trivial reversible choices need no record. Only qualifying decisions trigger ADR authoring.
+  5. The agent respects existing repository documentation structure without forcing an arbitrary `/GLOSSARY.md` or synthetic directory paths.
+- **Content Invariants & Verification:**
+  - Domain entity definitions cite observable codebase provenance.
+  - Conflicting glossary terms are disambiguated by bounded context.
+  - ADR qualification enforces all three conjunctive gates without exception.
+
+---
+
+### SCN-14: Material Builder-Readiness Blocker Halts Pipeline
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-readiness-blocker`.
+  - Populate with a draft specification for an external payment webhook handler, but leave webhook secret validation, HMAC signature verification, and replay window undefined.
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to assess builder-readiness and hand off to planning and implementation.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. In `daw-design`, the agent runs the builder-readiness assessment checklist against the specification.
+  2. The agent identifies a material architectural blocker: the authentication, replay prevention, and signature verification contract for inbound webhooks is completely unspecified.
+  3. The agent records the internal protocol readiness state as `blocker` within `details.builder_readiness.state` (with canonical handoff `status: "blocked"` or stage criteria blocked).
+  4. The agent reports the concrete material blocker and names the exact specification remediation required.
+  5. The agent refuses to declare builder-readiness satisfied and does NOT dispatch downstream implementers (`daw-plan` or `daw-build`) while material blockers remain.
+- **Content Invariants & Verification:**
+  - Protocol readiness state recorded as `blocker` under `details`.
+  - The material contract blocker is explicitly articulated.
+  - Downstream builder modules are not invoked while a material blocker remains open.
+
+---
+
+### SCN-15: Direct Question & Small Settled Change Without Ceremony
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-no-ceremony`.
+  - Populate with an existing Python project containing `config.py` with `DEFAULT_PORT = 3000` and `tests/test_config.py`.
+- **Prompt Invocation:**
+  ```text
+  Change DEFAULT_PORT from 3000 to 8080 in config.py and run the config tests.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent inspects the request and recognizes a direct, unambiguous, and localized change with settled scope.
+  2. The agent executes the change directly via the `patch` route (`daw-build` -> `daw-verify`) without launching a multi-round grilling interview, questionnaire, or full builder-readiness seam audit.
+  3. The agent edits `config.py` surgically and updates the corresponding test assertion.
+  4. The agent runs the test suite and captures verified evidence.
+- **Content Invariants & Verification:**
+  - Zero multi-round questionnaire rounds or grilling loops initiated.
+  - Surgical diff applied to `config.py`.
+  - Semantic test verification evidence captured.
 
 # Suite Procedure Regression Scenarios
 
