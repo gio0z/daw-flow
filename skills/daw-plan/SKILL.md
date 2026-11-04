@@ -21,7 +21,7 @@ The planning module converts design specifications, architectural requirements, 
 
 ### Non-Goals & Invariants
 
-- **No Document Sprawl:** Do not force creation of persistent `tasks.md` or tracker files unless requested by the user or required by established project conventions. Returning the structured plan in the stage payload is sufficient for standard tasks.
+- **No Document Sprawl & Authoring Boundaries:** Apply the Documentation Authoring Contract (`../../references/routing.md` §3). `daw-plan` owns tactical task decomposition, sequencing, disjoint file boundaries, and verification commands. It does not author architecture specifications. Do not force creation of persistent `tasks.md` or tracker files; returning the structured plan in the stage payload is sufficient for standard tasks. When authorized by repository conventions or explicit user request to maintain persistent tracking, `daw-plan` owns tactical task updates and milestone progress tracking in `roadmap.md` (while high-level strategic roadmap phasing remains authored by `daw-design`/`daw-wizard`).
 - **Concrete Scope:** Every task must specify exact file paths, operations, and verification commands.
 - **Disjoint File Ownership:** Parallel tasks must have non-overlapping file sets to prevent conflicting edits or race conditions.
 - **No Unwanted Commits or Git Hooks:** Planning never runs git commits, pushes, or alters hooks.

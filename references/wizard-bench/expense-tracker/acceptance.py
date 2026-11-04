@@ -179,23 +179,22 @@ def main() -> int:
         emit_result("R5_summary_command", "fail", str(exc))
 
     # R6: List command format and sorting (sorted by date asc, then id asc)
-    # Expected order:
-    # 1. 2026-01-10 (id 3)
-    # 2. 2026-01-15 (id 2)
-    # 3. today_utc (id 1)
+    # Expected order depends on today_utc relative to 2026-01-10 (id 3) and 2026-01-15 (id 2).
     try:
         proc_list = run_cli(entrypoint, ["list"], cwd=workspace)
-        expected_line_snack = "#3 | 2026-01-10 | $8.50 | food | Snack"
-        expected_line_taxi = "#2 | 2026-01-15 | $42.00 | Travel | Taxi"
-        expected_line_lunch = f"#1 | {today_utc} | $15.50 | Food | Lunch"
+        expected_entries = [
+            ("2026-01-10", 3, "#3 | 2026-01-10 | $8.50 | food | Snack"),
+            ("2026-01-15", 2, "#2 | 2026-01-15 | $42.00 | Travel | Taxi"),
+            (today_utc, 1, f"#1 | {today_utc} | $15.50 | Food | Lunch"),
+        ]
+        expected_entries.sort(key=lambda item: (item[0], item[1]))
+        expected_lines = [entry[2] for entry in expected_entries]
 
         out_lines = [line.strip() for line in proc_list.stdout.strip().splitlines() if line.strip()]
         if (
             proc_list.returncode == 0
             and len(out_lines) == 3
-            and out_lines[0] == expected_line_snack
-            and out_lines[1] == expected_line_taxi
-            and out_lines[2] == expected_line_lunch
+            and out_lines == expected_lines
         ):
             emit_result("R6_list_command_format", "pass", "List command sorted correctly with expected columns")
         else:

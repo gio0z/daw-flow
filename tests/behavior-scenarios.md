@@ -8,23 +8,24 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 
 ## Scenario Matrix Overview
 
-| Scenario ID | Name                                                | Invocation Type                                   | Fixture State                    | Expected Mode     | Key Invariant                                                                                        |
-| ----------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `SCN-01`    | Greenfield Bootstrap with Minimally Complete Brief  | Prompt with minimally complete brief              | Empty directory                  | `Bootstrap`       | Baseline 6-doc suite authored; tailored content; default `docs/specs/` used.                         |
-| `SCN-02`    | Adoption of Existing Codebase (Partial Docs)        | Natural skill invocation on repo                  | Codebase with partial specs      | `Adopt`           | Existing code untouched; user docs preserved (update on material gap); missing authored from facts.  |
-| `SCN-03`    | Small Scoped Bug Fix / Patch                        | Natural prompt for isolated bug                   | Repository with bug              | `Change`          | Zero-doc patch; explicit skip reason documented; no full doc suite.                                  |
-| `SCN-04`    | Read-Only Audit & Spec Review                       | Natural review prompt                             | Project with code & specs        | `Review`          | Zero writes; comparison output only; strict read-only behavior.                                      |
-| `SCN-05`    | Bare Invocation on Empty Directory (Missing Brief)  | Natural invocation on empty dir                   | Empty directory                  | Clarify           | 0 files authored; asks exactly one concrete question; never hallucinate product.                     |
-| `SCN-06`    | Explicit Request for Full 13-Document Suite         | Prompt requesting all 13 specs                    | Brief for CLI utility            | `Bootstrap`       | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.               |
-| `SCN-07`    | Repeated Adoption Idempotency                       | Natural invocation on adopted repo                | Codebase with full specs         | `Adopt`           | 0 created, N reused; hashes preserved unless material discrepancy found.                             |
-| `SCN-08`    | Stateless / No-Registry Low-Risk Progress           | Natural prompt for typo / localized fix           | Complete DAW; no external skills | `patch`           | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.       |
-| `SCN-09`    | High-Risk Operation Missing Access / Approval Block | Prompt for prod deploy / DB wipe without approval | Any fixture                      | Fail-Closed Block | Fails closed strictly due to missing human approval and access; no registry or skill presence helps. |
-| `SCN-10`    | Decision Frontier Prerequisites & Dependent Reopen  | Trade-off prompt with upstream shift              | Architectural spec in progress   | `Clarify`         | Respects dependency frontier; reopens dependent downstream decisions when upstream premise changes.  |
-| `SCN-11`    | Grounded Codebase Research (Facts Not Asked)        | Natural invocation on existing repo               | Multi-file existing codebase     | `Adopt`/`Design`  | Discovers codebase facts directly from workspace; 0 questions for discoverable repository facts.     |
-| `SCN-12`    | Read-Only Consultation Without Document Generation  | Conversational Q&A / architecture guidance        | Repository with code & specs     | `Ask`             | Strictly read-only; 0 files created or modified; surfaces trade-offs without writing phantom docs.   |
-| `SCN-13`    | Domain Glossary Clash, Provenance & ADR Qualify     | Architecture spec with overloaded domain terms    | Repo with established schemas    | `Design`          | Disambiguates clashes by bounded context; requires all 3 conjunctive ADR gates; no forced paths.     |
-| `SCN-14`    | Material Builder-Readiness Blocker Halts Pipeline   | Hand off incomplete specification to builder      | Spec with unspecified auth seam  | Blocked Gate      | Halts fail-closed with status `blocked`; never passes builder-readiness with open material blocker.  |
-| `SCN-15`    | Direct Question & Small Settled Change No Ceremony  | Natural prompt for direct localized patch         | Repository with localized task   | `patch`           | Executes direct surgical change immediately; 0 multi-round grilling ceremony or interview loops.     |
+| Scenario ID | Name                                                | Invocation Type                                   | Fixture State                    | Expected Mode                 | Key Invariant                                                                                            |
+| ----------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `SCN-01`    | Greenfield Bootstrap with Minimally Complete Brief  | Prompt with minimally complete brief              | Empty directory                  | `Bootstrap`                   | Baseline 6-doc suite authored; tailored content; default `docs/specs/` used.                             |
+| `SCN-02`    | Adoption of Existing Codebase (Partial Docs)        | Natural skill invocation on repo                  | Codebase with partial specs      | `Adopt`                       | Existing code untouched; user docs preserved (update on material gap); missing authored from facts.      |
+| `SCN-03`    | Small Scoped Bug Fix / Patch                        | Natural prompt for isolated bug                   | Repository with bug              | `Change`                      | Zero-doc patch; explicit skip reason documented; no full doc suite.                                      |
+| `SCN-04`    | Read-Only Audit & Spec Review                       | Natural review prompt                             | Project with code & specs        | `Review`                      | Zero writes; comparison output only; strict read-only behavior.                                          |
+| `SCN-05`    | Bare Invocation on Empty Directory (Missing Brief)  | Natural invocation on empty dir                   | Empty directory                  | Clarify                       | 0 files authored; asks exactly one concrete question; never hallucinate product.                         |
+| `SCN-06`    | Explicit Request for Full 13-Document Suite         | Prompt requesting all 13 specs                    | Brief for CLI utility            | `Bootstrap`                   | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.                   |
+| `SCN-07`    | Repeated Adoption Idempotency                       | Natural invocation on adopted repo                | Codebase with full specs         | `Adopt`                       | 0 created, N reused; hashes preserved unless material discrepancy found.                                 |
+| `SCN-08`    | Stateless / No-Registry Low-Risk Progress           | Natural prompt for typo / localized fix           | Complete DAW; no external skills | `patch`                       | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.           |
+| `SCN-09`    | High-Risk Operation Missing Access / Approval Block | Prompt for prod deploy / DB wipe without approval | Any fixture                      | Fail-Closed Block             | Fails closed strictly due to missing human approval and access; no registry or skill presence helps.     |
+| `SCN-10`    | Decision Frontier Prerequisites & Dependent Reopen  | Trade-off prompt with upstream shift              | Architectural spec in progress   | `Clarify`                     | Respects dependency frontier; reopens dependent downstream decisions when upstream premise changes.      |
+| `SCN-11`    | Grounded Codebase Research (Facts Not Asked)        | Natural invocation on existing repo               | Multi-file existing codebase     | `Adopt`/`Design`              | Discovers codebase facts directly from workspace; 0 questions for discoverable repository facts.         |
+| `SCN-12`    | Read-Only Consultation Without Document Generation  | Conversational Q&A / architecture guidance        | Repository with code & specs     | `Ask`                         | Strictly read-only; 0 files created or modified; surfaces trade-offs without writing phantom docs.       |
+| `SCN-13`    | Domain Glossary Clash, Provenance & ADR Qualify     | Architecture spec with overloaded domain terms    | Repo with established schemas    | `Design`                      | Disambiguates clashes by bounded context; requires all 3 conjunctive ADR gates; no forced paths.         |
+| `SCN-14`    | Material Builder-Readiness Blocker Halts Pipeline   | Hand off incomplete specification to builder      | Spec with unspecified auth seam  | Blocked Gate                  | Halts fail-closed with status `blocked`; never passes builder-readiness with open material blocker.      |
+| `SCN-15`    | Direct Question & Small Settled Change No Ceremony  | Natural prompt for direct localized patch         | Repository with localized task   | `patch`                       | Executes direct surgical change immediately; 0 multi-round grilling ceremony or interview loops.         |
+| `SCN-16`    | Reference-Driven Drafting & Missing Source Handling | Prompt requesting spec adoption/creation          | Repo with partial dependencies   | `Adopt` / `Feature` (unclear) | Reads matrix + template first; cites observed versions; marks unknown DB `[UNVERIFIED]`; blocks DB path. |
 
 ---
 
@@ -402,6 +403,37 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
   - Zero multi-round questionnaire rounds or grilling loops initiated.
   - Surgical diff applied to `config.py`.
   - Semantic test verification evidence captured.
+
+---
+
+### SCN-16: Reference-Driven Drafting & Missing Source Fail-Safe
+
+- **Target Workspace Fixture:**
+  - Create `/tmp/test-fixture-ref-drafting`.
+  - Populate with a Python package containing `pyproject.toml` (declaring `fastapi == 0.110.0` and `pydantic == 2.6.4`), `main.py` exposing a healthcheck endpoint, but no database configuration or credentials.
+- **Prompt Invocation:**
+  ```text
+  Use deterministic-agentic-workflow to author techstack.md and deployment.md for this service, connecting to PostgreSQL.
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent inspects `cwd`, identifies an existing codebase with missing specifications, and classifies the intent as `adopt` (or `feature` with `requirements: "unclear"` requiring `daw-design`) under the Documentation Authoring Contract (`references/routing.md` §3).
+  2. The agent reads `references/routing.md` §3 for `techstack.md` and `deployment.md`, reads `templates/techstack.md` and `templates/deployment.md`, and validates its write gate requirements (Output Contract, Exit Criterion, and builder-readiness) before drafting.
+  3. The agent inspects `pyproject.toml` and cites exact, version-matched observed facts: `FastAPI 0.110.0` and `Pydantic 2.6.4` per `pyproject.toml`.
+  4. In evaluating PostgreSQL and deployment, the agent searches for existing database drivers (`asyncpg`, `psycopg`), migrations, or environment variables. Finding none, the agent adheres to the hierarchy of truth, design proposal, and missing-source rules:
+     - **Absence $\neq$ Evidence of Absence:** The agent DOES NOT fabricate negative claims (such as declaring "no auth or cloud configured" merely because the brief omitted cloud or auth details). It records unmentioned areas as `[Unspecified / Open Question]`.
+     - **Preserve Domain Math:** If existing domain math is present in the codebase, the agent preserves it verbatim without inventing unsupplied inventory formulas (such as physical vs. reserved quantities).
+     - **Unresolved Interfaces:** Any proposed query parameters, path equivalents, or error codes (such as 404 defaults) remain explicitly marked as `[Agent Recommendation]` and DO NOT silently enter binding Acceptance Criteria (AC).
+     - Proposed architectural options are explicitly labeled as `[Agent Recommendation]` awaiting acceptance, never disguised as pre-existing codebase facts.
+     - The agent marks unverified PostgreSQL configurations as `[UNVERIFIED]` in an `## Open Questions` section, blocking only the database connection and migration commitments while allowing core API specs to proceed.
+  5. The agent concludes its stage with downstream handoff to `daw-plan` or parent; it NEVER performs recursive self-invocation (`handoff_to: "daw-design"` is forbidden).
+- **Content Invariants & Verification:**
+  - Matching routing section and canonical template read before file generation.
+  - Output Contract, Exit Criterion, and builder-readiness seams explicitly satisfied prior to handoff.
+  - Zero fabricated versions or phantom infrastructure paths; proposed options clearly labeled as recommendations.
+  - Absence of evidence not misconstrued as evidence of absence; no invented domain math or premature binding AC.
+  - Handoff targets `daw-plan` or parent; non-recursive execution preserved.
+  - Observed dependencies cited with exact file path (`pyproject.toml`).
+  - Unverified database configuration explicitly isolated in `Open Questions` blocking only impacted paths.
 
 # Suite Procedure Regression Scenarios
 

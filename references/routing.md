@@ -130,6 +130,80 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
 
 ## 3. The 13 Document Routing Specifications
 
+### Documentation Authoring Contract: Ownership, Provenance & Verification
+
+To prevent document sprawl, speculative filler, and ambiguous responsibilities, all document authoring across the Deterministic Agentic Workflow suite is governed by this single authoritative contract:
+
+#### 1. Accountable Writers & Phase Ownership Matrix
+
+| Document        | Accountable Author                           | Bootstrap Role (`daw-wizard`)                          | System Design / Adoption (`daw-design`)                 | Execution Planning (`daw-plan`)                              | Scope & Core Deliverable                                  |
+| :-------------- | :------------------------------------------- | :----------------------------------------------------- | :------------------------------------------------------ | :----------------------------------------------------------- | :-------------------------------------------------------- |
+| `blueprint.md`  | `daw-design`                                 | Drafts initial system brief & core invariants          | Authoritative author; enriches boundaries & seams       | Reads for architectural constraints & seams                  | High-level topology, module boundaries, system invariants |
+| `brd.md`        | `daw-design`                                 | Drafts commercial & problem scope from brief           | Authoritative author; enriches business scope           | Reads for business boundaries & constraints                  | Business goals, OKRs/KPIs, budget/timeline constraints    |
+| `prd.md`        | `daw-design`                                 | Drafts initial personas, user stories & AC             | Authoritative author; deepens stories & NFRs            | Reads for user stories & acceptance criteria                 | User personas, functional stories with verifiable AC      |
+| `frd.md`        | `daw-design`                                 | Drafts core functional flows & transitions             | Authoritative author; formalizes state machines         | Reads for validation logic & state transitions               | State transitions, logic rules, validation matrices       |
+| `techstack.md`  | `daw-design`                                 | Drafts proposed runtimes, stores & frameworks          | Authoritative author; grounds in code & ADRs            | Reads for runner commands, toolchains & versions             | Runtimes, libraries, DBs, toolchains, and ADR trade-offs  |
+| `design.md`     | `daw-design`                                 | Drafts initial design tokens / UI inventory            | Authoritative author; enforces token scales             | Reads for UI component boundaries (if UI)                    | Design tokens, color contrast, component styling          |
+| `wireframe.md`  | `daw-design`                                 | Drafts structural screen layouts (if UI)               | Authoritative author; responsive layout hierarchy       | Reads for layout structure (if UI)                           | ASCII/structural viewports, layout grids, screen blocks   |
+| `ui-ux.md`      | `daw-design`                                 | Drafts core user interaction states (if UI)            | Authoritative author; interaction states & a11y         | Reads for interactive states (if UI)                         | Micro-interactions, keyboard navigation, a11y tree        |
+| `security.md`   | `daw-design`                                 | Drafts initial threat boundaries & data flow           | Authoritative author; formal threat model & auth        | Reads for security invariants & test requirements            | Threat model, trust boundaries, auth rules, sanitization  |
+| `roadmap.md`    | `daw-design` (strategy) / `daw-plan` (tasks) | Drafts high-level milestone strategy & delivery phases | Authoritative for strategic release phases & milestones | Owns task decomposition & milestone progress when authorized | Strategic milestone phasing vs tactical task breakdown    |
+| `deployment.md` | `daw-design`                                 | Drafts deployment topology & target envs               | Authoritative author; release pipelines & rollback      | Reads for deployment targets & environment variables         | CI/CD pipeline, environments, containerization, rollback  |
+| `qa.md`         | `daw-design`                                 | Drafts test strategy & verification gates              | Authoritative author; coverage gates & test plan        | Reads for test requirements & verification gates             | Test pyramid, automated test suites, quality gates        |
+| `runbook.md`    | `daw-design`                                 | Drafts initial operational triage & alerts             | Authoritative author; operational procedures & triage   | Reads for operational constraints & commands                 | Service diagnostics, triage trees, incident remediation   |
+
+#### 2. Module Phase Ownership Rules
+
+- **`daw-wizard` (Bootstrap Greenfield Interview):** Conducts interactive elicitation for blank projects. Generates a _proportional bootstrap specification set_ grounded in interview answers and sensible defaults (typically baseline documents: `blueprint.md`, `prd.md`, `frd.md`, `techstack.md`, and high-level `roadmap.md` strategy). Hands off to `daw-design` for enrichment, boundary validation, and builder-readiness inspection.
+- **`daw-design` (Authoritative System Architecture & Adoption):** The primary custodian and authoritative author for specifications across the 13-document matrix. Creates, updates, enriches, and adopts specifications (`adopt` route, or `requirements: "unclear"` `feature` / `bootstrap` design stage; read-only `review` recommends authorized follow-up, never writes). Assesses builder-readiness and verifies consumer seams before downstream handoff. Follows the active parent route; NEVER performs recursive self-invocation (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent).
+- **`daw-plan` (Deterministic Execution Task Decomposition):** Converts design specifications or direct change requests into concrete, ordered implementation tasks with disjoint file ownership, acceptance criteria, and verification commands. Returns the structured plan directly in its stage response payload by default. NEVER forces document sprawl or creates persistent tracking files (`tasks.md`, `tracker.md`) unless requested by the user or required by repository conventions. When an authorized persistent tracking document or `roadmap.md` task-level breakdown is required, `daw-plan` owns tactical task breakdown and milestone progress updates.
+- **Consistency with Finite Routes:** Clear feature routes (`requirements: "clear"`) execute via `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. `daw-design` is NEVER forcibly inserted when requirements and interfaces are already clear. No new routes or mandatory stages are introduced.
+
+#### 3. Mandatory Reference Read & Write Gate (Matrix Entry, Canonical Template & Exit Criteria)
+
+Before authoring or mutating any specification document, the authoring module MUST:
+
+1. Read the corresponding document specification entry in §3 below to confirm Trigger, Inputs, Required Capability, Output Contract, and Exit Criterion.
+2. Read the actual canonical template file at `templates/<doc>.md` to load required structural headings, sections, and checklist items.
+3. Explicitly satisfy the chosen document's Output Contract, Exit Criterion, and builder-readiness seams before declaring completion. Authoring specifications without first loading the matching routing specification and template, or failing to meet its defined exit criteria, is a contract violation.
+
+#### 4. Source Inputs, Hierarchy of Truth & Provenance
+
+- **Templates define structure, NOT evidence:** Canonical templates provide structural scaffolding, headings, and checklists; they do not supply factual claims, software versions, or repository evidence.
+- **Hierarchy of Truth:**
+  1. _User Facts & Direct Directives:_ The user's explicit instructions, business goals, and constraints are ground truth.
+  2. _Repository Reality:_ Existing code, dependency manifests (`package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, etc.), and normative repository documentation outrank templates.
+  3. _Templates:_ Structural guidelines only. Template placeholder text NEVER overrides observed repository facts.
+- **Source-Quality, Version Grounding & Domain Integrity:**
+  - Technical claims regarding existing stack components, libraries, APIs, security mechanisms, or deployment topologies MUST cite actual version-matched repository configuration/code files or verified vendor/standards documentation.
+  - Authors must cite the exact file path and observed version (e.g. `Node.js 20.x per package.json#engines`, `PostgreSQL 16 per docker-compose.yml`).
+  - Agents MUST NEVER fabricate source citations, synthetic version numbers, or unobserved API endpoints.
+  - **Preserve Existing Domain Math & Invariants:** Specification examples and models MUST NOT invent domain calculations, math formulas, schemas, or domain invariants (e.g., inventing physical vs. reserved inventory counts when only existing stock math was supplied). Existing observed domain logic and math must be preserved verbatim.
+  - **Permitted Design Proposals vs. Binding Acceptance:** For new features or architecture, agents MAY legitimately propose new domain concepts, libraries, or patterns, provided they are clearly labeled as `[Agent Recommendation]` or proposed choices awaiting acceptance, rather than misrepresenting them as pre-existing observed repository facts.
+
+#### 5. Handling Missing Sources, Unresolved Interfaces & Absence of Evidence (Fail-Safe)
+
+- **Absence of Supplied Evidence $\neq$ Evidence of Absence:** When an architectural element, auth flow, or cloud configuration is not mentioned in the brief or workspace, the agent MUST NOT invent negative facts (e.g. asserting "no auth/cloud configured" or "no security needed"). Instead, mark the area as `[Unspecified / Open Question]`.
+- **Unresolved Interfaces & Error Topologies:** Unresolved query parameters, path equivalents, error response codes (e.g. inventing 404 defaults), or fallback mechanisms MUST remain explicitly labeled as `[Agent Recommendation]` or Open Decisions. They MUST NEVER silently enter binding Acceptance Criteria (AC) or be claimed as ready/settled requirements.
+- **Blocking Scope:** If network access, tooling, or required source documents are unavailable, or if a design choice cannot be grounded in observed facts:
+  - The agent MUST NOT invent plausible filler or speculative assumptions.
+  - The agent MUST explicitly mark the claim as `[UNVERIFIED]` or record it in an `## Open Questions` section with owner, impact, and resolution trigger.
+  - The agent blocks ONLY the impacted downstream commitments or execution paths; unaffected orthogonal paths proceed.
+
+#### 6. Proportionality & Anti-Sprawl (No Forced 13 Documents)
+
+- The 13-document matrix is an exhaustive reference catalog, NOT a mandatory checklist for every project.
+- Author ONLY the documents justified by the project scope, trigger criteria, and user intent.
+- For small scoped bug fixes, refactorings, or localized patches, zero persistent document churn or minimal updates to existing specs is the standard.
+
+#### 7. Optional Specialist Capabilities
+
+- Specialist capabilities (e.g., application security, backend architecture, database optimization, UX architecture) are optional domain augmentations.
+- They are orchestrated strictly by the parent/orchestrator at the top level when available.
+- They MUST NEVER be treated as hidden required dependencies or invoked recursively. The DAW suite executes completely and deterministically using its bundled modules and inline capabilities even when zero external specialist skills are installed.
+
+---
+
 ### 1. `blueprint.md` — System Architecture & Foundational Design
 
 - **Trigger:** Greenfield system initiation, major platform rewrite, or introducing a core multi-service domain boundary.

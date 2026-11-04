@@ -25,7 +25,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 - **No Approval Ceremony:** Proceed autonomously on routine engineering choices; gate only on consequential user decisions.
 - **Proportional Documentation:** Do not author unnecessary documents for small changes. Use canonical root templates (`../../templates/`) when authoring or updating formal specifications.
 - **Fact-Based Exploration & Grounded Reality:** Inspect existing files, dependencies, schemas, and constraints before proposing architecture. Never invent agreement or synthetic domain terminology; distinguish observed facts from legitimately proposed new concepts.
-- **Nonrecursive Dispatch:** `daw-design` performs structural analysis, interactive elicitation, specification drafting, and readiness inspection; it never executes code, performs recursive module dispatch, or invokes sub-skills directly. Orchestration remains strictly with the parent router.
+- **Nonrecursive Dispatch & Downstream Handoff:** `daw-design` performs structural analysis, interactive elicitation, specification drafting, and readiness inspection; it never executes code, performs recursive module dispatch, or invokes sub-skills directly (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent). Orchestration remains strictly with the parent router.
 
 ---
 
@@ -88,10 +88,13 @@ The design module governs structural analysis, architectural evaluation, domain 
 
 ### Step 5: Proportional Specification Authoring
 
-1. Author or update only the relevant specifications for the scope across the canonical 13-document matrix.
-2. For canonical documents (`blueprint.md`, `prd.md`, `frd.md`, `techstack.md`, etc.), reuse templates from `../../templates/`.
-3. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
-4. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
+1. Govern specification authoring under the Authoritative Documentation Authoring Contract (`../../references/routing.md` §3). `daw-design` is the primary authoritative author, custodian, and adopter for specifications across the 13-document matrix.
+2. Before authoring or updating any specification, read its matching entry in `../../references/routing.md` §3 and the actual canonical template in `../../templates/<doc>.md`. Before declaring completion, explicitly satisfy the Output Contract, Exit Criterion, and builder-readiness seams.
+3. **Hierarchy of Truth, Domain Math & Provenance:** User facts and existing repository realities (code, manifests, configs) outrank templates. Templates define structure, not evidence. Ground technical choices in observed repository manifests (`package.json`, `Cargo.toml`, etc.); cite exact paths and observed versions. Never fabricate citations or synthetic version numbers. Specification examples must preserve existing observed domain calculations, schemas, and invariants verbatim without inventing unsupplied math (such as physical vs. reserved inventory counts).
+4. **Handling Missing Sources & Absence of Evidence:** Absence of supplied evidence is not evidence of absence; never invent negative facts (e.g. asserting "no auth configured" simply because none was supplied). If a decision cannot be grounded in verified sources or tools are unavailable, record it as `[UNVERIFIED]` or an Open Question. Unresolved interfaces, query parameters, path variants, or error codes (e.g. 404 defaults) must remain proposed `[Agent Recommendation]` awaiting acceptance, never silently entering binding Acceptance Criteria or claimed as settled. Block only impacted downstream paths; do not halt unaffected orthogonal work.
+5. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
+6. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
+7. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
 
 ### Step 6: Builder-Readiness Assessment & Seam Inspection
 

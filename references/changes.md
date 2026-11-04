@@ -1,5 +1,24 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-04: Independent Grading and Source-Grounded Documentation
+
+- Separate bookmark validation/update checks from the search-format fixture so an
+  invalid-URL defect fails its own criterion without contaminating search grading.
+- Derive expense list expectations from date and numeric ID instead of assuming the
+  current UTC date follows the fixed January fixtures; retain strict format checks.
+- Define accountable documentation authors and mandatory matrix/template reads in
+  routing §3. Require observed sources, explicit proposed decisions, and the selected
+  document's output and exit criteria without forcing all thirteen documents.
+- Add behavioral regressions for grading independence, date boundaries, incorrect
+  ordering and formatting. Direct CLI probes exercised the corrected grading paths.
+- A documentation behavior probe initially invented domain math and interface details;
+  strengthen the source rules and record unresolved commitments explicitly. A corrected
+  probe preserved supplied facts and blocked only unsupported commitments. These
+  observations are not a guarantee of model reliability.
+- Final Linux verification: 149 unit tests passed, package validation reported no
+  findings, and suite inspection returned ready. Temporary install/status/package
+  validation/uninstall shipped the updated authoring references successfully.
+
 ## 2026-11-04: On-Demand Interview and Design Protocols
 
 - Share bounded grilling through one supporting reference used directly by ask, wizard,

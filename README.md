@@ -206,6 +206,15 @@ The suite includes standard Markdown templates in `templates/` for the complete 
 
 Default greenfield projects author the 6-doc core set (`blueprint`, `prd`, `frd`, `techstack`, `security`, `roadmap`). Non-applicable domains are marked with explicit `N/A` rationales.
 
+### Documentation Authoring Contract & Accountability
+
+Specification authoring is governed by the Authoritative Documentation Authoring Contract (`references/routing.md` §3):
+
+- **Ownership by Phase:** `daw-wizard` conducts interviews and drafts proportional bootstrap specs; `daw-design` is the authoritative author, custodian, and adopter across all 13 specs; `daw-plan` owns task decomposition and returns plans in the stage payload (no forced `tasks.md` files; updates `roadmap.md` only when authorized).
+- **Mandatory Reference Reads:** Writers must read the matching matrix entry in `references/routing.md` §3 and the canonical template in `templates/` before writing.
+- **Hierarchy of Truth & Provenance:** User facts and repository files (`package.json`, source configs) outrank templates. Templates define structure, not evidence. Technical claims must cite exact paths and observed versions; missing facts become `[UNVERIFIED]` or Open Questions blocking only impacted commitments, never speculative filler.
+- **No Forced 13 Documents:** Small changes require zero or minimal spec updates; specialists are optional orchestrator augmentations, not recursive dependencies.
+
 ---
 
 ## 6. References & Documentation Links

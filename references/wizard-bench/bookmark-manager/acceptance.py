@@ -66,6 +66,7 @@ def main() -> int:
     # R1: Entry point exists
     emit_result("R1_entrypoint_exists", "pass", "bookmarks.py exists in workspace")
 
+    r4_errors: list[str] = []
     # R4 part 1: URL validation error
     try:
         proc_bad_url = run_cli(
@@ -73,21 +74,12 @@ def main() -> int:
             ["add", "--url", "ftp://example.org/files", "--title", "FTP Site"],
             cwd=workspace,
         )
-        if proc_bad_url.returncode == 1 and "Error: invalid URL scheme" in proc_bad_url.stderr:
-            url_val_ok = True
-        else:
-            url_val_ok = False
-            failures += 1
-            emit_result(
-                "R4_validation_and_update",
-                "fail",
-                f"Invalid URL check failed: rc={proc_bad_url.returncode}, stderr={proc_bad_url.stderr.strip()!r}",
+        if not (proc_bad_url.returncode == 1 and "Error: invalid URL scheme" in proc_bad_url.stderr):
+            r4_errors.append(
+                f"Invalid URL check failed: rc={proc_bad_url.returncode}, stderr={proc_bad_url.stderr.strip()!r}"
             )
     except Exception as exc:
-        url_val_ok = False
-        failures += 1
-        emit_result("R4_validation_and_update", "fail", str(exc))
-
+        r4_errors.append(f"Invalid URL check error: {exc}")
     # R3: Add command basic functionality & tag normalization
     try:
         proc_add1 = run_cli(
@@ -139,39 +131,42 @@ def main() -> int:
         emit_result("R2_json_persistence", "fail", str(exc))
 
     # R4 part 2: Duplicate URL updates existing bookmark
-    if url_val_ok:
-        try:
-            proc_update = run_cli(
-                entrypoint,
-                [
-                    "add",
-                    "--url",
-                    "https://python.org",
-                    "--title",
-                    "Python Language",
-                    "--tags",
-                    "python, core",
-                ],
-                cwd=workspace,
-            )
-            if proc_update.returncode == 0 and "Updated bookmark: Python Language" in proc_update.stdout:
-                # check file updated in place
+    try:
+        proc_update = run_cli(
+            entrypoint,
+            [
+                "add",
+                "--url",
+                "https://python.org",
+                "--title",
+                "Python Language",
+                "--tags",
+                "python, core",
+            ],
+            cwd=workspace,
+        )
+        if proc_update.returncode == 0 and "Updated bookmark: Python Language" in proc_update.stdout:
+            # check file updated in place
+            if data_file.is_file():
                 data = json.loads(data_file.read_text(encoding="utf-8"))
-                if len(data) == 1 and data[0]["title"] == "Python Language":
-                    emit_result("R4_validation_and_update", "pass", "Validation and in-place URL update verified")
+                if isinstance(data, list) and len(data) == 1 and data[0].get("title") == "Python Language":
+                    pass
                 else:
-                    failures += 1
-                    emit_result("R4_validation_and_update", "fail", f"Data not updated in place: {data}")
+                    r4_errors.append(f"Data not updated in place: {data}")
             else:
-                failures += 1
-                emit_result(
-                    "R4_validation_and_update",
-                    "fail",
-                    f"Update failed: rc={proc_update.returncode}, out={proc_update.stdout.strip()!r}",
-                )
-        except Exception as exc:
-            failures += 1
-            emit_result("R4_validation_and_update", "fail", str(exc))
+                r4_errors.append("bookmarks.json does not exist after update")
+        else:
+            r4_errors.append(
+                f"Update failed: rc={proc_update.returncode}, out={proc_update.stdout.strip()!r}, err={proc_update.stderr.strip()!r}"
+            )
+    except Exception as exc:
+        r4_errors.append(f"Update error: {exc}")
+
+    if not r4_errors:
+        emit_result("R4_validation_and_update", "pass", "Validation and in-place URL update verified")
+    else:
+        failures += 1
+        emit_result("R4_validation_and_update", "fail", "; ".join(r4_errors))
 
     # Add more bookmarks for search tests:
     # 1. Django Docs - https://docs.djangoproject.com - tags: web, python
@@ -232,6 +227,29 @@ def main() -> int:
     # 3. Python Language: [core, python] Python Language - https://python.org
     # 4. Rust Lang: [programming, systems] Rust Lang - https://rust-lang.org
     try:
+        r6_fixture = [
+            {
+                "url": "https://rust-lang.org",
+                "title": "Rust Lang",
+                "tags": ["systems", "programming"],
+            },
+            {
+                "url": "https://docs.djangoproject.com",
+                "title": "Django Docs",
+                "tags": ["web", "python"],
+            },
+            {
+                "url": "http://example.com",
+                "title": "Example Site",
+                "tags": [],
+            },
+            {
+                "url": "https://python.org",
+                "title": "Python Language",
+                "tags": ["python", "core"],
+            },
+        ]
+        data_file.write_text(json.dumps(r6_fixture, indent=2), encoding="utf-8")
         proc_all = run_cli(entrypoint, ["search"], cwd=workspace)
         expected_lines = [
             "[python, web] Django Docs - https://docs.djangoproject.com",
