@@ -134,6 +134,8 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
 
 To prevent document sprawl, speculative filler, and ambiguous responsibilities, all document authoring across the Deterministic Agentic Workflow suite is governed by this single authoritative contract:
 
+> **Applicability Notice:** The 13-document matrix applies strictly to greenfield system creation (`bootstrap`), undocumented codebase onboarding (`adopt`), or when requirements are explicitly missing or requested. Routine bug fixes, isolated tasks, refactors, and settled features with clear requirements do NOT require generating or updating the 13 specification documents.
+
 #### 1. Accountable Writers & Phase Ownership Matrix
 
 | Document        | Accountable Author                           | Bootstrap Role (`daw-wizard`)                          | System Design / Adoption (`daw-design`)                 | Execution Planning (`daw-plan`)                              | Scope & Core Deliverable                                  |
@@ -436,6 +438,7 @@ Before authoring or mutating any specification document, the authoring module MU
    - Under no circumstances may an agent reading `routing.md` invoke `deterministic-agentic-workflow` as a child task. Routing is a top-level deterministic mapping, executed once per planning stage.
    - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 10 public execution modules (`skills/daw-*/`). Supporting resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
    - Supporting references grant no new execution permissions or tools, and loading them does not spawn background workers.
+   - **Targeted Reference Lookups:** When consulting reference manuals (`routing.md`, `operations.md`), agents MUST use progressive disclosure—querying or reading ONLY the specific section heading or line range needed rather than ingesting entire multi-thousand-line references upfront.
    - Parent agents retain full control over delegation. If an independent assessment of builder-readiness is warranted, the parent delegates to the existing `daw-review` module rather than recursively re-dispatching design or creating ad-hoc wrapper skills.
    - Handoff schema contracts remain fixed: any protocol-specific status or findings belong under the existing optional `details` object without introducing new required top-level JSON fields.
 
@@ -448,6 +451,8 @@ This section defines the canonical output envelope produced by all 10 internal e
 > **Contract Scope Note:** This schema defines the **runtime module handoff contract** returned across module completion stages. It is distinct from the top-level route decision payload emitted by `scripts/route.py` and the task verification envelope checked by `scripts/validate.py`.
 
 ### Canonical Handoff Schema
+
+> **Observable Transition Checkpoint Invariant:** Canonical output handoffs MUST be emitted and observable as complete JSON envelopes BEFORE advancing to the next stage, not deferred to final retrospective prose. In a single session executing stages sequentially, the agent MUST display the checkpoint handoff envelope at the end of each stage before loading or executing the next stage. If subagent tools or external delegators are unavailable, execute directly via honest direct fallback in the current session.
 
 Every execution module returns a JSON object adhering to this structure:
 
@@ -500,19 +505,18 @@ Every execution module returns a JSON object adhering to this structure:
      - `summary` (string): Concise summary of what was observed.
 6. **`status` (string, required):**
    - Discrete execution status: `"pass"`, `"fail"`, or `"blocked"`.
-   - **Stage-Scoped Invariant:** `status: "pass"` certifies ONLY that the current module's stage-specific criteria were satisfied. It is NEVER proof of end-to-end task completion, full system implementation, production readiness, or operational authorization.
+   - **Stage-Scoped & Proposed Pass Invariant:** `status: "pass"` is a module self-report certifying ONLY that the current module proposes its stage-specific criteria were satisfied. It is NEVER proof of parent acceptance, end-to-end task completion, full system implementation, production readiness, or operational authorization.
+   - **Parent Acceptance vs. Proposed Pass:** As defined in the canonical [Parent Acceptance Checkpoint](operations.md#parent-acceptance-checkpoint), the parent orchestrator independently evaluates results across explicit [Checkpoint Boundaries](operations.md#checkpoint-boundaries) and records decisions via the [Parent-Owned Acceptance Record](operations.md#parent-owned-acceptance-record). Dispatch completion or a proposed worker `pass` does not equal parent stage acceptance (`accepted` / `not accepted`). Reported passes with missing, unexercised, or contradicted evidence are rejected as `not accepted`. Worker-supplied `details` are NOT parent decisions. Optional criterion-to-evidence mappings use existing parent `details` or plan artifacts without altering the outer schema.
    - `fail`: Executed criteria failed, produced errors, or were incomplete.
    - `blocked`: Execution could not proceed due to missing prerequisites, environment context, unverified risk, or missing exact interactive approval.
    - Rich findings inside `details` cannot override the outer `status`.
 7. **`handoff_to` (string or null, required):**
    - Name of the recommended next canonical execution module (e.g., `"daw-verify"`, `"daw-review"`), or `null` if the pipeline has concluded or halted.
    - **Advisory Invariant:** `handoff_to` is purely advisory metadata returned to the parent orchestrator. Modules MUST NOT directly invoke child modules or recursively dispatch routing.
-   - Parent-controlled corrective rounds may resume retained workers without changing the active route or allowing module recursion. See the [persistent worker graph contract](operations.md#persistent-worker-graphs-harness-native): only accepted current-revision results satisfy dependencies, and a correction invalidates affected downstream passes. Canonical outer outcomes remain `pass`, `fail`, and `blocked`; graph bookkeeping belongs in existing plan artifacts or optional `details`, not new outer statuses.
+   - Parent-controlled corrective rounds may resume retained workers without changing the active route or allowing module recursion. See the [persistent worker graph contract](operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](operations.md#parent-acceptance-checkpoint): only accepted current-revision results satisfy dependencies via mandatory pre-dispatch joins, and a correction invalidates affected downstream passes. Canonical outer outcomes remain strictly `pass`, `fail`, and `blocked`; `not accepted` is solely the parent's evaluation decision label, never a new outer JSON envelope status. Downstream pending work strictly precludes declaring the final workflow complete.
 
 8. **`details` (object, required):**
-   - Module-specific domain payload (e.g. diagnostics, test summaries, review findings, workspace branches). Details preserve rich information but remain subordinate to the outer `status`.
-
----
+   - Module-specific domain payload (e.g. diagnostics, test summaries, review findings, workspace branches). Details preserve rich information defined by the current active module's output contract (such as `tasks` with `target_files` and `verification_command` in `daw-plan`, separate `stage_1_conformity` and `stage_2_technical_audit` in `daw-review`, and `checks` with runtime evidence in `daw-verify`), but remain subordinate to the outer `status`.
 
 ## 6. Direct Module Invocation & Governance Loader Sequence
 

@@ -7,8 +7,8 @@ Operational scope pairs generative cognitive planning with deterministic, script
 ### Self-Contained Execution & Risk Gating Invariants
 
 - **No External Skill Gate:** High-risk operations fail closed strictly on missing human/provider approvals, missing operational credentials or permissions, unverified preflight checks, missing immutable rollback targets, or inadequate semantic evidence—NEVER because of the presence or absence of a specific named external skill.
-- **Direct Execution vs. Delegation:** An agent may fulfill required operational capabilities directly or delegate to an appropriate subagent. The absence of an external registry or named skill package is never a blocker for reachable, authorized tasks.
-- **Direct Module Invocation Governance:** When any internal module (`skills/daw-*/SKILL.md` or sibling symlinks) is invoked directly rather than through the root router, it MUST execute the Governance Loader Sequence: load root `SKILL.md` §4/§6, `references/routing.md` §5, and this document's preflight and approval rules before performing mutations. Safe read-only intake and inspection proceed without mutation blocks.
+- **Direct Execution vs. Delegation:** An agent may fulfill required operational capabilities directly or delegate to an appropriate subagent. The absence of an external registry or named skill package is never a blocker for reachable, authorized tasks. If tools or subagent delegation are unavailable, the agent executes directly via honest direct fallback in the current session.
+- **Direct Module Invocation Governance & Progressive Disclosure:** When any internal module (`skills/daw-*/SKILL.md` or sibling symlinks) is invoked directly rather than through the root router, it MUST execute the Governance Loader Sequence: if root `SKILL.md` §4/§6, `references/routing.md` §5, and preflight rules are already loaded into context from a prior sequential stage in the same session, reuse them directly without redundant re-reading. Load only the current stage's module instructions. Reference documentation must be consulted using progressive disclosure by exact section heading rather than loading multi-thousand-line references upfront.
 - **Subordination to Host Policy:** All actions remain subordinate to host environment security boundaries, sandboxing, and approval policies. The workflow never performs global tool uninstallation, system-wide configuration alterations, or unauthorized environmental overrides.
 
 ---
@@ -149,6 +149,138 @@ Verification establishes truthful, observable evidence that the system satisfies
    - **Strict Secret & Data Redaction:** Commands, logs, error outputs, and audit records MUST redact all secrets, API tokens, passwords, private keys, authorization headers, and sensitive customer personal data. Record configuration key names or reference identifiers only (e.g., `AUTH_TOKEN=[REDACTED]`), never credential values.
    - **Distinguish Outcomes Truthfully:** Explicitly record whether checks are `passed`, `failed`, `blocked`, or `unexercised`. Never claim verification passed for tests that were skipped, mocked, or not run.
 
+### Parent Acceptance Checkpoint
+
+The parent orchestrator evaluates all module outputs through this canonical verification checkpoint before accepting any stage result or advancing the execution pipeline. These constraints are instructional contracts governing agent reasoning, not runtime enforcement hooks or daemon supervisors.
+
+1. **Four Discrete Execution & Acceptance States:**
+   A workflow distinguishes four separate states:
+   - **Dispatch Completion:** The worker process or execution transport completed and returned an output payload or envelope.
+   - **Proposed Module Pass:** The worker envelope declares `status: "pass"`, indicating the module self-reports that its internal stage criteria were met.
+   - **Parent Stage Acceptance:** The parent orchestrator inspects primary evidence, verifies identity and criteria, and explicitly decides the stage is `accepted` (or `not accepted`). A proposed pass NEVER automatically constitutes stage acceptance.
+   - **Final Workflow Completion:** All required route and user criteria are `accepted` and zero required downstream, review, or verification tasks remain pending or blocked. Required pending work strictly precludes declaring completion; optional unrequested follow-ups do not block completion.
+
+2. **Predeclared Verification Contract & Proportional Checks:**
+   - Before dispatching work or mutating state, the orchestrator or module predeclares each acceptance criterion, its expected outcome, and a proportional verification check.
+   - Verification checks MUST be proportional to the change scope: unit tests or targeted command assertions for local bug fixes, schema/diff inspections for specifications, or integration assertions for multi-boundary changes. Do not require universal full-suite runs for minor local edits.
+   - Small, direct tasks may record criteria and acceptance inline within existing plans or handoffs without spawning extra worker processes or ceremony. Both inline text and structured JSON formats are optional parent records.
+
+3. **Identity, Revision & Transport Integrity:**
+   - The parent validates the execution envelope against the current dispatch identity: node/task ID, worker ID, current round, assigned role, declared file/domain scope, and current artifact revision (commit SHA, file content hash, or immutable snapshot).
+   - The parent MUST reject stale, duplicate, cancelled, mismatched-scope, or failed-transport deliveries as valid success claims (while retaining failure payloads as diagnostic evidence for corrective rounds). A result referencing an outdated round/revision or mismatched identity cannot be accepted.
+
+4. **Primary Observable Evidence & Expected-vs-Actual Evaluation:**
+   - Every applicable criterion must be mapped to an inspectable primary observation comparing expected versus actual results, along with the execution or transport outcome.
+   - **Failures and Missing Evidence Cannot Become Pass:** If evidence is missing, unexercised, ambiguous, or contradicted by primary observations, the parent MUST reject the reported pass as a success and mark the stage `not accepted` with a criterion-specific reason, retaining failure outputs as diagnostic evidence.
+   - Criteria are identified stably by existing criterion text or ID.
+   - Optional criterion-to-evidence mappings belong inside existing envelope `details` or plan/handoff artifacts—NEVER requiring new mandatory outer envelope fields.
+   - Expected negative tool exit codes or expected error messages from tools (e.g., a test asserting that invalid CLI flags exit with code 2) are valid verification checks, distinct from worker execution or transport failures.
+   - Existing evidence can be inspected and reused when current, relevant, and sufficient; do not mandate universal rerun of identical checks when the underlying revision is unchanged. Record explicit evidence invalidation whenever the underlying artifact revision, criteria, scope, or relevant environment context changes.
+   - Parent stage acceptance verifies that execution criteria were satisfied; it NEVER constitutes operational authorization for high-risk actions (production deployment, destructive migrations, or external mutations).
+
+5. **Source vs. Runtime Evidence Distinction:**
+   - **Source/Static Proof:** Inspectable diffs, AST/type checks, structural grep, and file content reviews constitute sufficient proof for documentation updates, specification alignment, architectural design, and read-only code review when they directly establish the relevant claim (a bare pattern match alone without verifying context is never sufficient).
+   - **Runtime Proof:** Functional behavior, side effects, API responses, CLI commands, and database state mutations require inspectable runtime execution evidence (test runner output, command exit code + stdout, rendered UI state).
+   - NEVER force runtime command execution or test runs during read-only reviews or static document edits where source inspection is the appropriate proof.
+
+6. **Mandatory Pre-Dispatch Dependency Joins:**
+   - Before dispatching any dependent downstream task, the parent orchestrator MUST join and verify that all mandatory inputs from predecessor tasks are accepted for their current expected input revisions (disjoint artifacts maintain their own revision hashes; there is no global single-hash requirement).
+   - An earlier successful sibling or prior run cannot mask a failed, missing, outdated, or still-running dependency.
+   - Success-dependent stages require accepted successful predecessors. A corrective
+     dispatch instead consumes current, validated failure findings under explicit
+     correction scope; accepting findings as diagnostic input does not mark the failed
+     stage successful or unlock release. Missing or failed-transport output cannot
+     supply findings it never produced.
+
+7. **Parent Acceptance Record (`accepted` / `not accepted`):**
+   - The parent records an explicit decision: `accepted` or `not accepted`, accompanied by a criterion-specific rationale for any rejection.
+   - This decision is distinct from worker outer execution statuses (`pass`, `fail`, `blocked`). The outer status vocabulary remains strictly `"pass"`, `"fail"`, `"blocked"`; `not accepted` is solely the parent's evaluation decision label, never a new outer JSON envelope status.
+   - No unexercised required criterion may be accepted. Missing observations must be explicitly marked absent or unexercised, never invented.
+
+### Checkpoint Boundaries
+
+The execution pipeline requires the parent orchestrator to apply three discrete verification checkpoints. Each boundary enforces explicit entry prerequisites, evidence evaluation rules, and parent decision options:
+
+| Boundary                                                       | Inputs                                                                                                                                                                                                                          | Parent Decision                                                                                                                                                                                   | Advance Condition                                                                                                                                                                                                                                                 |
+| :------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pre-Dispatch Checkpoint** (prior to worker dispatch)         | Predecessor artifact revisions with `accepted` parent status (or validated diagnostic failure findings under explicit correction scope), declared scope, and operational permissions (acceptance != operational authorization). | `dispatch_eligible` vs `hold` / `blocked` (evaluates readiness to dispatch, not evidence success; planned checks remain unexercised).                                                             | All mandatory predecessor dependencies accepted for current revisions (or validated diagnostic failure findings consumed for scoped corrective round); dispatch worker to execute assigned scope.                                                                 |
+| **Result Acceptance Checkpoint** (upon worker envelope return) | Worker envelope (`status: "pass"\|"fail"\|"blocked"`), current artifact revision snapshot, and primary observable evidence.                                                                                                     | `accepted` vs `not accepted` with criterion rationale (worker proposed pass or worker-forged `accepted` is untrusted; failure findings authorize scoped correction without unlocking downstream). | If `accepted`: all stage criteria verified by primary observable evidence matching expected outcomes, advance to next stage. If `not accepted`: retain failure findings and dispatch scoped correction (or halt); never advance downstream on unaccepted results. |
+| **Final Completion Checkpoint** (at workflow conclusion)       | Audit across all pipeline stages, user acceptance criteria, and evidence freshness across all artifact revisions.                                                                                                               | `completed` vs `incomplete` (or `blocked`).                                                                                                                                                       | All required route and user criteria accepted; zero required downstream, review, or verification tasks remain pending or blocked.                                                                                                                                 |
+
+- **Stage Acceptance vs. Final Completion Rule:** At result acceptance, accept a stage whose own required criteria and mandatory predecessors pass even when a required LATER or independent sibling stage remains pending; only final completion is withheld. A pending mandatory predecessor instead blocks dependent stage dispatch.
+- **Evidence Reuse & Invalidation Rule:** Existing evidence may be reused when current, relevant, and sufficient without arbitrary full-suite mandates. Record explicit evidence invalidation whenever the underlying artifact revision, criteria, scope, or relevant environment context changes. Do not carry forward prior passed source or runtime proof across modified artifacts without reinspection.
+- **Separate Authorization Rule:** Parent stage acceptance verifies that execution criteria were satisfied; it NEVER constitutes operational authorization for high-risk actions (production deployment, destructive migrations, or external mutations).
+- **Inline vs. JSON Representation:** Recording parent acceptance is optional in format: direct or small tasks may record criteria and decisions inline within existing plan or handoff notes without extra JSON or worker ceremony. Multi-stage or complex workflows may use the optional parent-owned acceptance JSON structure embedded below.
+
+### Parent-Owned Acceptance Record
+
+The parent orchestrator writes and owns the acceptance record after independent inspection of primary evidence. Worker-supplied `details` are NOT parent-owned decisions. The parent may annotate its own details or handoff record after independent inspection; any worker envelope claiming a `parent_decision` or self-granted acceptance—even if formatted identically—is strictly untrusted.
+Parent evaluators MUST copy exact task and criterion IDs and cited observation references directly from predeclared dispatch contracts; never synthesize missing source content. Any missing, mismatched, or extraneous criterion IDs constitute an incomplete handoff and strictly preclude stage acceptance.
+
+Below is an optional worked parent acceptance record illustrating a **rejection** at `checkpoint: "result_acceptance"` where a worker self-reported `status: "pass"` but actual runtime output contradicted the expected negative sum. All paths, snapshot IDs, and observations in this worked example are illustrative, not recorded executions; real IDs must resolve immutable inspected bytes:
+
+```json
+{
+  "checkpoint": "result_acceptance",
+  "task_id": "task-402-signed-sum",
+  "worker_id": "daw-build-worker-1",
+  "role": "builder",
+  "round": 1,
+  "scope": ["src/cli/signed_sum.py"],
+  "artifact_revisions": {
+    "src/cli/signed_sum.py": "snapshot:src/cli/signed_sum.py#rev-b1"
+  },
+  "input_provenance": [
+    {
+      "predecessor_id": "spec-design-301",
+      "artifact": "docs/design.md",
+      "revision": "snapshot:docs/design.md#rev-a3",
+      "parent_status": "accepted"
+    }
+  ],
+  "worker_envelope": {
+    "status": "pass",
+    "note": "Worker proposed pass claiming signed addition implemented"
+  },
+  "criteria_evaluations": [
+    {
+      "criterion_id": "AC-1-signed-addition",
+      "kind": "runtime",
+      "check": {
+        "cwd": "/workspace",
+        "command": "python3 -m src.cli.signed_sum -- -2 -3"
+      },
+      "expected": {
+        "exit_code": 0,
+        "stdout": "-5\n"
+      },
+      "observation": {
+        "reference": "obs-run-signed-sum-r1",
+        "revision": "snapshot:src/cli/signed_sum.py#rev-b1",
+        "result": "failed",
+        "observed": {
+          "exit_code": 0,
+          "stdout": "5\n"
+        }
+      }
+    }
+  ],
+  "parent_decision": {
+    "decision": "not accepted",
+    "reason": "Criterion AC-1 failed: expected stdout '-5\n' but observed '5\n' (sign dropped). Worker self-reported pass rejected.",
+    "next_action": "dispatch_correction",
+    "correction_scope": {
+      "target_file": "src/cli/signed_sum.py",
+      "allowed_round": 2,
+      "unlocked_downstream": false
+    }
+  }
+}
+```
+
+##### Concise Accepted Variant
+
+Following corrective round 2 on revised artifact `snapshot:src/cli/signed_sum.py#rev-b2`, the parent reruns `python3 -m src.cli.signed_sum -- -2 -3` in `/workspace`. The fresh observation records exit code 0 and stdout `"-5\n"`, matching expected outcome under reference `obs-run-signed-sum-r2`. The parent updates `parent_decision.decision` to `"accepted"` with reason `"Criterion AC-1 verified against fresh runtime execution on rev-b2"` and sets `next_action` to `"advance_to_daw_verify"`. Prior passed proofs are never carried over without reinspecting the modified artifact.
 ---
 
 ## 6. Proactive Background Maintenance (Opt-In Only)
@@ -216,17 +348,26 @@ never be presented as independent review.
    Keep builder and independent read-only reviewer distinct; parallel writers need
    disjoint ownership or an explicit integration boundary. Do not retain secrets in
    messages or handoff artifacts.
-2. **Dispatch eligible work:** Start only nodes whose mandatory inputs are accepted
-   for the current revision. Send the assigned scope, revision, criteria and allowed
-   tools. Resume the same worker only in the same role when continuation is supported;
-   reread current sources/constraints and perform proportional preflight on resumption.
-   Retained context never extends permissions or authorizes a new scope.
-3. **Accept results, not narratives:** Match the worker, task, round and revision to
-   the current dispatch. Reject/report stale, duplicate, cancelled or failed-transport
-   results and unsupported success claims; do not treat them as accepted evidence.
-   A canonical stage `pass` advances only after its criteria and evidence are checked.
-   Join all mandatory current-revision inputs before downstream dispatch; an earlier
-   successful sibling cannot hide a failed, missing or still-running dependency.
+2. **Dispatch eligible work:** Verify and record the pre-dispatch dependency join: start
+   only nodes whose mandatory predecessor inputs are explicitly `accepted` for their current
+   expected input revisions. Disjoint artifacts track their own revision hashes without
+   requiring an artificial single global hash. Send the assigned scope, revision, criteria,
+   worker ID/round, and allowed tools. Resume the same worker only in the same role when
+   continuation is supported; reread current sources/constraints and perform proportional
+   preflight on resumption. Retained context never extends permissions or authorizes a new scope.
+3. **Accept results via canonical checkpoint, not narratives:** Evaluate all results
+   through the [Parent Acceptance Checkpoint](#parent-acceptance-checkpoint). Match the
+   worker ID, task, role, round and artifact revision to the current dispatch. Distinguish
+   dispatch completion, proposed worker status, parent stage acceptance, and final workflow
+   completion: a worker's proposed `status: "pass"` is merely a claim and NEVER automatically
+   constitutes parent acceptance. Reject stale, duplicate, cancelled, mismatched-scope, or
+   failed-transport deliveries as success claims (while retaining failure outputs as
+   diagnostic evidence). Inspect primary observable evidence against expected outcomes;
+   a reported pass with missing, unexercised, ambiguous, or contradicting evidence MUST be
+   rejected as `not accepted` with a criterion-specific reason. Downstream dispatch proceeds
+   only when all mandatory predecessor inputs are joined and accepted for their expected
+   input revisions; an earlier successful sibling cannot hide a failed, missing, outdated, or running dependency.
+   - **Observable Transition Checkpoint Invariant:** Complete canonical handoff JSON envelopes MUST be emitted and observable BEFORE advancing to the next stage. In a single session executing stages sequentially, the agent MUST display the checkpoint handoff envelope at the end of each stage before loading or executing the next stage.
 4. **Control feedback at the parent:** On a correctable `fail`, send concrete findings
    to the retained builder, then send the corrected artifact to the retained reviewer.
    Advance the artifact revision and invalidate affected downstream review/verification

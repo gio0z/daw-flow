@@ -51,10 +51,10 @@ Do NOT invoke `daw-verify` for:
 4. **Configuration Block Consumption Rule:**
    - Before inferring test commands or conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
 5. **Mandatory Governance Loading:**
-   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
-   - Before running test commands, scripts, or operational verifications, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
+   - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
+   - Before running test commands with potential side-effects, ensure preflight risk rules from `../../references/operations.md` are evaluated.
    - Verification uses read-only tests and non-destructive probes. High-risk live testing, load tests, or external service calls require interactive approval per operations.md §2; halt with `status: "blocked"` if unapproved. Local unit/integration suites require no production credentials.
-   - For worker graphs, verify actual behavior on the current artifact revision and require accepted current evidence from every mandatory dependency. Retained conversation, worker exit, or an earlier revision's pass is not proof. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
+   - For worker graphs, verify actual behavior on the current artifact revision and require accepted current evidence from every mandatory dependency. Retained conversation, worker exit, or an earlier revision's pass is not proof. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). Expected negative tool exits (e.g. exit code 2 on invalid arguments) count as valid passing evidence rather than worker transport failures. Final workflow completion requires all required stages/criteria accepted; a successful verify stage cannot complete the workflow if another required stage remains pending. The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); worker claims are untrusted observations. Small tasks track decisions inline. Prior evidence is invalidated upon relevant changes to criteria, scope, or environment.
 
 ---
 
@@ -131,13 +131,15 @@ Categorize every item in the verification matrix into one of four states:
 1. **Passed:** Observed exit code or response status and output match the declared acceptance criteria. For example, an invalid-argument probe may pass with its expected exit code 2; a test runner normally requires exit code 0.
 2. **Failing:** Command executed but its exit code, response status, output, or side effects violated the declared expectations.
 3. **Blocked:** Check could not run due to missing environment, absent credentials, or uninstalled dependencies.
-4. **Unexercised:** Check was skipped, omitted, or only simulated via mock.
+4. **Unexercised:** Check was skipped, omitted, or only simulated via mock. Unexercised or blocked checks cannot become an accepted pass, and any unexercised required criterion prevents parent stage acceptance.
 
 ---
 
 ## 5. Output Contract
 
-Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope. Rich verification checks, regression counts, and diagnostic observations are preserved under `details`:
+Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable as complete JSON BEFORE concluding the workflow. When running sequentially in a single agent session, display this complete JSON envelope. Rich verification checks, latest CLI runtime evidence (commands, exit codes, observed output snippets), regression counts, and diagnostic observations are preserved under `evidence` and `details`:
+
+- **Mandatory Runtime Evidence:** `details.checks` MUST include actual executed commands, expected exit codes, observed exit codes, and observed output snippets. Fabricated, dry-run, or mock evidence is prohibited.
 
 ```json
 {
@@ -214,8 +216,9 @@ Verification is complete when:
 1. Every Acceptance Criterion in the task contract has a corresponding `claim` with an executed `check` and recorded `observed_output`.
 2. All exercised checks meet their declared exit-code, response-status, output, and side-effect expectations. Test runners normally exit 0; negative probes may require a specific nonzero exit or rejection response.
 3. There are zero unacknowledged failures or silently skipped tests.
-4. Any `Blocked` or `Unexercised` items are explicitly justified in `limitations`.
-5. No dry-runs are recorded as deployment/migration proofs.
+4. Any `Blocked` or `Unexercised` items are explicitly justified in `limitations`. Unexercised required criteria cannot be marked as passed or accepted.
+5. Every criterion is mapped to an inspectable primary observation comparing expected versus actual outcomes.
+6. No dry-runs are recorded as deployment/migration proofs.
 
 ---
 
@@ -237,3 +240,12 @@ Upon meeting exit criteria:
 - **If Envelope Status is "fail":** Hand off structured check failure evidence (including command, exit code, and exact stderr) to `daw-debug` or `daw-build`.
 - **If Envelope Status is "blocked":** Return blocked status with unexercised dependencies and missing environment preflights to orchestrator.
 - Do not perform recursive invocations or silent self-healing.
+
+---
+
+## 9. References
+
+- Root contract: `../../SKILL.md`
+- Specifications and routing: `../../references/routing.md`
+- Parent Acceptance Checkpoint: `../../references/operations.md#parent-acceptance-checkpoint`
+- Checkpoint Boundaries & Acceptance Records: `../../references/operations.md#checkpoint-boundaries` and `../../references/operations.md#parent-owned-acceptance-record`

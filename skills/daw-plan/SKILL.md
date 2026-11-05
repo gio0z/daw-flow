@@ -45,7 +45,7 @@ The planning module converts design specifications, architectural requirements, 
   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
   - Before performing any state mutations or file writes, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
   - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Planning and task decomposition require no production credentials.
-  - For worker graphs, the parent records role-to-worker IDs, mandatory dependencies, write ownership, rounds and artifact revisions in the existing plan/handoff. Reuse is same-role only and introduces no required configuration keys. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
+- For worker graphs, the parent records role-to-worker IDs, mandatory dependencies, write ownership, rounds and artifact revisions in the existing plan/handoff. Reuse is same-role only and introduces no required configuration keys. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), optionally using a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record). Parent authors acceptance decisions independently; workers supply observations. Small tasks track criteria inline without ceremony.
   - Select retained workers automatically for already-justified delegated corrective rounds when the harness supports completed-worker continuation, unless the user opts out. Do not add delegation or review stages for retention; unsupported optional retention uses an explicit fresh-worker handoff, not a blocker.
 
 ## 3. Operational Steps
@@ -70,9 +70,10 @@ The planning module converts design specifications, architectural requirements, 
 
 ### Step 4: Define Acceptance Criteria & Verification Commands
 
-1. Define observable Acceptance Criteria (AC) for each task.
+1. Pre-declare observable Acceptance Criteria (AC) for each task, pairing each criterion with its expected result and proportional check method before work begins.
 2. Provide deterministic verification commands (e.g. `pytest tests/test_feature.py`) that run non-interactively.
 3. Include negative verification cases where appropriate.
+4. Record expected verification evidence per criterion within the plan details so downstream execution and parent acceptance can evaluate expected vs. actual outcomes without introducing mandatory outer schema fields.
 
 ### Step 5: Synthesize Implementation Contract
 
@@ -82,9 +83,11 @@ Format the plan into the standard output schema. Provide the plan directly in th
 
 ## 4. Output Contract
 
-Every completion of `daw-plan` delivers a structured handoff payload adhering to the canonical suite envelope. Rich task breakdowns, dependencies, and verification commands are preserved under `details`.
+Every completion of `daw-plan` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable BEFORE advancing to the next stage (e.g., `daw-build`). When running sequentially in a single agent session, display this complete JSON envelope before proceeding. Rich task breakdowns, dependencies, and verification commands are preserved under `details`.
 
-**Handoff Selection:** Choose `handoff_to` from the active route only; never invoke another module directly.
+- **Mandatory Task Fields:** Each task in `details.tasks` MUST specify `task_id`, `title`, `target_files`, `depends_on`, `acceptance_criteria`, and non-interactive `verification_command`.
+- **Suite Command:** `details` MUST include `suite_verification_command` covering the full affected test suite.
+  **Handoff Selection:** Choose `handoff_to` from the active route only; never invoke another module directly.
 
 - **`bootstrap` / `adopt` routes (documentation-only):** `daw-plan` is the terminal stage. Return `handoff_to: null` even when `status: "pass"`. Never recommend `daw-build`; planning completion ends the pipeline.
 - **`feature` / `bugfix` routes (implementation):** Read the active route's ordered stages from the router plan and recommend the stage immediately following `daw-plan`. Never skip a stage or jump past review.
@@ -151,7 +154,9 @@ _(Note: `status: "pass"` indicates that planning phase criteria have been satisf
 - [ ] Every task specifies exact file paths and concrete operational changes.
 - [ ] Concurrent tasks have strictly disjoint file ownership.
 - [ ] Every task has deterministic verification commands.
+- [ ] Acceptance criteria pre-declare expected results and proportional checks before work begins.
 - [ ] Pre-existing uncommitted workspace modifications are explicitly noted for preservation.
+- [ ] Expected evidence mapping aligns with the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) and [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries); workers author observations, parent authors decisions; small tasks keep criteria inline.
 - [ ] No unwanted documentation files created unless explicitly requested.
 
 ---
@@ -176,4 +181,4 @@ Select `handoff_to` from the active route:
 - **`feature` / `bugfix`:** Recommend the stage immediately after `daw-plan` in the active route's ordered stages (the next stage in the router plan), preserving review/verify ordering. Do not skip stages.
 - **Halted (`fail` / `blocked`) or verification failure during planning:** Return `handoff_to: null`; report the blocker and let the parent route to `daw-debug` or replan.
 
-_Reference Link:_ See [Shared Routing Contract](../../references/routing.md) and [Changes Lifecycle Guide](../../references/changes.md).
+_Reference Link:_ See [Shared Routing Contract](../../references/routing.md), [Changes Lifecycle Guide](../../references/changes.md), [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), and [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record).

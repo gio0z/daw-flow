@@ -41,9 +41,9 @@ Before conducting a code review:
    - Resolve all relative links (`../../references/...`, `../../SKILL.md`) relative to the canonical physical module directory, NEVER relative to the logical alias path or `cwd`.
    - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
 5. **Mandatory Governance Loading:**
-   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
+   - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
    - `daw-review` is strictly read-only and never performs file mutations. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
-   - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
+   - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Findings must be grounded in source proof or static verification of the current revision; independent review is strictly required only when the active route specifies it, and read-only review never forces unnecessary runtime execution when static proof is appropriate. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); reviewer findings serve as primary observations, not self-executing acceptance. Small tasks record reviews inline.
 
 ---
 
@@ -110,7 +110,9 @@ To ensure review loops remain deterministic and avoid both premature halts and e
 
 ## 5. Output Contract
 
-Every completion of `daw-review` delivers a structured handoff payload adhering to the canonical suite envelope. Rich audit findings, conformity status, and stage-gate verdicts are preserved under `details`:
+Every completion of `daw-review` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable BEFORE advancing to the next stage (`daw-verify`). When running sequentially in a single agent session, display this complete JSON envelope before proceeding. Rich audit findings, conformity status, and stage-gate verdicts are preserved under `details`.
+
+- **Separate Stage 1 & Stage 2 Requirements:** `details` MUST contain explicit and separate verdicts and evidence for Stage 1 (`stage_1_conformity`) and Stage 2 (`stage_2_technical_audit`). Conflating both stages into a single unseparated verdict is invalid.
 
 ```json
 {
@@ -203,3 +205,5 @@ Upon exit:
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`
+  - Parent Acceptance Checkpoint: `../../references/operations.md#parent-acceptance-checkpoint`
+  - Checkpoint Boundaries & Acceptance Records: `../../references/operations.md#checkpoint-boundaries` and `../../references/operations.md#parent-owned-acceptance-record`

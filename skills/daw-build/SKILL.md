@@ -41,12 +41,11 @@ Before writing or modifying code:
    - Resolve all relative links (`../../references/...`, `../../SKILL.md`) relative to the canonical physical module directory, NEVER relative to the logical alias path or `cwd`.
    - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
 7. **Mandatory Governance Loading:**
-   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
-   - Before mutating any files or writing code, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
+   - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
+   - Before mutating any files or writing code, ensure preflight risk rules from `../../references/operations.md` are evaluated.
    - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Standard local file construction requires no production credentials.
-   - On same-role worker continuation, reread current source and scope, apply only authorized corrections, and return evidence for the current artifact revision to the parent. Never dispatch the next module yourself. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
-
----
+   - On same-role worker continuation, reread current source and scope, apply only authorized corrections, and return evidence for the current artifact revision to the parent. Never dispatch the next module yourself. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries).
+   - Build outputs supply inspectable primary observations across the assigned scope and current revision rather than self-certifying completion; `status: "pass"` is a proposed module state for parent evaluation. The parent authors acceptance decisions independently (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); worker claims of acceptance are untrusted.
 
 ## 3. Step-by-Step Procedure
 
@@ -94,8 +93,7 @@ When the orchestrator delegates tasks across multiple subagents:
 
 ## 4. Output Contract
 
-Every completion of `daw-build` delivers a structured handoff payload adhering to the canonical suite envelope. Rich build facts, test strategies, and clean cutover status are preserved under `details`.
-
+Every completion of `daw-build` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable BEFORE advancing to the next stage (e.g., `daw-review` or `daw-verify`). When running sequentially in a single agent session, display this complete JSON envelope before proceeding. Rich build facts, test strategies, and clean cutover status are preserved under `details`.
 **Handoff Selection:** Choose `handoff_to` from the active route only; the handoff is advisory metadata for the parent orchestrator and `daw-build` never invokes another module directly.
 
 - **`patch` route:** `daw-build` precedes `daw-verify`. On `status: "pass"`, recommend `daw-verify`.
@@ -212,6 +210,7 @@ When direct invocation attempts high-risk modifications (such as production auth
 3. Code changes represent minimal-viable diffs without dead code, speculative features, or unrelated file changes.
 4. Exported interfaces, callers, and dependencies remain consistent with repository conventions.
 5. In parallel execution, no file collision or concurrent overwrite occurred across sibling tasks.
+6. Build evidence supplies concrete scope and current revision observations; proposed module completion remains subject to independent parent evaluation per the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) and [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries).
 
 ---
 
@@ -232,3 +231,5 @@ Upon exit, return the Build Handoff report to the parent orchestrator with the a
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`
+  - Parent Acceptance Checkpoint: `../../references/operations.md#parent-acceptance-checkpoint`
+  - Checkpoint Boundaries & Acceptance Records: `../../references/operations.md#checkpoint-boundaries` and `../../references/operations.md#parent-owned-acceptance-record`

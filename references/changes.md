@@ -1,5 +1,55 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-04: Efficient Context Loading & Observable Transition Checkpoints
+
+- Instruct stage-scoped context loading (load CURRENT stage skill only, never all 10 modules upfront).
+- Enforce governance reuse in single-session sequential runs; avoid reloading unchanged root rules.
+- Add progressive disclosure for reference documents (consult exact headings only).
+- Clarify that the 13-document matrix is not mandatory for settled features or routine bug fixes.
+- Enforce emission and display of observable canonical handoff JSON envelopes before stage advancement.
+- Emphasize observable contract compliance across plan (expected output + command), review (separate Stage 1 and Stage 2 verdicts/evidence), and verify (latest CLI runtime evidence); illustrative transition envelopes were omitted from the suite at integration.
+- Retain observed benchmark evidence from local test rounds: Round 1 (three completed CLI task pairs) and Round 2 (multi-step project goals). Neither established lower token cost or verified canonical handoffs; Round 2 is blocked and incomplete after an unmetered upstream rate-limit failure halted dispatch under the frozen protocol.
+- Document honest direct fallback when subagent delegation tools are unavailable.
+- Present context reuse as instruction guidance, not as demonstrated compliance or proven token cost reduction.
+
+## 2026-11-04: Parent-Owned Records and Current Evidence
+
+- Add pre-dispatch, result-acceptance, and final-completion boundaries, plus an
+  optional criterion/evidence/decision record authored by the parent. Preserve outer
+  handoff statuses, inline small-task records, and approval boundaries.
+- Integrate verified 2026 journal, conference, and preprint sources with bounded
+  implications, including counterevidence that process verification is not reliably
+  beneficial. Add acceptance error metrics, independent oracle accounting, and
+  explicit handling of missing, duplicate, or fabricated case IDs.
+- Extend manual scenarios for forged acceptance, context invalidation, negative-exit
+  and source-proof positive controls, pending later stages, and scoped correction.
+- Actual local comparisons did not establish reliability improvement: complete runs
+  retained false rejections, one checkpoint run fabricated/omitted case IDs, and a
+  focused follow-up still conflated stage acceptance with final completion. Record
+  these failures and control confounders in the evaluation reference; stop repeated
+  prompt retries rather than claiming success.
+- Final unified verification: 149 unit tests passed, package validation had no
+  findings, suite inspection returned ready, and the optional JSON example parsed.
+  No installed-skill update, commit, push, executor, or runtime interceptor was added.
+
+## 2026-11-04: Parent Acceptance Checkpoint
+
+- Separate completed dispatch, proposed module pass, parent acceptance, and workflow
+  completion. Require criterion-linked expected/actual observations, current identity
+  and revisions, and mandatory dependency joins in existing plan/handoff records.
+- Keep validated failure findings usable for explicitly scoped correction without
+  counting them as successful stage evidence. Preserve existing outer statuses and
+  harness-native instructional scope; add no scheduler, interceptor, or schema.
+- Link root governance, canonical handoffs, plan/build/review/verify, and README to the
+  checkpoint. Add four manual acceptance scenarios and bounded research rationale
+  distinguishing three journal references from two conference papers.
+- A single real-harness decision smoke matched four predeclared decisions: reject
+  contradicted success, stale/incomplete input, and failed/unexercised verification;
+  accept matching current evidence. CLI observations came from disposable signed-add
+  artifacts. This is not a controlled efficacy or cross-harness reliability result.
+- Unified checks: 149 unit tests passed, package validation had no findings, and suite
+  inspection returned ready. No installed-skill update, commit, or push was performed.
+
 ## 2026-11-04: Independent Grading and Source-Grounded Documentation
 
 - Separate bookmark validation/update checks from the search-format fixture so an
