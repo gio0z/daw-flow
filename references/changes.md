@@ -1,5 +1,12 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-05: Version 0.1.1 Release
+
+- Define parent-owned acceptance boundaries and current runtime evidence requirements across multi-agent workflows.
+- Require observable stage transition checkpoints, canonical handoff JSON envelopes, and verified CLI execution outputs before advancing phases.
+- Standardize progressive context loading (stage-scoped skill resolution and exact heading lookups) to prevent premature context saturation.
+- Align README usage limits and documentation with actual shipped suite capabilities, excluding synthetic benchmark claims and automated daemon supervisor assumptions.
+
 ## 2026-11-04: Efficient Context Loading & Observable Transition Checkpoints
 
 - Instruct stage-scoped context loading (load CURRENT stage skill only, never all 10 modules upfront).

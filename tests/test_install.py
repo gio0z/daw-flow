@@ -129,9 +129,12 @@ class InstallTests(unittest.TestCase):
     def test_upgrade_requires_update_flag_and_keeps_aliases(self):
         bundle = self.installed()
         source = self.source_copy()
+        previous_version = (source / "VERSION").read_text().strip()
         (source / "VERSION").write_text("0.2.0\n")
         skill = source / "SKILL.md"
-        skill.write_text(skill.read_text().replace('version: "0.1.0"', 'version: "0.2.0"', 1))
+        skill.write_text(skill.read_text().replace(
+            f'version: "{previous_version}"', 'version: "0.2.0"', 1
+        ))
         result = self.cli(source=source)
         self.assertEqual(result.returncode, 1)
         self.assertNotEqual((bundle / "VERSION").read_text(), "0.2.0\n")
