@@ -42,6 +42,7 @@ The wizard module conducts a structured, interactive specification interview for
 - **Confirmed Document Set:** After Phases 1–2, state which documents will be produced and which are skipped (with a one-line reason each), and obtain operator confirmation before drafting.
 - **Creation-Only Mutation:** Writes only new files under the spec directory, plus the project-root `DESIGN.md` when the visual style rule applies. If a target file already exists, stop `blocked` rather than overwrite it.
 - **No Premature Implementation & No Premature Spec-Ready:** Does not implement production code or scaffold the project; produces specification artifacts only. Never declares specifications ready if a material architectural blocker remains (`../../references/grilling.md` §1).
+- **Workflow Transition Gate vs. Hook Claims:** Specification authoring and handoff follow explicit deterministic workflow transitions (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition TRANSITION --documents PATH [PATH ...] --format text|json`) driven by the orchestrator. It does NOT claim or use automatic harness hook interception, daemon supervisors, or runtime monkeypatching. Trivial or minimal inline work does not require mandatory 13 documents or document-quality JSON records. If Python 3 is unavailable, report canonical `status: "blocked"` (never emit a fake pass).
 
 ---
 
@@ -57,6 +58,7 @@ The wizard module conducts a structured, interactive specification interview for
    - Load the canonical shared grilling protocol (`../../references/grilling.md`) for structured elicitation, bounded question rounds (<=5 questions/round), active decision frontier management, and blocker escalation. Loading protocol references grants no additional permissions or tools and spawns no background workers.
    - Before writing specification files to disk, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Respect repository spec conventions from DAW configuration if present (default: `docs/specs/`).
+   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) whenever authoring formal specifications across the 13-document matrix.
 
 ---
 
@@ -78,12 +80,22 @@ _(Note: User-facing UI specifications in Phase 4 are omitted for headless CLI or
 ### Step-by-Step Procedure
 
 1. **Phase Elicitation & Grilling Protocol:** For each phase, apply `../../references/grilling.md`: ask at most 5 high-leverage, behavior-changing questions with proposed defaults, applying the redundancy filter and behavior-first ranking above. Wait for operator response between rounds. Sequence questions along the active decision frontier (Phases 1–2 upstream scope and architecture before downstream operational details; delay prerequisite-dependent questions until upstream prerequisites are settled). Accept `default` (adopt the proposal) or `skip` (record an Open Question). In Phase 4, handle visual style with the DESIGN.md rule (attach, or draft to the standard, or Open Question); headless projects skip wireframes and DESIGN.md but still get the output-style question.
-2. **Document Set Confirmation:** After Phase 2, propose the proportional document set (avoiding fixed mandatory document sets for small projects) and confirm it before drafting.
-3. **Drafting Specifications:** Apply the Authoritative Documentation Authoring Contract (`../../references/routing.md` §3):
-   - For each confirmed document, read its matching routing specification entry and the canonical template at `../../templates/<doc>.md` before writing.
+2. **Document Set Confirmation & Intake Gate:** After Phase 2, propose the proportional document set (avoiding fixed mandatory 13-document sets) and confirm it before drafting. The parent/orchestrator establishes the objective, audience, scope, empirical sources, and supplies the expected `--documents` list, executing the intake transition check:
+   `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition intake-authoring --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+   Formal drafting begins only when intake transition eligibility is satisfied.
+3. **Drafting Specifications & Scoped Reader Questions:** Apply the Authoritative Documentation Authoring Contract (`../../references/routing.md` §3):
+   - For each confirmed document, read its matching routing specification entry, canonical template at `../../templates/<doc>.md`, and the scoped reader questions from [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json` (DQ-01 to DQ-05 plus kind-specific criteria).
    - Ground all content in operator interview responses, confirmed scope, and explicit defaults. Templates define structural headings, not factual evidence; never invent synthetic data or unverified external claims.
    - Create the confirmed documents in the spec directory (`spec_dir` from a `<!-- daw-config:start -->` block if present, else `docs/specs/`).
-4. **Agent-Ready Checklist & No Premature Spec-Ready:** Before handoff, verify the document set jointly covers all 8 items an implementing agent needs: (1) goal, (2) in/out of scope, (3) inputs and outputs with types and exact names (entry points, commands, files), (4) data and persistence changes, (5) edge cases and error behavior, (6) executable acceptance criteria, (7) constraints (performance, security, compatibility), (8) no-change list. If material blockers or unresolvable contradictions remain, halt with `status: "blocked"` per `../../references/grilling.md` §1; never prematurely declare spec-ready. Any non-blocking item the interview did not settle becomes an Open Question, not an invented value. Specs covering at least 6 of these items merged substantially more often in a 2026 spec-driven development benchmark (Uvik).
+   - When drafting finishes, author emits:
+     `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition authoring-review --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+4. **Review, Ready Transition & Agent-Ready Checklist:**
+   - Downstream handoff to `daw-design` requires parent/reviewer evaluation of semantic content and evidence (author self-grading pass is rejected). Upon review acceptance (`decision: "accepted"` across all required criteria), execute:
+     `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition review-ready --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+   - If any required criterion is rejected, execute `review-rework`, update documents, and re-enter via `rework-review`.
+   - Any modification to specification text alters its SHA-256 hash and invalidates prior `review-ready` eligibility.
+   - QA review limitation: human comprehension testing remains unexercised without live people; automated review evaluates structural and evidence compliance only.
+   - Jointly verify the document set covers all 8 agent-ready items: (1) goal, (2) in/out of scope, (3) inputs and outputs with types and exact names (entry points, commands, files), (4) data and persistence changes, (5) edge cases and error behavior, (6) executable acceptance criteria, (7) constraints (performance, security, compatibility), (8) no-change list. If material blockers or unresolvable contradictions remain, halt with `status: "blocked"` per `../../references/grilling.md` §1; never prematurely declare spec-ready. Any non-blocking item the interview did not settle becomes an Open Question, not an invented value.
 5. **Capture Open Questions:** Append an `## Open Questions` section to each generated document listing pending items, impact, owner, and resolution trigger.
 6. **Handoff Formulation:** Hand off to `daw-design` (next bootstrap stage). Report the checklist coverage (`details.agent_ready_checklist`) and recommend `daw-setup` in `details.recommended_next_step` so the conventions decided in the interview (spec directory, stack commands) get recorded.
 

@@ -23,8 +23,9 @@ The design module governs structural analysis, architectural evaluation, domain 
 ### Non-Goals & Invariants
 
 - **No Approval Ceremony:** Proceed autonomously on routine engineering choices; gate only on consequential user decisions.
-- **Proportional Documentation:** Do not author unnecessary documents for small changes. Use canonical root templates (`../../templates/`) when authoring or updating formal specifications.
+- **Proportional Documentation:** Do not author unnecessary documents for small changes. Use canonical root templates (`../../templates/`) when authoring or updating formal specifications. Trivial inline work (localized single-file tweaks, internal refactors, minor fixes) does not require mandatory 13 documents or document-quality JSON records.
 - **Fact-Based Exploration & Grounded Reality:** Inspect existing files, dependencies, schemas, and constraints before proposing architecture. Never invent agreement or synthetic domain terminology; distinguish observed facts from legitimately proposed new concepts.
+- **Workflow Transition Gate vs. Hook Claims:** Document-quality validation operates as an explicit deterministic workflow transition gate (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition TRANSITION --documents PATH [PATH ...] --format text|json`) invoked by the orchestrator/parent. It does NOT claim or use automatic harness hook interception, daemon supervisors, or runtime monkeypatching. If Python 3 is unavailable, the gate must honestly halt with canonical `status: "blocked"` (never emit a fake pass).
 - **Nonrecursive Dispatch & Downstream Handoff:** `daw-design` performs structural analysis, interactive elicitation, specification drafting, and readiness inspection; it never executes code, performs recursive module dispatch, or invokes sub-skills directly (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent). Orchestration remains strictly with the parent router.
 
 ---
@@ -44,6 +45,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 - **Conditional Supporting References (Load On-Demand Only):**
   - Read [Shared Grilling Protocol](../../references/grilling.md) ONLY when requirements are ambiguous, trade-offs depend on unstated business priorities, or conflicting constraints arise; skip for routine tasks.
   - Read [Domain Modeling Protocol](references/domain-modeling.md) ONLY when domain terminology is overloaded, ambiguous across modules, or ADR gating applies; skip for standard extensions with established vocabulary.
+  - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) whenever authoring or updating formal specifications from the canonical 13-document matrix.
   - Read [Builder-Readiness Protocol](references/builder-readiness.md) ONLY before substantive design handoff (new services, modified data schemas, multi-module refactoring) to inspect material seams; skip for minimal, routine, or localized changes.
 - **Mandatory Governance Loading:**
   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
@@ -61,6 +63,9 @@ The design module governs structural analysis, architectural evaluation, domain 
 3. Inspect existing domain vocabulary, entity models, database schemas, and ADR conventions (e.g. `docs/adr/`, `doc/decisions/`, `docs/specs/`, `architecture/`).
 4. Avoid forcing generic `GLOSSARY.md` or arbitrary ADR paths onto an existing codebase; conform to existing repo conventions.
 5. If overloaded domain terms appear across modules, resolve them via concrete operational scenarios and bounded contexts per [Domain Modeling Protocol](references/domain-modeling.md).
+6. **Intake Workflow Transition Gate:** When formal specifications are planned, the parent/orchestrator establishes the objective, target audience, scope, empirical sources, and selects the expected target set (`--documents`). The orchestrator executes the intake transition check:
+   `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition intake-authoring --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+   Formal authoring begins only after intake transition eligibility is satisfied.
 
 ### Step 2: Formulate Invariants, Scope, and Non-Goals
 
@@ -92,9 +97,18 @@ The design module governs structural analysis, architectural evaluation, domain 
 2. Before authoring or updating any specification, read its matching entry in `../../references/routing.md` §3 and the actual canonical template in `../../templates/<doc>.md`. Before declaring completion, explicitly satisfy the Output Contract, Exit Criterion, and builder-readiness seams.
 3. **Hierarchy of Truth, Domain Math & Provenance:** User facts and existing repository realities (code, manifests, configs) outrank templates. Templates define structure, not evidence. Ground technical choices in observed repository manifests (`package.json`, `Cargo.toml`, etc.); cite exact paths and observed versions. Never fabricate citations or synthetic version numbers. Specification examples must preserve existing observed domain calculations, schemas, and invariants verbatim without inventing unsupplied math (such as physical vs. reserved inventory counts).
 4. **Handling Missing Sources & Absence of Evidence:** Absence of supplied evidence is not evidence of absence; never invent negative facts (e.g. asserting "no auth configured" simply because none was supplied). If a decision cannot be grounded in verified sources or tools are unavailable, record it as `[UNVERIFIED]` or an Open Question. Unresolved interfaces, query parameters, path variants, or error codes (e.g. 404 defaults) must remain proposed `[Agent Recommendation]` awaiting acceptance, never silently entering binding Acceptance Criteria or claimed as settled. Block only impacted downstream paths; do not halt unaffected orthogonal work.
-5. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
-6. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
-7. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
+5. **Scoped Reader Questions & Fact Provenance:** Author specifications answering the scoped reader questions from [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json`: the 5 common criteria (DQ-01 to DQ-05: audience/task location, empirical fact vs proposal separation, domain terminology coherence, completeness of actionable contracts, absence of vanity padding) plus the 3 kind-specific criteria for each selected document. Ground factual assertions in empirical codebase citations with line numbers and exact quotes.
+6. **Progressive Workflow Transitions:**
+   - **Authoring to Review (`authoring-review`):** When drafting is complete, author emits the record with artifact citations and invokes:
+     `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition authoring-review --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+   - **Review to Ready (`review-ready`):** Downstream spec-dependent work requires parent/reviewer evaluation of semantic content and current evidence (author self-grading pass is rejected). Upon review acceptance (`decision: "accepted"` across all required criteria), parent executes:
+     `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition review-ready --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+   - **Review to Rework (`review-rework` / `rework-review`):** If any required criterion is rejected (`decision: "not_accepted"`), execute `review-rework`, perform targeted rework, and transition back via `rework-review`.
+   - **Mutation Invalidation:** Any modification to specification text alters its SHA-256 hash and invalidates prior `review-ready` eligibility.
+   - **QA Review Limitation:** Human comprehension remains unexercised without live people; automated review evaluates structural and evidence compliance only.
+7. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
+8. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
+9. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
 
 ### Step 6: Builder-Readiness Assessment & Seam Inspection
 

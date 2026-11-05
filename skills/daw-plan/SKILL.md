@@ -25,6 +25,7 @@ The planning module converts design specifications, architectural requirements, 
 - **Concrete Scope:** Every task must specify exact file paths, operations, and verification commands.
 - **Disjoint File Ownership:** Parallel tasks must have non-overlapping file sets to prevent conflicting edits or race conditions.
 - **No Unwanted Commits or Git Hooks:** Planning never runs git commits, pushes, or alters hooks.
+- **Workflow Transition Gate vs. Hook Claims:** Spec-dependent planning tasks require upstream specifications to have passed the `review-ready` workflow transition gate (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition review-ready --documents PATH [PATH ...] --format text|json`). The gate is a deterministic CLI utility, not an automatic daemon or harness hook interceptor. Trivial inline tasks or bug fixes do not require mandatory 13 documents or document-quality JSON records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
 
 ---
 
@@ -33,6 +34,8 @@ The planning module converts design specifications, architectural requirements, 
 - **Design Contracts / Requirements:**
   - Upstream design from `daw-design` or direct user requirements.
   - Specified non-goals and system invariants.
+  - Upstream specification workflow transition verification: For spec-dependent tasks, verify that the required upstream specifications passed the `review-ready` transition on their current revision. If specifications were modified after review, the cached verdict is invalid due to SHA-256 mismatch, requiring rework re-entry and review re-evaluation before planning commences.
+  - Reference [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json` for document quality standards.
 - **Workspace State:**
   - Target source files, configuration files, and test runners identified via read-only inspection.
   - Identified pre-existing uncommitted modifications (must be preserved).

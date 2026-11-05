@@ -34,6 +34,39 @@ python3 "$SKILL_DIR/scripts/validate.py" contract "$PROJECT_DIR/task-contract.js
 python3 "$SKILL_DIR/scripts/validate.py" contract task-contract.json --project-root "$PROJECT_DIR" --stage complete --format json
 ```
 
+```bash
+# Validate documentation workflow transition (intake to authoring)
+python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
+  --project-root "$PROJECT_DIR" \
+  --transition intake-authoring \
+  --documents docs/prd.md docs/architecture.md
+
+# Validate authoring to review transition with JSON output envelope
+python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
+  --project-root "$PROJECT_DIR" \
+  --transition authoring-review \
+  --documents docs/prd.md docs/architecture.md \
+  --format json
+
+# Validate review to ready downstream transition
+python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
+  --project-root "$PROJECT_DIR" \
+  --transition review-ready \
+  --documents docs/prd.md docs/architecture.md
+
+# Validate review to rework transition
+python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
+  --project-root "$PROJECT_DIR" \
+  --transition review-rework \
+  --documents docs/prd.md docs/architecture.md
+
+# Validate rework to review transition
+python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
+  --project-root "$PROJECT_DIR" \
+  --transition rework-review \
+  --documents docs/prd.md docs/architecture.md
+```
+
 ### Arguments & Defaults
 
 - `package`:
@@ -45,13 +78,20 @@ python3 "$SKILL_DIR/scripts/validate.py" contract task-contract.json --project-r
   - `--stage plan|execute|complete`: Lifecycle stage. Defaults to `plan`.
   - `--format text|json`: Output format (`text` or `json`). Defaults to `text`.
 
+- `docs`:
+  - `RECORD`: Path to the JSON documentation transition record file. May be specified as a project-root-relative path or an absolute path within `--project-root`.
+  - `--project-root DIR`: Required. Absolute or relative path to the target project root. All target document paths and quoted source evidence files are bounded project-relative paths within this root.
+  - `--transition intake-authoring|authoring-review|review-ready|review-rework|rework-review`: Required. Explicit workflow transition edge to validate.
+  - `--documents PATH [PATH ...]`: Required. Parent-owned expected target document set (strict project-relative paths). Normalized set equality against the record's declared `documents` is strictly enforced; duplicate targets and alias collisions are rejected. There is no mandatory 13-document requirement; only selected actual documents for the current task.
+  - `--format text|json`: Output format (`text` or `json`). Defaults to `text`.
+
 ### Exit Codes
 
-| Exit Code | Meaning                      | Details                                                                                               |
-| --------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `0`       | **Valid**                    | All structural checks passed for the requested stage. Non-blocking warnings may be present.           |
-| `1`       | **Validation Error**         | Schema violation, boundary escape, missing required field, hash mismatch, or stage gating failure.    |
-| `2`       | **Input / Invocation Error** | Missing file, malformed JSON (including duplicate keys), invalid CLI arguments, or unreadable inputs. |
+| Exit Code | Meaning                      | Details                                                                                                                     |
+| --------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `0`       | **Valid**                    | All structural checks passed for requested stage or transition. Non-blocking warnings may be present.                       |
+| `1`       | **Validation Error**         | Schema violation, boundary escape, missing field, hash mismatch, criterion coverage failure, or transition edge violation.  |
+| `2`       | **Input / Invocation Error** | Missing file, malformed JSON (including duplicate keys), invalid CLI arguments, unreadable inputs, or invalid project root. |
 
 _Note: CLI syntax errors handled directly by `argparse` print standard error text to `stderr` and exit with code 2._
 
@@ -67,10 +107,16 @@ The validator is deliberately bounded and **fail-closed**:
 4. **No Risk Inference:** The validator enforces schema requirements for declared `risk` (`"low"` or `"high"`), but does **not** classify or infer risk levels from code diffs or objectives.
 5. **Read-Only Behavior:** The validator strictly reads files; it never writes files, never spawns subprocesses (no Git CLI or shell execution), and never connects to network endpoints.
 6. **Project-Relative vs. Contract Path Resolution:** The contract `FILE` argument may be absolute or project-root-relative. All internal contract fields (`baseline.files[].path`, `documents[].path`, `evidence[].reference`) MUST be strict project-relative paths that resolve within `--project-root` without directory traversal (`..`) or symlink escapes.
-7. **Supported Metadata Subset:** Frontmatter validation supports standard `name`, `description`, and `compatibility` string fields in the standard Agent Skills format. It is an explicit parser for this subset, not a generic full-YAML/multi-document parser.
+7. **Supported Metadata Subset:** Frontmatter validation supports standard Scalar values (strings, numbers, booleans) and lists of strings. Custom tags or complex types trigger validation errors.
 8. **Markdown Link & Code Fence Integrity:** Markdown links (`[label](path)`) and reference definitions (`[label]: path`) must resolve within the package root (with URL percent-encoding supported). Proprietary host-specific URI schemes outside code fences are rejected.
 9. **Diagnostic Safety:** Diagnostic messages and error outputs use static diagnostic codes and paths, never echoing raw file contents, credentials, tokens, or untrusted payload values.
 10. **JSON Strictness:** Duplicate keys at any level (root or nested) are strictly rejected as invalid JSON (exit code 2). Python booleans (`True`/`False`) are not accepted in place of integers.
+11. **Explicit Command Gates Not Hooks (`docs`):** The documentation transition validator is a passive, read-only CLI command invoked explicitly by the parent orchestrator. It installs no daemon supervisors, background services, pre-tool hooks, or automated interception mechanisms. The parent orchestrator holds actual workflow state and decides when to execute validation.
+12. **Structural Evidence Eligibility vs. Semantic Truth (`docs`):** A `valid: true` (or `eligible: true`) result certifies only that the transition record strictly satisfies schema, path boundary containment, rubric criterion coverage, regular UTF-8 document and source file existence, SHA-256 byte digests, and exact line-range quote matches against decoded text splitlines. It does NOT certify semantic prose truth, technical correctness, design suitability, or runtime success.
+13. **Parent-Owned Workflow State & History (`docs`):** The validator is strictly read-only and does not persist state across invocations. The parent orchestrator maintains actual workflow state in task contracts or handoff records. The parent MUST verify that the record's `transition.from` matches the actual accepted current state before recording state advancement.
+14. **Opacity of Reviewer (`docs`):** Review exit transitions (`review-ready` and `review-rework`) validate `reviewer` as a non-empty string reference. The validator never authenticates human signatures, verifies external identity providers, or certifies reviewer independence.
+15. **Non-Applicable (N/A) Evidence Attestation (`docs`):** Criteria marked `not_applicable` require non-empty rationale and grounded source evidence objects demonstrating why the criterion does not apply. N/A is an explicit reviewer/author attestation backed by inspectable evidence, not an automated bypass.
+16. **Artifact Mutation Invalidates Verdict (`docs`):** Review verdicts (`review-ready`) are cryptographically pinned to document and source SHA-256 byte hashes. Any file modification invalidates prior eligibility, requiring re-entry via `rework`, `rework-review`, and fresh `review-ready` validation. Decision `"accepted"` with status `"blocked"` is invalid across all edges. On `review-rework`, at least one check must have `decision: "not_accepted"`.
 
 ---
 
@@ -100,8 +146,10 @@ When `--format json` is specified, stdout contains a single JSON object adhering
 ### Envelope Fields
 
 - `schema_version` (_integer_): Exactly `1`.
-- `check` (_string_): Either `"package"` or `"contract"`.
-- `valid` (_boolean_): `true` if there are zero `error` severity findings; `false` otherwise.
+- `check` (_string_): One of `"package"`, `"contract"`, or `"docs"`.
+- `valid` (_boolean_): `true` if there are zero `error` severity findings; `false` otherwise. For `docs`, this indicates eligibility for the requested transition edge.
+- `transition` (_string, docs check only_): The requested transition string (e.g., `"review-ready"`).
+- `eligible` (_boolean, docs check only_): Identical to `valid`, explicitly naming transition eligibility.
 - `findings` (_array of objects_): List of diagnostic findings.
   - `severity` (_string_): `"error"` (fails validation, triggers exit 1) or `"warning"` (does not fail validation, allows exit 0).
   - `code` (_string_): Machine-readable diagnostic code (e.g., `baseline_changed`, `missing_approval`, `invalid_stage`).
@@ -240,7 +288,120 @@ Records verifiable artifacts demonstrating AC satisfaction.
 
 ---
 
-## 6. Suite Integrity Check (`scripts/route.py --check-suite`)
+## 6. Documentation Workflow Transition Schema (`scripts/validate.py docs`)
+
+The documentation workflow transition validator enforces deterministic state-transition rules and evidence requirements across the document lifecycle:
+
+```text
+intake ----[ intake-authoring ]----> authoring ----[ authoring-review ]----> review
+                                                                               |  |
+                                       review-ready (downstream unlocked) <----+  |
+                                                                                  |
+rework <----------------------------------[ review-rework ]-----------------------+
+  |
+  +-----[ rework-review ]----> review
+```
+
+### Allowed Transition Edges
+
+| Transition Edge    | From State  | To State    | Purpose & Requirements                                                                                                                                                                                                                                                                                               |
+| :----------------- | :---------- | :---------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intake-authoring` | `intake`    | `authoring` | Base document intake: validates objective, scope, audience, reader task, sources, and safe path containment. Document need not exist yet on disk; checks and sha256 are forbidden. Source evidence items must exist as regular UTF-8 files.                                                                          |
+| `authoring-review` | `authoring` | `review`    | Author submits draft for review: target document must exist as a regular UTF-8 file; doc sha256, source hashes/quotes, and all 8 rubric criteria (5 common + 3 kind) must be present. Status `blocked` is permitted (exposing unresolved criteria to reviewer). Field `reviewer` and check `decision` are forbidden. |
+| `review-ready`     | `review`    | `ready`     | Reviewer approves document for downstream consumption: `reviewer` string required. Every check must have `decision: "accepted"` and status `pass` or `not_applicable`. Any `blocked` check or `not_accepted` decision fails validation. Decision `"accepted"` with status `"blocked"` is rejected.                   |
+| `review-rework`    | `review`    | `rework`    | Reviewer rejects document, requiring revisions: `reviewer` string required. At least one check must have `decision: "not_accepted"` (or `status: "blocked"` with `decision: "not_accepted"`). Check `decision` values are required on all checks. Decision `"accepted"` with status `"blocked"` is rejected.         |
+| `rework-review`    | `rework`    | `review`    | Author resubmits revised document: document must exist as a regular UTF-8 file; updated sha256 and source evidence; all 8 rubric criteria present. Field `reviewer` and check `decision` are forbidden.                                                                                                              |
+
+### Schematic Record Excerpt
+
+The following JSON shows the structural layout of a transition record. It is an explicitly incomplete structural schematic (showing 1 check excerpt; a production record requires all 8 criteria: 5 common `DQ-01`..`DQ-05` plus 3 kind-specific criteria):
+
+```json
+{
+  "schema_version": 1,
+  "transition": {
+    "from": "review",
+    "to": "ready"
+  },
+  "objective": "Define architectural boundaries and interfaces for payment processing",
+  "scope": "Payment processing service and webhook listeners",
+  "reviewer": "architecture-reviewer",
+  "documents": [
+    {
+      "path": "docs/blueprint.md",
+      "kind": "blueprint",
+      "audience": "Backend engineering team and security reviewers",
+      "reader_task": "Implement webhook verification and idempotency handlers",
+      "sources": [
+        {
+          "path": "src/config.py",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "start_line": 1,
+          "end_line": 2,
+          "quote": "WEBHOOK_SECRET = \"test-secret\"\nTIMEOUT_SECONDS = 30"
+        }
+      ],
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "checks": [
+        {
+          "id": "DQ-01",
+          "status": "pass",
+          "decision": "accepted",
+          "rationale": "Audience, operational scope, and core reader tasks are defined in Section 1.",
+          "evidence": [
+            {
+              "path": "src/config.py",
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "start_line": 1,
+              "end_line": 2,
+              "quote": "WEBHOOK_SECRET = \"test-secret\"\nTIMEOUT_SECONDS = 30"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Detailed Schema Rules
+
+1. **Top-Level Fields:**
+   - `schema_version` (_integer, required_): Must be exactly `1`.
+   - `transition` (_object, required_): Must contain `from` and `to` strings matching the CLI `--transition` edge.
+   - `objective` (_string, required_): Non-blank description of documentation goal.
+   - `scope` (_string, required_): Non-blank description of in-scope boundaries.
+   - `reviewer` (_string_): Required on `review-ready` and `review-rework`. Strictly forbidden on `intake-authoring`, `authoring-review`, and `rework-review` (unknown fields rejected).
+   - `documents` (_array of objects, required_): Non-empty array of document objects. Set of document `path` values must match CLI `--documents` exactly (normalized set equality; no duplicates or alias collisions).
+
+2. **Per-Document Base Fields (All Transitions):**
+   - `path` (_string, required_): Bounded, strict project-relative path. Traversal (`..`), absolute paths, and symlink escapes are rejected. For `intake-authoring`, the file need not exist yet, but its parent directory must be safe. For all other transitions, the file must exist as a regular UTF-8 file.
+   - `kind` (_string, required_): Must be one of the 13 canonical document kinds (`blueprint`, `brd`, `prd`, `frd`, `techstack`, `design`, `wireframe`, `ui-ux`, `security`, `qa`, `deployment`, `runbook`, `roadmap`).
+   - `audience` (_string, required_): Non-blank description of target human or agent reader.
+   - `reader_task` (_string, required_): Non-blank description of task reader must execute.
+   - `sources` (_array of objects, required_): Non-empty list of source evidence objects grounding prerequisites and factual context in existing regular UTF-8 files within `--project-root`.
+
+3. **Per-Document Lifecycle Fields (`authoring-review`, `review-ready`, `review-rework`, `rework-review`):**
+   - `sha256` (_string, required_): 64 lowercase hexadecimal SHA-256 digest of the current document file on disk. Forbidden on `intake-authoring`.
+   - `checks` (_array of objects, required_): Must contain exactly 8 criteria: the 5 common criteria (`DQ-01` through `DQ-05`) plus the 3 kind-specific criteria from `references/document-quality-rubric.json`. Missing, duplicate, or unknown criteria IDs fail validation. Forbidden on `intake-authoring`.
+
+4. **Check Object Schema:**
+   - `id` (_string, required_): Rubric criterion ID.
+   - `status` (_string, required_): One of `"pass"`, `"not_applicable"`, `"blocked"`. On `review-ready`, all statuses must be `"pass"` or `"not_applicable"`. Status `"blocked"` with decision `"accepted"` is invalid across all transition edges.
+   - `rationale` (_string, required_): Non-blank justification explaining how evidence satisfies the criterion, why it is not applicable, or why it is blocked.
+   - `evidence` (_array of objects, required_): Non-empty array of source evidence objects.
+   - `decision` (_string_): Required on `review-ready` and `review-rework` (`"accepted"` or `"not_accepted"`). Strictly forbidden on `authoring-review` and `rework-review`. On `review-ready`, all decisions must be `"accepted"`. On `review-rework`, at least one check must have `decision: "not_accepted"`.
+
+5. **Source Evidence Object Schema:**
+   - `path` (_string, required_): Strict project-relative path to a regular UTF-8 file within `--project-root`. Binary files, directories, unreadable encodings, and symlink escapes are rejected.
+   - `sha256` (_string, required_): 64 lowercase hexadecimal SHA-256 digest binding the raw file bytes on disk.
+   - `start_line` (_integer, required_): Positive 1-indexed start line number (boolean values rejected).
+   - `end_line` (_integer, required_): Integer greater than or equal to `start_line`.
+   - `quote` (_string, required_): Exact non-blank full line slice from source file without trailing newline (`"\n".join(file_lines[start_line-1:end_line])` where `file_lines = content.splitlines()` on UTF-8 decoded text). Must match decoded lines exactly.
+
+---
+
+## 7. Suite Integrity Check (`scripts/route.py --check-suite`)
 
 Complementary to `validate.py package` (which performs purely structural validation of package assets and templates), `scripts/route.py --check-suite` validates the declarative suite manifest (`references/suite-manifest.json`) and verifies that all 10 bundled internal execution modules exist within the suite root without path traversal escapes.
 

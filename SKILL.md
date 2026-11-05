@@ -165,6 +165,7 @@ When specifications are required by `bootstrap`, `adopt`, or complex `feature` w
   > **Source Documents / Revision:** [Commit SHA, PR #, or path@rev, or unverified]
   ```
 - **Truthful Decision Provenance:** Capture decisions in a concise human-readable provenance table with clear labels: `user_directed`, `observed_from_source`, or `agent_proposed`.
+- **Document Workflow Gate:** For selected formal specifications, use the audience tasks and per-document criteria in [Document Quality](references/document-quality.md). The parent owns the expected document set and actual workflow state: intake → authoring → review → ready, with review → rework → review. Invoke the read-only `validate.py docs --transition` gate before each edge; advance only when that transition is eligible. Document or source changes invalidate prior acceptance. The gate checks transition prerequisites, current evidence, coverage, and recorded review decisions; it does not persist workflow state, authenticate reviewers, decide semantic truth, prove human comprehension, or intercept tools. Keep trivial inline work proportional and never require all 13 documents merely to satisfy the gate.
 
 ---
 

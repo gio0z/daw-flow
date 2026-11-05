@@ -18,6 +18,7 @@ Invoke `daw-review` when:
 - Conducting intermediate stage-gate evaluations during multi-step engineering plans.
 - Re-evaluating previously flagged review findings after an orchestrator-directed fix cycle.
 - Auditing security, input validation, error handling, or performance regression risks in modified code.
+- Auditing specification documents and evaluating workflow transitions (`review-ready`, `review-rework`) for selected canonical specifications.
 
 **Do NOT use `daw-review` for:**
 
@@ -44,6 +45,19 @@ Before conducting a code review:
    - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
    - `daw-review` is strictly read-only and never performs file mutations. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
    - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Findings must be grounded in source proof or static verification of the current revision; independent review is strictly required only when the active route specifies it, and read-only review never forces unnecessary runtime execution when static proof is appropriate. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); reviewer findings serve as primary observations, not self-executing acceptance. Small tasks record reviews inline.
+
+6. **Document Quality Reference & Review Invariants:**
+   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json` when reviewing formal specifications.
+   - **Independent Evaluation vs. Author Self-Grading:** The reviewer/parent evaluates semantic clarity, task accessibility for fresh readers/agents, and empirical evidence validity. Authors cannot self-grade unlock or grant themselves a pass; review exits require an independent `reviewer` identifier and explicit per-check `decision`: `accepted` | `not_accepted`.
+   - **Workflow Transition Gate vs. Hook Claims:** Review transitions are verified deterministically via:
+     `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition review-ready|review-rework --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
+     This is a portable read-only CLI command, not an automatic harness interceptor hook or daemon supervisor.
+   - **Transition Verdict Conditions:**
+     - `review-ready`: Requires every decision to be `accepted` AND every author status to be `pass` or `not_applicable`. This unlocks downstream spec-dependent work.
+     - `review-rework`: Triggered when at least one criterion is `not_accepted` (or blocked with `not_accepted`). Requires actionable repair rationale; routes back to authoring for rework, which subsequently transitions via `rework-review`.
+   - **Mutation Invalidation:** Modifying any specification document changes its SHA-256 hash and immediately invalidates any prior `review-ready` eligibility.
+   - **Proportionality & Python Fallback:** Trivial inline changes without formal specifications do not require document review transition records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
+   - **QA Review Limitation:** Document quality review verifies structural evidence eligibility, coverage, and citation presence. Human comprehension remains unexercised without live people (`[UNEXERCISED: NO HUMAN PARTICIPANTS]`).
 
 ---
 

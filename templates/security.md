@@ -1,14 +1,21 @@
 # Security Specification & Threat Model: [Feature / Service]
 
-> **Fill-in Guidance:** Fill this template for sensitive assets, authorization rules, and threat vectors using actual controls approved for the repository or environment. Equivalent existing threat models or security RFCs may be linked directly. Mark N/A with rationale only if there is zero impact on data, auth, tenancy, dependencies, or external surfaces. Do not use fixed placeholder protocols (like TLS 1.3 or zero-trust) unless verified as applicable; record actual controls and note unresolved applicability. Security risk ratings and classifications must be labeled as proposed assessments rather than verified facts. Frontend changes with token storage, DOM rendering, or script injection impact MUST be analyzed here. The security exit gate records the review status of planned mitigations and verification evidence (drafting does not require a finalized zero-CVE proof). Unresolved security items block impacted execution paths until reviewed. Never include secret values or credentials in templates.
+> **Fill-in Guidance:** Fill this template for sensitive assets, authorization rules, and threat vectors using actual controls approved for the repository or environment. Equivalent existing threat models or security RFCs may be linked directly. Structure analysis along the canonical chain: assets & data classification -> dataflow & trust boundaries -> threat vector mapping -> defensive controls -> residual risk verification. Mark N/A with rationale only if there is zero impact on data, auth, tenancy, dependencies, or external surfaces. Do not use fixed placeholder protocols (like TLS 1.3 or zero-trust) unless verified as applicable; record actual controls and note unresolved applicability. Security risk ratings and classifications must be labeled as proposed assessments rather than verified facts. Frontend changes with token storage, DOM rendering, or script injection impact MUST be analyzed here. The security exit gate records the review status of planned mitigations and verification evidence (drafting does not require a finalized zero-CVE proof). Unresolved security items block impacted execution paths until reviewed. Never include secret values or credentials in templates. Preserve exact risk point confirmation and never invent commands.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Data boundaries, authentication, authorization, external surfaces, front-end security impact]
+> **Target Reader Role:** [Security engineer, compliance reviewer, or fresh implementing subagent assessing authorization boundaries and defensive controls]
+> **Core Reader Task:** [Verify sensitive assets, trust boundaries, threat mitigations, and residual risk verification procedures without assuming ambient conversational context]
 > **Source Documents / Revision:** [Actual observed FRD, techstack.md, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Network perimeter, trust zones, underlying cryptography primitives]
 > **Open Decisions:** [Material security trade-offs — block impacted execution until resolved and approved]
 > **Acceptance Criteria IDs:** [SEC-01, SEC-02, ...]
+> **Quality Guide & Rubric:** Refer to [Canonical Document Quality & Workflow Transition Specification](../references/document-quality.md) and [Machine Rubric Registry](../references/document-quality-rubric.json) for standard quality gates and common criteria (DQ-01..DQ-05).
+>
+> - **security-01 (Asset & Classification Catalog):** Are sensitive assets, data classifications, cryptographic requirements, or security boundaries cataloged for the system?
+> - **security-02 (Trust Boundaries & Threat Vectors):** Are trust boundaries, threat vectors, entry points, and abuse cases mapped against recognized security patterns (e.g. OWASP)?
+> - **security-03 (Controls & Defensive Mitigations):** Are authentication, authorization, secret handling, and defensive mitigation controls actionable and verifiable?
 
 ---
 

@@ -204,6 +204,16 @@ Before authoring or mutating any specification document, the authoring module MU
 - They are orchestrated strictly by the parent/orchestrator at the top level when available.
 - They MUST NEVER be treated as hidden required dependencies or invoked recursively. The DAW suite executes completely and deterministically using its bundled modules and inline capabilities even when zero external specialist skills are installed.
 
+#### 8. Documentation Quality Standards, Rubric & Transition Gate
+
+All authored documentation must satisfy the quality criteria defined in the canonical reference [Document Quality Standards & Review Rubric](document-quality.md) and machine-readable rubric [document-quality-rubric.json](document-quality-rubric.json).
+
+- **Deterministic Transition Gate (`scripts/validate.py docs`):** Documents advance through an explicit 5-edge state machine (`intake-authoring` -> `authoring-review` -> `review-ready` / `review-rework` -> `rework-review`).
+- **Parent-Owned Scope & State:** The parent orchestrator specifies the exact selected document target set via `--documents` (normalized set equality; no mandatory 13-doc requirement) and persists actual workflow state. The validator is a stateless, read-only CLI check.
+- **Evidence Grounding:** Authoring and review transitions require exact line-range quotes and SHA-256 digests matching UTF-8 source files in `--project-root`.
+- **Mutation Invalidation:** Review verdicts (`review-ready`) are pinned to exact document and source file hashes. Any modification of a document or source file invalidates prior eligibility, requiring explicit re-entry via `rework`.
+- **Explicit Command Gates:** The validator is invoked explicitly at workflow transition boundaries; it does not install background daemons, supervisors, or runtime pre-tool hooks.
+
 ---
 
 ### 1. `blueprint.md` — System Architecture & Foundational Design

@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "common": [
+    {
+      "id": "DQ-01",
+      "question": "Does the document define its target reader role, core reader task, and locate key information without requiring ambient conversational memory?"
+    },
+    {
+      "id": "DQ-02",
+      "question": "Are observed empirical facts distinguished from proposals, assumptions, or unknowns, with verifiable provenance?"
+    },
+    {
+      "id": "DQ-03",
+      "question": "Does the document use coherent domain terminology and canonical cross-links without conflicting duplicates across specifications?"
+    },
+    {
+      "id": "DQ-04",
+      "question": "Are actionable acceptance criteria, failure modes, boundaries, and dependencies explicitly bounded and proportional to the document scope?"
+    },
+    {
+      "id": "DQ-05",
+      "question": "Are document scope boundaries, open decisions, and recorded revision context clearly identified?"
+    }
+  ],
+  "kinds": {
+    "blueprint": [
+      {
+        "id": "blueprint-01",
+        "question": "Does the executive summary establish high-level system boundaries, core components, and primary architecture proportional to project scope?"
+      },
+      {
+        "id": "blueprint-02",
+        "question": "Does the document routing map enumerate active specifications, their authoritative owners, and lifecycle stages without orphan links?"
+      },
+      {
+        "id": "blueprint-03",
+        "question": "Are cross-cutting system contracts, communication conventions, and governance invariants explicitly stated?"
+      }
+    ],
+    "brd": [
+      {
+        "id": "brd-01",
+        "question": "Are core business objectives, problem statements, and target outcomes explicitly defined for the relevant scope?"
+      },
+      {
+        "id": "brd-02",
+        "question": "Are internal or external stakeholders, impacted business workflows, and operational constraints identified?"
+      },
+      {
+        "id": "brd-03",
+        "question": "Are business-level constraints, non-goals, and boundary conditions clearly separated from product implementation details?"
+      }
+    ],
+    "prd": [
+      {
+        "id": "prd-01",
+        "question": "Are primary actors, target users, or consuming systems and their specific problem scenarios concretely defined?"
+      },
+      {
+        "id": "prd-02",
+        "question": "Are product capabilities, user or system interaction flows, and usage priorities mapped directly to target outcomes?"
+      },
+      {
+        "id": "prd-03",
+        "question": "Are functional and experiential success conditions, feature-level acceptance criteria, and explicit out-of-scope boundaries defined?"
+      }
+    ],
+    "frd": [
+      {
+        "id": "frd-01",
+        "question": "Are domain entities, data models, attributes, or payload schemas defined with unambiguous types and validation constraints?"
+      },
+      {
+        "id": "frd-02",
+        "question": "Are system state transitions, event triggers, preconditions, and postconditions deterministically mapped?"
+      },
+      {
+        "id": "frd-03",
+        "question": "Are edge cases, error handling contracts, and input boundary conditions specified with observable behavior?"
+      }
+    ],
+    "techstack": [
+      {
+        "id": "techstack-01",
+        "question": "Are programming languages, runtimes, frameworks, and storage systems specified with explicit versions and architectural rationales?"
+      },
+      {
+        "id": "techstack-02",
+        "question": "Are key architectural decisions and technical trade-offs recorded with context, decision rationale, and consequences?"
+      },
+      {
+        "id": "techstack-03",
+        "question": "Are third-party dependencies, license constraints, and integration boundaries documented?"
+      }
+    ],
+    "design": [
+      {
+        "id": "design-01",
+        "question": "Are design tokens (e.g. colors, typography, spacing, radii) canonically defined with semantic mappings where applicable to the project interface?"
+      },
+      {
+        "id": "design-02",
+        "question": "Are visual contrast and accessibility considerations documented against applicable standards (e.g. WCAG 1.4.3 / 1.4.11) or explicitly declared not applicable?"
+      },
+      {
+        "id": "design-03",
+        "question": "Are reusable UI component structures, visual variants, and responsive layout rules specified for applicable surfaces?"
+      }
+    ],
+    "wireframe": [
+      {
+        "id": "wireframe-01",
+        "question": "Are target viewports, responsive breakpoints, or presentation layouts documented for applicable interfaces?"
+      },
+      {
+        "id": "wireframe-02",
+        "question": "Are screen layouts, structural container hierarchies, and spatial element allocations mapped using clear structural representations?"
+      },
+      {
+        "id": "wireframe-03",
+        "question": "Are primary navigation flows, user orientation cues, and screen transitions clearly defined across views?"
+      }
+    ],
+    "ui-ux": [
+      {
+        "id": "ui-ux-01",
+        "question": "Are interactive component states (e.g. default, active, disabled, loading, error) specified for applicable interface elements?"
+      },
+      {
+        "id": "ui-ux-02",
+        "question": "Are interaction behaviors, transitions, and progressive disclosure rules explicitly defined?"
+      },
+      {
+        "id": "ui-ux-03",
+        "question": "Are keyboard navigation paths, ARIA semantics, and accessibility compliance rules (including WCAG 2.4.7 Focus Visible and WCAG 2.4.11 Focus Not Obscured) detailed for applicable UI?"
+      }
+    ],
+    "security": [
+      {
+        "id": "security-01",
+        "question": "Are sensitive assets, data classifications, cryptographic requirements, or security boundaries cataloged for the system?"
+      },
+      {
+        "id": "security-02",
+        "question": "Are trust boundaries, threat vectors, entry points, and abuse cases mapped against recognized security patterns (e.g. OWASP)?"
+      },
+      {
+        "id": "security-03",
+        "question": "Are authentication, authorization, secret handling, and defensive mitigation controls actionable and verifiable?"
+      }
+    ],
+    "qa": [
+      {
+        "id": "qa-01",
+        "question": "Is the test strategy partitioned across appropriate testing levels (e.g. unit, integration, system) with concrete testing boundaries?"
+      },
+      {
+        "id": "qa-02",
+        "question": "Are test environments, fixtures, synthetic data, and isolation strategies specified proportional to system architecture?"
+      },
+      {
+        "id": "qa-03",
+        "question": "Are exit criteria, defect severity classifications, flakiness policies, and regression gating rules explicitly defined?"
+      }
+    ],
+    "deployment": [
+      {
+        "id": "deployment-01",
+        "question": "Are deployment topologies, release artifacts, and environment configurations specified proportional to project infrastructure?"
+      },
+      {
+        "id": "deployment-02",
+        "question": "Are automated or reproducible release phases, health check verification steps, and cutover procedures documented?"
+      },
+      {
+        "id": "deployment-03",
+        "question": "Are rollback triggers, rollback procedures, and stateful migration reversibility rules explicitly documented?"
+      }
+    ],
+    "runbook": [
+      {
+        "id": "runbook-01",
+        "question": "Are service operational profiles, monitoring indicators, alert thresholds, and health checks documented with observable queries or paths?"
+      },
+      {
+        "id": "runbook-02",
+        "question": "Are operational incident severity levels, triage escalation paths, and communication roles defined for the operational model?"
+      },
+      {
+        "id": "runbook-03",
+        "question": "Are step-by-step diagnostic procedures, mitigation playbooks, common failure modes, and recovery commands copy-paste executable?"
+      }
+    ],
+    "roadmap": [
+      {
+        "id": "roadmap-01",
+        "question": "Are delivery phases, milestones, and deliverables broken down into sequenced, dependency-ordered work units?"
+      },
+      {
+        "id": "roadmap-02",
+        "question": "Are critical path dependencies, integration risk choke-points, and technical debt mitigations explicitly identified?"
+      },
+      {
+        "id": "roadmap-03",
+        "question": "Are phase completion gates, release acceptance criteria, and go/no-go decision rules defined with observable signals?"
+      }
+    ]
+  }
+}

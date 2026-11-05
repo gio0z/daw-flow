@@ -9,6 +9,8 @@
 > **Assumptions:** [Market, regulatory, or business operational assumptions]
 > **Open Decisions:** [Material business trade-offs — block impacted scope until resolved]
 > **Acceptance Criteria IDs:** [BIZ-01, BIZ-02, ...]
+> **Target Audience & Reader Task:** [Executive sponsor, business operations lead, or product strategist: evaluate strategic necessity, authorize business scope, or verify operational impact and success metrics]
+> **Quality Standards:** [Canonical Document Quality & Transition Guide](../references/document-quality.md)
 
 ---
 
@@ -26,11 +28,11 @@
 
 ## 3. Success Metrics & Verification Criteria
 
-_Use measurable operational indicators grounded in observable telemetry._
+_Use measurable operational indicators grounded in observable telemetry, or an evidence-backed qualitative criterion when no metric exists._
 
-- **Primary Metric:** [e.g., Lead cycle time, manual processing steps eliminated]
-- **Counter Metric:** [Guardrail metric to ensure quality/accuracy is preserved]
-- **Verification Source:** [Concrete report, query, or audit log]
+- **Primary Metric / Outcome Criteria:** [e.g., Lead cycle time, manual processing steps eliminated, or evidence-backed qualitative acceptance criteria]
+- **Counter Metric / Guardrail:** [Guardrail metric or qualitative boundary to ensure quality/accuracy is preserved]
+- **Verification Source:** [Concrete report, query, audit log, or observable artifact]
 
 ## 4. Business Constraints & Compliance
 
@@ -40,5 +42,13 @@ _Use measurable operational indicators grounded in observable telemetry._
 
 ## 5. Scope Boundaries
 
-- **In Scope:** [Explicitly funded and approved deliverables]
+- **In Scope:** [Deliverables with observed funding/approval evidence, or explicitly distinguished proposed scope if approval is pending]
 - **Out of Scope:** [Future explorations, non-critical enhancements]
+
+## 6. Document Quality & Review Checks
+
+_Reviewers and authoring agents must verify the document against the canonical [Document Quality Specification](../references/document-quality.md) before workflow transitions:_
+
+- [ ] **brd-01:** Are core business objectives, problem statements, and target outcomes explicitly defined for the relevant scope?
+- [ ] **brd-02:** Are internal or external stakeholders, impacted business workflows, and operational constraints identified?
+- [ ] **brd-03:** Are business-level constraints, non-goals, and boundary conditions clearly separated from product implementation details?

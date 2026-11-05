@@ -9,6 +9,8 @@
 > **Assumptions:** [Team availability, platform stability, upstream component releases]
 > **Open Decisions:** [Material sequencing questions — block dependent milestones until resolved]
 > **Acceptance Criteria IDs:** [ROAD-01, ROAD-02, ...]
+> **Reader & Core Task:** [Engineering Lead / Delivery Coordinator / Implementation Agent] — Sequence delivery phases, verify dependency ordering and bounded milestone outcomes, and monitor stop/replan triggers without relying on invented calendar release dates.
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05` and `roadmap-01`..`03`).
 
 ---
 
@@ -53,3 +55,12 @@ _If unexpected blockers occur, de-scoping must be agreed upon explicitly rather 
 
 - **Non-Negotiable Core (Must Have):** [Core functionality required for safety and functionality]
 - **Negotiable Secondary (Nice to Have):** [Performance micro-optimizations, auxiliary batch scripts]
+- **Stop / Replan Triggers:** [Explicit conditions that halt delivery execution and require replanning rather than pushing broken state downstream]
+
+## 4. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **roadmap-01 (Sequencing & Phasing):** Are delivery phases, milestones, and deliverables broken down into sequenced, dependency-ordered work units?
+- [ ] **roadmap-02 (Critical Path & Dependencies):** Are critical path dependencies, integration risk choke-points, and technical debt mitigations explicitly identified?
+- [ ] **roadmap-03 (Completion Gates & Decision Rules):** Are phase completion gates, release acceptance criteria, and go/no-go or stop/replan decision rules defined with observable signals without invented dates?

@@ -185,8 +185,8 @@ The suite includes two read-only Python 3.10+ standard library diagnostic utilit
 2. **Package & Task Contract Validator (`validate.py`):**
    - `python3 scripts/validate.py package`: Verifies directory structure, templates, and baseline files.
    - `python3 scripts/validate.py contract <file> --stage <stage>`: Validates structured project task contracts against the phase schema (`plan`, `execute`, `complete`).
-
-Truthful verification requires inspecting observable runtime evidence (exit codes, test runner reports, diff checks) against defined Acceptance Criteria. Structural validity checks ensure the repository adheres to contract conventions; they are not substitutes for functional testing.
+   - `python3 scripts/validate.py docs <record> --project-root <dir> --transition <edge> --documents <docs...>`: Validates documentation workflow transition eligibility across 5 lifecycle edges (`intake-authoring`, `authoring-review`, `review-ready`, `review-rework`, `rework-review`) against the [Document Quality Standards & Review Rubric](references/document-quality.md). Checks criterion coverage, SHA-256 digests, and grounded line-slice source quotes. Operates as a passive, read-only CLI check invoked explicitly by the parent orchestrator; it installs no daemons or hooks, and checks structural evidence eligibility without certifying semantic truth or human comprehension.
+     Truthful verification requires inspecting observable runtime evidence (exit codes, test runner reports, diff checks) against defined Acceptance Criteria. Structural validity checks ensure the repository adheres to contract conventions; they are not substitutes for functional testing.
 
 ---
 
@@ -233,6 +233,7 @@ Specification authoring is governed by the Authoritative Documentation Authoring
 - [Operations & Execution Manual (`references/operations.md`)](references/operations.md): Preflight gates, fail-closed approvals, rollback mechanics, and persistent worker graph contracts.
 - [Evaluation Harness & Benchmark Guide (`references/evaluation.md`)](references/evaluation.md): Reproducible task evaluations, oracle benchmarking, acceptance evaluation dimensions, and empirical baseline findings.
 - [Changelog & Architecture Decisions (`references/changes.md`)](references/changes.md): Suite design history, contract hardening, and historical notes.
+- [Document Quality Standards & Review Rubric (`references/document-quality.md`)](references/document-quality.md): Canonical 13-doc quality rubric, dual human and fresh-agent reader criteria, grounded evidence rules, and workflow transition gate.
 - [Behavioral Verification Scenarios (`tests/behavior-scenarios.md`)](tests/behavior-scenarios.md): Test scenarios and regression verification cases.
 
 ---

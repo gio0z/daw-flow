@@ -379,3 +379,46 @@ These evaluation procedures are manual behavioral inspection guidelines, **not**
 6. **Zero-Ceremony Small Change Bypass (SCN-15):**
    - Submit an unambiguous, single-file localized patch request (e.g., updating a configuration constant).
    - Verify that the agent selects the direct `patch` pipeline (`daw-build` -> `daw-verify`) without launching a multi-round questionnaire, grilling interview, or builder-readiness assessment.
+
+---
+
+## Documentation Quality & Audience Evaluation Protocol
+
+Technical documentation generated during deterministic workflows serves two distinct audiences: human operators/maintainers and fresh coding agents (clean-context subagents or subsequent execution sessions lacking conversational memory).
+
+The canonical reference [Document Quality Standards & Review Rubric](document-quality.md) defines the 13 document rubrics and research foundations. This section defines the bounded evaluation protocol for measuring document efficacy across both audiences.
+
+### 1. Fresh-Agent Blind Comprehension Protocol
+
+To verify that a document functions independently of the conversational context in which it was authored:
+
+1. **Clean Context Initialization:** Initialize a fresh agent session with zero prior conversational turns, no chat memory, and access only to the project repository and the target document.
+2. **Reader Task Execution:** Provide the agent with the exact `reader_task` declared in the document's workflow transition record (e.g., "Implement webhook verification according to specifications in `docs/architecture.md`").
+3. **Observation & Scoring:**
+   - Observe whether the fresh agent successfully locates operational invariants, boundaries, and acceptance criteria without asking for clarification or inventing missing requirements.
+   - Check whether the agent hallucinated external dependencies or requested files not cited in `sources`.
+   - Verify that all necessary implementation contracts were discoverable from the document alone.
+
+### 2. Human Peer Review Protocol
+
+Automated checks and fresh-agent tests cannot measure qualitative human factors. Human evaluation must verify:
+
+1. **Cognitive Load & Scannability:** Key operational failure modes, entry points, and boundaries must be identifiable in under two minutes of scanning.
+2. **Ambiguous Terminology:** Ensure domain concepts are strictly defined and consistently used across all related specifications without conflicting duplicate definitions.
+3. **Actionable Operational Guidance:** Runbooks, deployment procedures, and architectural blueprints must provide clear, step-by-step instructions with verifiable expected outputs.
+
+### 3. Invariants & Scope Limitations
+
+- **Structural Eligibility vs. Semantic Truth:** Passing transition validation (`scripts/validate.py docs`) confirms only that line-slice quotes exist on disk, hashes match, and rubric criteria are addressed. It does **not** certify that the document's architectural or business claims are technically correct or optimal.
+- **Reviewer Opacity:** The transition record captures the reviewer identity as an opaque string. The gate does not verify reviewer qualifications, authenticate signatures, or prevent self-review if an orchestrator permits it.
+- **Unexercised Human Comprehension:** Automated evaluation suites and fresh-agent tests do not simulate genuine human comprehension. In automated pipelines, human readability remains formally unexercised until evaluated by real operators.
+- **No Empirical Efficacy Claims:** The documentation transition gate enforces structural rigor and evidence grounding; it does not make empirical claims of reduced implementation time, reduced token cost, or guaranteed zero-defect handoffs.
+
+---
+
+## Observed Local Doc-Quality Workflow Smoke (2026-11-05)
+
+- **Harness & Invariants:** 216 unit tests pass prior to Windows fix; 5 transition edges eligible; `notacceptedready` rejected; stale hash invalidated. Installed CLI copy works from unrelated working directory with project inventory unchanged.
+- **Fresh-Agent Comprehension:** Fresh reader answered 13 canonical questions plus 1 labelled variant against docs; parent compared all 13 expected facts. Single synthetic doc set without human subjects; no blind controlled benefit claim. Fixture path: `/tmp/daw-doc-reader-evaluation-n0yiFtdu`.
+- **Negative Controls:** Two unlabelled negative controls evaluated by separate fresh agents were both rejected (conflicting replay exit 3 vs 0; default TTL missing) via fixture `/tmp/daw-doc-negative-5tixm6mh`. Oracle outside project excluded as non-portable local URI.
+- **Downstream Integration & Corrective Verification:** Initial integration failed: global `--ledger` before subcommand was ignored because base parser defaults overwrote values, landing at default path (parent relocated generated data to temp and cleared directory); five functional behavior checks passed only with flags after subcommand. A separate corrective worker resolved the subparser default override using `argparse.SUPPRESS`. On parent rerun in an isolated `HOME` environment (zero unexpected writes), all 5 held-out checks with documented global `--ledger`/`--json` placed before the subcommand passed (custom ledger used, exact replay preserved same ID, conflict exited with code 3 with bytes unchanged, release available count 1). Initial failure preserved; no causal comprehension or empirical benefit claimed.

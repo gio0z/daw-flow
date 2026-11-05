@@ -9,6 +9,8 @@
 > **Assumptions:** [Explicit operational or technical assumptions]
 > **Open Decisions:** [Material questions — block impacted execution paths until resolved]
 > **Acceptance Criteria IDs:** [AC-01, AC-02, ...]
+> **Reader & Core Task:** [Systems Architect / Lead Engineer / Implementer] — Locate architectural boundaries, cross-specification routing, subsystem responsibilities, shared contracts, and decision risk boundaries without requiring ambient memory.
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05` and `blueprint-01`..`03`).
 
 ---
 
@@ -50,3 +52,11 @@ _Mark existing repo docs, aliases, selected additions, or N/A with rationale._
 - [ ] **Phase 3: Implementation** — Implement core changes against verified acceptance criteria.
 - [ ] **Phase 4: Semantic Verification** — Run acceptance test matrix with concrete before/after evidence.
 - [ ] **Phase 5: Release Hand-off** — Operational readiness verification per runbook.
+
+## 5. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **blueprint-01:** Does the executive summary establish high-level system boundaries, core components, and primary architecture proportional to project scope?
+- [ ] **blueprint-02:** Does the document routing map enumerate active specifications, their authoritative owners, and lifecycle stages without orphan links?
+- [ ] **blueprint-03:** Are cross-cutting system contracts, communication conventions, and governance invariants explicitly stated?

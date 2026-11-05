@@ -9,6 +9,8 @@
 > **Assumptions:** [User capability, data availability, or platform baseline]
 > **Open Decisions:** [Material product questions — block impacted feature paths until settled]
 > **Acceptance Criteria IDs:** [PRD-01, PRD-02, ...]
+> **Target Audience & Reader Task:** [Product engineer, system designer, or QA reviewer: understand target actor problem scenarios, verify user journey priorities, and implement observable acceptance criteria]
+> **Quality Standards:** [Canonical Document Quality & Transition Guide](../references/document-quality.md)
 
 ---
 
@@ -42,3 +44,11 @@ _Applicable to UI screens, CLI commands, or programmatic backend consumers. Do n
 - **Cross-Service Dependencies:** [Upstream services, external APIs, shared libraries]
 - **Performance Expectations:** [Target response latency or throughput within known system constraints]
 - **Telemetry & Logging:** [Required user action events or audit milestones]
+
+## 6. Document Quality & Review Checks
+
+_Reviewers and authoring agents must verify the document against the canonical [Document Quality Specification](../references/document-quality.md) before workflow transitions:_
+
+- [ ] **prd-01:** Are primary actors, target users, or consuming systems and their specific problem scenarios concretely defined?
+- [ ] **prd-02:** Are product capabilities, user or system interaction flows, and usage priorities mapped directly to target outcomes?
+- [ ] **prd-03:** Are functional and experiential success conditions, feature-level acceptance criteria, and explicit out-of-scope boundaries defined?

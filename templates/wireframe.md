@@ -9,6 +9,8 @@
 > **Assumptions:** [Target viewports, rendering engine, terminal/browser capabilities]
 > **Open Decisions:** [Material layout questions — block impacted layout coding until resolved]
 > **Acceptance Criteria IDs:** [WIRE-01, WIRE-02, ...]
+> **Audience & Reader Task:** Product designers / frontend developers constructing responsive page layouts, information hierarchy, and layout grids.
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05`, `wireframe-01`..`wireframe-03`).
 
 ---
 
@@ -16,11 +18,12 @@
 
 - **Parent Screen / Entry Point:** [URL, route, command, or screen triggering this layout]
 - **Child Screens / Drill-Downs:** [Modal dialogs, drawers, secondary tabs, sub-routes]
+- **Reachable Navigation Transitions:** [Reachable screen transitions, navigation flows, and user orientation cues across views]
 - **Exit Paths:** [Back navigation, cancellation, completion routes]
 
 ## 2. Layout Structure & Content Blocks
 
-_Represent layout structure using ASCII or text hierarchy. Do NOT invent decorative assets or non-existent brand components._
+_Represent layout structure using ASCII or text hierarchy. Document structural container hierarchy, spatial element allocations, and responsive information priorities. Do NOT invent decorative assets or non-existent brand components._
 
 ```text
 +------------------------------------------------------------------+
@@ -46,6 +49,16 @@ _Define states applicable to this surface; mark N/A with justification if not ap
 
 ## 4. Responsive & Breakpoint Adjustments
 
-- **Mobile (<640px):** [Stacking behavior, collapsed drawers, bottom sheets, or N/A]
-- **Tablet (640px - 1024px):** [Grid column adjustments, visible tabs, or N/A]
-- **Desktop (>1024px):** [Multi-column split, persistent navigation, or N/A]
+_Document responsive reflow rules and information hierarchy adjustments across applicable viewports. Breakpoints should follow repository conventions; mark N/A with rationale for non-UI or fixed-layout surfaces._
+
+- **Mobile / Compact Viewport:** [Stacking behavior, collapsed drawers, bottom sheets, prioritized essential controls, or N/A]
+- **Tablet / Medium Viewport:** [Grid column adjustments, visible tabs, secondary panels, or N/A]
+- **Desktop / Wide Viewport:** [Multi-column split, persistent navigation, expanded data tables, or N/A]
+
+## 5. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **wireframe-01:** Are target viewports, responsive breakpoints, or presentation layouts documented for applicable interfaces?
+- [ ] **wireframe-02:** Are screen layouts, structural container hierarchies, and spatial element allocations mapped using clear structural representations?
+- [ ] **wireframe-03:** Are primary navigation flows, user orientation cues, and screen transitions clearly defined across views?

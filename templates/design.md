@@ -10,12 +10,14 @@
 > **Assumptions:** [Existing styling framework (e.g. Tailwind, CSS variables), theme mode support]
 > **Open Decisions:** [Material visual questions — block impacted visual implementation only]
 > **Acceptance Criteria IDs:** [DES-01, DES-02, ...]
+> **Audience & Reader Task:** Frontend engineers / designers implementing visual foundations, tokens, and design system components.
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05`, `design-01`..`design-03`).
 
 ---
 
 ## 1. Design Tokens & Core Primitives
 
-_Document existing repository token bindings. New tokens may be proposed with clear rationale._
+_Document existing repository token bindings, source/reuse relationships, and design constraints. New tokens may be proposed with clear technical rationale._
 
 - **Color Palette & Semantic Tokens:**
   - Primary / Brand: `[Existing repo token / CSS variable / class]`
@@ -47,8 +49,16 @@ _Inventory existing repository UI primitives used to assemble this surface._
 
 ## 4. Accessibility & Contrast Rationale
 
-_Verify compliance against the target accessibility baseline (WCAG 2.2 AA default, or AAA if required)._
+_Verify compliance against the target accessibility baseline (WCAG 2.2 AA default, or AAA if required). For non-UI / CLI / headless surfaces, mark web contrast rules N/A with rationale._
 
-- **Text Contrast Rationale:** [Proof that normal text tokens maintain required contrast ($\ge 4.5:1$ for AA, $\ge 7:1$ for AAA) against bound surface backgrounds]
-- **Large Text / UI Control Contrast:** [Proof that headers and interactive borders maintain required contrast ($\ge 3:1$ for AA, $\ge 4.5:1$ for AAA) against adjacent surfaces]
-- **Color Independence:** [Visual indicators (icons, text labels, borders) ensuring meaning is not conveyed by color alone]
+- **Text Contrast Rationale:** [Proof that normal text tokens maintain required contrast ($\ge 4.5:1$ for AA, $\ge 7:1$ for AAA) against bound surface backgrounds, or N/A with rationale for non-UI/CLI surfaces]
+- **Large Text / UI Control Contrast:** [Proof that headers and interactive borders maintain required contrast ($\ge 3:1$ for AA, $\ge 4.5:1$ for AAA) against adjacent surfaces, or N/A with rationale for non-UI/CLI surfaces]
+- **Color Independence:** [Visual indicators (icons, text labels, borders) ensuring meaning is not conveyed by color alone, or N/A with rationale for non-UI/CLI surfaces]
+
+## 5. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **design-01:** Are design tokens (e.g. colors, typography, spacing, radii) canonically defined with semantic mappings where applicable to the project interface?
+- [ ] **design-02:** Are visual contrast and accessibility considerations documented against applicable standards (e.g. WCAG 1.4.3 / 1.4.11) or explicitly declared not applicable?
+- [ ] **design-03:** Are reusable UI component structures, visual variants, and responsive layout rules specified for applicable surfaces?

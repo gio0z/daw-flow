@@ -1050,7 +1050,8 @@ def output_result(result: dict[str, Any], fmt: str) -> None:
     else:
         status_str = "VALID" if result["valid"] else "INVALID"
         print(f"[{status_str}] Check: {result['check']} (schema_version: {result['schema_version']})")
-        if result["findings"]:
+        if "transition" in result:
+            print(f"Transition: {result['transition']} (eligible: {result.get('eligible', result['valid'])})")
             print("\nFindings:")
             for f in result["findings"]:
                 print(f"  [{f['severity'].upper()}] {f['code']} @ {f['path']}: {f['message']}")
@@ -1092,6 +1093,38 @@ def main() -> None:
         help="Lifecycle stage: plan (default), execute, or complete.",
     )
     contract_parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format: text or json.",
+    )
+
+    docs_parser = subparsers.add_parser("docs", help="Validate document quality workflow transition fact records.")
+    docs_parser.add_argument("file", help="Path to the document quality record JSON file (relative or absolute).")
+    docs_parser.add_argument(
+        "--project-root",
+        required=True,
+        help="Project root directory bounding all documents and evidence.",
+    )
+    docs_parser.add_argument(
+        "--transition",
+        choices=[
+            "intake-authoring",
+            "authoring-review",
+            "review-ready",
+            "review-rework",
+            "rework-review",
+        ],
+        required=True,
+        help="Workflow transition edge.",
+    )
+    docs_parser.add_argument(
+        "--documents",
+        nargs="+",
+        required=True,
+        help="Expected target document relative paths (one or more).",
+    )
+    docs_parser.add_argument(
         "--format",
         choices=["text", "json"],
         default="text",
@@ -1164,6 +1197,84 @@ def main() -> None:
             res = validate_contract(contract_data, proj_root, args.stage)
         except OSError:
             sys.stderr.write("OS error validating contract.\n")
+            sys.exit(2)
+
+        output_result(res, args.format)
+        sys.exit(0 if res["valid"] else 1)
+
+    elif args.subcommand == "docs":
+        try:
+            from scripts.doc_quality import validate_docs
+        except ImportError:
+            from doc_quality import validate_docs  # type: ignore[import-not-found]
+
+        proj_root_raw = pathlib.Path(args.project_root)
+        try:
+            proj_root = proj_root_raw.resolve()
+            if not proj_root.is_dir():
+                sys.stderr.write("Error: Project root is not a directory.\n")
+                sys.exit(2)
+        except (OSError, RuntimeError, ValueError):
+            sys.stderr.write("Error: Cannot resolve project root.\n")
+            sys.exit(2)
+
+        raw_file_str = str(args.file)
+        rec_p = pathlib.Path(raw_file_str)
+        rec_anchor = rec_p.anchor if rec_p.is_absolute() else ""
+        rec_tail = raw_file_str[len(rec_anchor):] if rec_anchor else raw_file_str
+        if "\0" in raw_file_str or ":" in rec_tail or (not rec_p.is_absolute() and "\\" in raw_file_str):
+            res = validate_docs(rec_p, proj_root, args.transition, args.documents)
+            output_result(res, args.format)
+            sys.exit(0 if res["valid"] else 1)
+        try:
+            record_file_raw = pathlib.Path(raw_file_str)
+            if record_file_raw.is_absolute():
+                try:
+                    resolved_rec = record_file_raw.resolve()
+                    resolved_rec.relative_to(proj_root)
+                    record_file_path = resolved_rec
+                except (ValueError, OSError, RuntimeError):
+                    res = validate_docs(record_file_raw, proj_root, args.transition, args.documents)
+                    output_result(res, args.format)
+                    sys.exit(0 if res["valid"] else 1)
+            else:
+                try:
+                    rec_bound, rec_err = resolve_bounded_path(proj_root, raw_file_str)
+                except (OSError, RuntimeError, ValueError):
+                    rec_bound, rec_err = None, "fs_error"
+                if rec_err or rec_bound is None:
+                    res = validate_docs(record_file_raw, proj_root, args.transition, args.documents)
+                    output_result(res, args.format)
+                    sys.exit(0 if res["valid"] else 1)
+                record_file_path = rec_bound
+        except (OSError, RuntimeError, ValueError):
+            res = validate_docs(pathlib.Path(raw_file_str), proj_root, args.transition, args.documents)
+            output_result(res, args.format)
+            sys.exit(0 if res["valid"] else 1)
+
+        try:
+            if not record_file_path.is_file():
+                sys.stderr.write("Error: Record file does not exist or is not a file.\n")
+                sys.exit(2)
+        except (OSError, RuntimeError):
+            sys.stderr.write("Error accessing record file.\n")
+            sys.exit(2)
+        try:
+            raw_text = record_file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            sys.stderr.write("Error reading record file.\n")
+            sys.exit(2)
+
+        try:
+            parse_strict_json(raw_text)
+        except (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError):
+            sys.stderr.write("Error parsing record JSON: malformed JSON, duplicate keys, or unsupported values.\n")
+            sys.exit(2)
+
+        try:
+            res = validate_docs(record_file_path, proj_root, args.transition, args.documents)
+        except OSError:
+            sys.stderr.write("OS error validating docs.\n")
             sys.exit(2)
 
         output_result(res, args.format)

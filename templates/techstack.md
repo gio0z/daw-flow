@@ -9,6 +9,8 @@
 > **Assumptions:** [Deployment platform, existing library compatibility, runtime constraints]
 > **Open Decisions:** [Material technical selections — block adding unapproved dependencies]
 > **Acceptance Criteria IDs:** [TECH-01, TECH-02, ...]
+> **Reader & Core Task:** [Software Architect / Backend Engineer / Platform Lead] — Evaluate existing runtime conventions against proposed technical additions, inspect architectural decision trade-offs, and verify lifecycle/dependency constraints without introducing avoidable dependencies.
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05` and `techstack-01`..`03`).
 
 ---
 
@@ -39,3 +41,11 @@ _Document evaluated alternatives to prevent bikeshedding and ensure boring, main
 - **Observability Support:** [Tracing, logging, telemetry integration]
 - **Upgrade Cadence:** [Release stability, LTS support status, breaking change history]
 - **Failure Modes:** [Memory leaks, connection exhaustion, deadlocks, serialization overhead]
+
+## 5. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **techstack-01:** Are programming languages, runtimes, frameworks, and storage systems specified with explicit versions and architectural rationales?
+- [ ] **techstack-02:** Are key architectural decisions and technical trade-offs recorded with context, decision rationale, and consequences?
+- [ ] **techstack-03:** Are third-party dependencies, license constraints, and integration boundaries documented?

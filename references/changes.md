@@ -2,6 +2,15 @@
 
 ## 2026-11-05: Version 0.1.1 Release
 
+- Implement documentation quality standards, research-informed rubric (`references/document-quality.md`, `references/document-quality-rubric.json`), and deterministic workflow transition gate (`scripts/validate.py docs`).
+- Enforce an explicit 5-edge state machine (`intake-authoring`, `authoring-review`, `review-ready`, `review-rework`, `rework-review`) governing document intake, drafting, review, rework, and downstream readiness.
+- Require parent-owned expected document target sets (`--documents`) with strict normalized set equality against records, rejecting duplicate targets and alias collisions without mandating all 13 documents.
+- Validate grounded source evidence: exact line-range slice quotes and SHA-256 digests verified against regular UTF-8 source files in `--project-root`.
+- Require non-empty rationale and grounded source evidence for non-applicable (`not_applicable`) criterion attestations; N/A is an explicit author/reviewer attestation, not an automated bypass.
+- Enforce that review verdicts (`review-ready`) require an opaque `reviewer` reference and per-check `decision: "accepted"`. Any subsequent mutation of document or source artifacts invalidates prior eligibility, requiring re-entry via `rework`.
+- Implement as a read-only, zero-dependency Python 3.10+ standard library validator without daemon supervisors, background services, or harness pre-tool hooks.
+- Establish fresh-agent blind comprehension evaluation protocols and human peer review guidelines, noting that human comprehension remains formally unexercised without live participants.
+- Document structural evidence eligibility vs. semantic truth: the validator verifies schema conformity, bounds, hashes, and quotes without certifying semantic prose correctness or making empirical efficacy claims.
 - Define parent-owned acceptance boundaries and current runtime evidence requirements across multi-agent workflows.
 - Require observable stage transition checkpoints, canonical handoff JSON envelopes, and verified CLI execution outputs before advancing phases.
 - Standardize progressive context loading (stage-scoped skill resolution and exact heading lookups) to prevent premature context saturation.

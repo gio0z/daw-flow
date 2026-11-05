@@ -1,14 +1,17 @@
 # Operational Runbook: [Service / Feature]
 
-> **Fill-in Guidance:** Fill this template using verified repository commands, scripts, and parameters. Equivalent existing ops manuals or runbooks may be reused directly. Do not invent executable commands, script paths, CLI flags, or mock "HEALTHY" output strings. Critical operations require explicit human approval by reference only (ticket ID / approval request ID; never include secret values or credentials). Rollback must target an explicit known-good release; database or state restoration snapshot is required ONLY when data recovery is applicable (stateless services roll back artifact without database restoration). Preflight backups require verified integrity and restore-test status (mark N/A for stateless or harmless operations). Distinguish verified operational facts from author-proposed recovery defaults using a concise provenance ledger or explicit labels. Unresolved material operational questions block impacted operations only. Never record secret values or credentials in templates.
+> **Fill-in Guidance:** Fill this template using verified repository commands, scripts, and parameters. Equivalent existing ops manuals or runbooks may be reused directly. Structure operational procedures around concrete symptom identification, safe bounded diagnostic steps, expected observations, stop/escalation boundaries, and verified recovery actions. Do not invent executable commands, script paths, CLI flags, or mock "HEALTHY" output strings. Critical operations require explicit human approval by reference only (ticket ID / approval request ID; never include secret values or credentials). Rollback must target an explicit known-good release; database or state restoration snapshot is required ONLY when data recovery is applicable (stateless services roll back artifact without database restoration). Preflight backups require verified integrity and restore-test status (mark N/A for stateless or harmless operations). Distinguish verified operational facts from author-proposed recovery defaults using a concise provenance ledger or explicit labels. Unresolved material operational questions block impacted operations only. Never record secret values or credentials in templates. Preserve exact risk point confirmation and never invent commands.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Service operations, preflight gates, fail-closed approval, incident triage, recovery]
+> **Target Reader Role:** [Operator, SRE incident responder, or fresh operational subagent executing mitigation playbooks; on-call role when applicable]
+> **Core Reader Task:** [Diagnose operational symptoms, execute safe bounded troubleshooting steps, verify expected telemetry observations, adhere to stop/escalation limits, and restore service health]
 > **Source Documents / Revision:** [Actual observed FRD, deployment.md, git commit SHA, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Access permissions, verified backup schedule, available monitoring tools]
 > **Open Decisions:** [Material operational questions — block impacted deployment/operations only]
 > **Acceptance Criteria IDs:** [OPS-01, OPS-02, ...]
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05`, `runbook-01`..`runbook-03`).
 
 ---
 
@@ -80,6 +83,14 @@ _CRITICAL: Rollback MUST target an explicitly verified, known-good release artif
 
 ## 5. Escalation & Contact Directory
 
-- **Primary On-Call:** `[On-call engineer handle / Pager link]`
-- **Secondary On-Call / Escalation Lead:** `[Lead engineer handle]`
-- **Security Incident Response:** `[Security team channel / on-call]`
+- **Primary Operator / On-Call:** `[Primary operator handle / Pager link where on-call rotation applies]`
+- **Secondary / Escalation Lead:** `[Lead engineer / escalation owner handle]`
+- **Security Incident Response:** `[Security team channel / incident contact]`
+
+## 6. Document Quality & Review Checks
+
+_Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
+
+- [ ] **runbook-01:** Are service operational profiles, monitoring indicators, alert thresholds, and health checks documented with observable queries or paths?
+- [ ] **runbook-02:** Are operational incident severity levels, triage escalation triggers, and incident responder roles defined?
+- [ ] **runbook-03:** Are diagnostic procedures, mitigation playbooks, common failure modes, and recovery commands copy-paste executable?

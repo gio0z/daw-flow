@@ -1,14 +1,21 @@
 # Deployment & Release Specification: [Service / Release]
 
-> **Fill-in Guidance:** Fill this template using verified release mechanisms and immutable artifact digests. Equivalent existing release PRs or deployment configs may be linked directly. Mark N/A with rationale if the change has no deployment impact (e.g. documentation, local tooling). Pre-deployment backup is N/A for stateless services or releases without state/schema mutation. Human approvals must use system references only (Change Ticket # / Review ID; never copy secret tokens or credentials). Post-deployment log inspection is scoped by relevant service, release time window, and expected severity thresholds, not an unbounded check across all logs. Distinguish verified infrastructure facts from author-proposed release defaults using a concise provenance ledger or explicit labels. Unresolved release items block deployment execution only. Never record secret values or credentials in templates.
+> **Fill-in Guidance:** Fill this template using verified release mechanisms and immutable artifact digests. Equivalent existing release PRs or deployment configs may be linked directly. Specify pinned artifact digests and environment prerequisites before detailing rollout and rollback validation steps. Mark N/A with rationale if the change has no deployment impact (e.g. documentation, local tooling). Pre-deployment backup is N/A for stateless services or releases without state/schema mutation. Human approvals must use system references only (Change Ticket # / Review ID; never copy secret tokens or credentials). Post-deployment log inspection is scoped by relevant service, release time window, and expected severity thresholds, not an unbounded check across all logs. Distinguish verified infrastructure facts from author-proposed release defaults using a concise provenance ledger or explicit labels. Unresolved release items block deployment execution only. Never record secret values or credentials in templates. Preserve exact risk point confirmation and never invent commands.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Target environment, immutable artifacts, migrations, release verification]
+> **Target Reader Role:** [Release engineer, DevOps/SRE operator, or fresh deployment subagent executing rollout]
+> **Core Reader Task:** [Validate pinned immutable artifacts, environment prerequisites, and execute reproducible cutover and rollback procedures without assuming ambient memory]
 > **Source Documents / Revision:** [Actual observed FRD, runbook.md, git commit SHA, tag, or relative path (marked unversioned if revision unobserved); never invent synthetic tags like @initial]
 > **Assumptions:** [Cluster capacity, target infrastructure health, network routing]
 > **Open Decisions:** [Material deployment blockers — block release execution until settled]
 > **Acceptance Criteria IDs:** [DEP-01, DEP-02, ...]
+> **Quality Guide & Rubric:** Refer to [Canonical Document Quality & Workflow Transition Specification](../references/document-quality.md) and [Machine Rubric Registry](../references/document-quality-rubric.json) for standard quality gates and common criteria (DQ-01..DQ-05).
+>
+> - **deployment-01 (Topologies & Immutable Artifacts):** Are deployment topologies, release artifacts, and environment configurations specified proportional to project infrastructure?
+> - **deployment-02 (Release Phases & Health Gates):** Are automated or reproducible release phases, health check verification steps, and cutover procedures documented?
+> - **deployment-03 (Rollback Triggers & Reversibility):** Are rollback triggers, rollback procedures, and stateful migration reversibility rules explicitly documented?
 
 ---
 

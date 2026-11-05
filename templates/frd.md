@@ -9,6 +9,8 @@
 > **Assumptions:** [Runtime environment, language version, database engine capabilities]
 > **Open Decisions:** [Material engineering trade-offs — block impacted execution paths until settled]
 > **Acceptance Criteria IDs:** [FRD-01, FRD-02, ...]
+> **Target Audience & Reader Task:** [Backend engineer, systems integrator, or test automation author: implement domain entities, verify deterministic state transitions, and enforce interface contracts and error invariants]
+> **Quality Standards:** [Canonical Document Quality & Transition Guide](../references/document-quality.md)
 
 ---
 
@@ -43,3 +45,11 @@ _Describe interfaces, CLI arguments, or endpoints according to repo architecture
 
 - **FRD-01 -> Unit / Integration Test:** `[tests/path/test_case.ext]`
 - **FRD-02 -> Unit / Integration Test:** `[tests/path/test_case.ext]`
+
+## 6. Document Quality & Review Checks
+
+_Reviewers and authoring agents must verify the document against the canonical [Document Quality Specification](../references/document-quality.md) before workflow transitions:_
+
+- [ ] **frd-01:** Are domain entities, data models, attributes, or payload schemas defined with unambiguous types and validation constraints?
+- [ ] **frd-02:** Are system state transitions, event triggers, preconditions, and postconditions deterministically mapped?
+- [ ] **frd-03:** Are edge cases, error handling contracts, and input boundary conditions specified with observable behavior?
