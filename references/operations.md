@@ -488,3 +488,22 @@ idle/parked worker, and results arrive automatically; use `wait` only when block
 Observe successful continuation before relying on it. A drained `workpool` is not a
 retained worker graph. Other harnesses may expose different tools or no continuation;
 apply the capability/fallback rules above rather than requiring OMP commands.
+
+## Native Workflow Tracking & Scheduling
+
+At intake, “discover the actual native task/todo tracker” means inspecting exposed harness tools/documentation and reusing still-applicable observed discovery: record in the existing plan/handoff which native tracker is present, its name/ID namespace, and the observed schema/fields — never assume a fixed client, vendor, or field set, and never enable global settings to obtain one.
+
+### Tracker binding & separation of execution from acceptance
+
+1. When a native tracker is present: bind each stable plan task ID to its native ref (create or reuse the actual ref if the tracker supports it); parent updates in the tracker derive only from observed worker lifecycle transitions.
+2. A worker's `done`/`pass` is a proposal, not parent acceptance. The tracker MUST NOT duplicate authoritative acceptance status: the structured plan/handoff and [Parent Acceptance Checkpoint](#parent-acceptance-checkpoint) remain the authority — the tracker references them (e.g. tracker item → plan task ID + current revision + acceptance record ref). Static plan desired dependencies and criteria are preserved in the plan; the tracker carries execution progress only. Parent acceptance is recorded per [Parent-Owned Acceptance Record](#parent-owned-acceptance-record), never by writing `accepted` into the tracker from a worker claim.
+3. If a tracker lacks fields (identity, revision, evidence), carry those in the existing handoff/plan records — never claim the native tracker supports them. A UI-only step completion or checkbox MUST NOT be interpreted as entire-task success.
+4. No automatic external issue creation, state resets, or global scans. Existing worker graph continuity is unchanged.
+
+### Structured fallback (no tracker)
+
+When no native tracker exists, use structured records in the existing plan/handoff (task ID, owner, depends_on, acceptance_criteria, verification_command, evidence, status) as the record. Fallback is usable without any mandatory file. Evidence unavailable means `unexercised`, never a fake pass.
+
+### Native DAG/batch scheduling
+
+When the harness exposes a native DAG/batch scheduler, the parent MAY use it for independent, disjoint items (non-overlapping write ownership). It MUST NOT dispatch success-dependent consumers on automatic worker completion alone: consumers dispatch only after the parent's current-revision acceptance joins the predecessor (per [Mandatory Pre-Dispatch Dependency Joins](#parent-acceptance-checkpoint)). If the scheduler cannot represent that gate, hold at a phase boundary until parent acceptance; corrective dispatch consumes validated failure findings per existing correction rules.

@@ -74,6 +74,7 @@ Before conducting a code review:
    - **Proportionality & Python Fallback:** Trivial inline changes without formal specifications do not require document review transition records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
    - **QA Review Limitation:** Document quality review verifies structural evidence eligibility, coverage, and citation presence. Human comprehension remains unexercised without live people (`[UNEXERCISED: NO HUMAN PARTICIPANTS]`).
 7. **Structural Coupling Reference:** Consult [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) during Stage 2 technical audit when evaluating whether structural changes introduce hidden links, needless wrappers, or surplus taxonomy.
+   7a. **Code Intelligence Capability Hierarchy:** Follow the canonical hierarchy in `../../skills/daw-untangle/SKILL.md` §2 for any code-intelligence lookups during review: real LSP for semantic definitions/references/callers/rename when available and language-supported; AST structural discovery when appropriate and authorized; graph only after coverage/freshness validation; scoped grep/glob fallback otherwise. Review is strictly read-only and never applies code actions, renames, or codemods (even when LSP/AST support them); cite the tier actually used and current revision in evidence; unavailable evidence is unexercised, never a pass. No global scans, fictitious tooling, mandatory external install, or static-as-runtime-proof claims.
 
 ---
 

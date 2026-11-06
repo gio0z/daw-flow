@@ -75,6 +75,9 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 - Execute the falsification test:
   - If the test disproves the mechanism, mark the hypothesis `Falsified` and document the exact observation.
   - If the test confirms the mechanism, isolate whether it is the **causal root** or merely an **intermediate symptom**.
+- **Prefer Runtime Inspection When Available:** When the hypothesis turns on live process state, and the runtime exposes a native debugger capability, discover the actual capability name and schema from exposed harness tools/documentation — never assume or invent a specific client, command, or wire shape. Use bounded breakpoints, stack/backtrace reads, and targeted value inspection to falsify the hypothesis directly, in preference to adding log instrumentation, when the session is authorized and in scope.
+  - No automatic attach to production or shared processes; run only an authorized, isolated, non-destructive local reproduction target. Avoid side effects and sensitive values (secrets, credentials, PII, full payloads) in inspected state. Obey actual tool schema, host policy, and existing read-only/action bounds; low-risk local inspection needs no new approval, but missing required authorization blocks debugger use.
+  - Logging/tracing remain a valid fallback when the debugger is unavailable or inappropriate. Record only state actually observed and tie each observation to its hypothesis; an unavailable/unauthorized debugger is `unexercised`, never a fabricated debugger session or invented stack/value.
 - **Distinguish Root Cause vs. Surface Symptom:**
   - _Symptom:_ `TypeError: Cannot read property 'id' of undefined` at line 142.
   - _Symptom Patch (FORBIDDEN):_ Adding optional chaining `user?.id` or `if (!user) return;` without understanding why `user` is undefined.
@@ -85,7 +88,7 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 - **Anti-Thrashing Rule:** If two consecutive hypotheses are falsified without narrowing the boundary, or if attempts to reproduce the issue yield contradictory results:
   1. Stop speculative testing immediately.
   2. Re-examine assumptions: verify whether environment, dependencies, dirty working tree state, or configuration drift are masking the issue.
-  3. Expand logging or tracing at the outermost subsystem boundary rather than guessing deeper internal states.
+  3. Expand appropriate observations — bounded debugger breakpoints/stack/value inspection when available and authorized, otherwise logging or tracing — at the outermost subsystem boundary rather than guessing deeper internal states.
   4. Escalate open design/infrastructure unknowns to the parent orchestrator via the Stop/Replan protocol.
 
 ### Step 5: Formulate Root Cause Dossier & Remediation Strategy

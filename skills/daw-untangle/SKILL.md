@@ -65,9 +65,14 @@ The untangle module performs deterministic, read-only structural analysis and ch
    - Before executing structural analysis, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already active in the current session, reuse them directly without redundant re-reading.
    - `daw-untangle` is strictly read-only. Preflight evaluation confirms read-only scope. Dirty git working trees are explicitly accepted; no clean tree is required.
 5. **Code Intelligence Tools & Inspection Hierarchy:**
-   - **Language Server Protocol (LSP):** Prefer LSP methods (`definitions`, `references`, `type_definitions`, `implementations`) when configured and active.
-   - **Graph Intelligence:** When graph tools are available, verify index freshness against file modification timestamps before trusting graph edges; verify cited symbols via source reads.
-   - **Targeted Static Analysis:** When LSP or graph tools are unavailable, use deterministic static tools (`grep`, `glob`, AST grep, and targeted line-range reads).
+
+   ### Code Intelligence Capability Hierarchy
+   - **Language Server Protocol (LSP) First (Semantic):** Prefer real LSP `definitions`, `type_definitions`, `references`, `implementations`, and callers for semantic definitions, references, callers, and rename when LSP is configured, active, and supports the target language. Verify results against current-revision source reads; an unavailable/unsupported LSP is an honest fallback trigger, never a pass.
+   - **AST Structural Discovery / Codemods:** Use AST-aware structural search and codemods (e.g. AST grep/edit patterns) for structural discovery and authorized mechanical codemods when pattern shape — not just literal text — defines the target. Do not invent AST tooling; fall back when unavailable.
+   - **Graph Coverage / Freshness Validation:** When graph tools are available, validate index coverage and freshness (timestamps/revision) before trusting edges; verify every cited symbol against current-revision source. Stale or incomplete graph evidence is scoped as fallback, not proof.
+   - **Literal / Coverage Fallback:** Use scoped `grep`/`glob` literal search plus targeted line-range `read` for literal text, coverage-gap checks, and when higher tiers are unavailable or unsupported. Scope stays within the authorized area; no global scans.
+   - **Read-Only Mutation Ban:** `daw-untangle` never applies code actions, renames, codemods, or any mutation — even when LSP/AST support them. It only proposes boundaries/invariants for `daw-plan`/`daw-build`. No fictitious tooling, no mandatory external install, and no static result claims runtime proof.
+
 6. **Canonical Supporting Reference:**
    - Read [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) for the canonical coupling taxonomy, legitimate pattern catalog, and deep module principles.
 

@@ -66,6 +66,7 @@ Inspect observable repository facts without executing mutating commands:
 ### Step 2: Formulate Findings & Batched Confirmation
 
 Present discovered facts to the operator in one single batched round, pre-filling defaults:
+**Native Clarify Transport:** For unresolved config preferences (e.g. `workspace`, `issue_tracker`), use the shared grilling native clarify transport via parent capability-based routing (native clarify, or the equivalent ask/question tool actually exposed — never invent a tool call), with decision context before blocking and tool-supplied recommendation/custom/free-text/multiselect semantics (no hardcoded schema, no synthesized `Other`, no duplicate text questionnaire). Discovered facts (`spec_dir`, commands, `default_branch`, `high_risk_paths`) are presented as pre-filled defaults in one batched round, not re-asked as fact questions. Cancel/unanswered stays unresolved, never default consent; still show the proposed diff and await explicit confirmation before writing. Ordinary clarification never substitutes for provider/security point-risk authorization. See `../../references/grilling.md`.
 
 1. **spec_dir:** Default `docs/specs/` (or discovered existing path).
 2. **test_command:** Discovered test command or `none`.

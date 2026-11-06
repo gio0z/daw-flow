@@ -1,5 +1,19 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-06: Capability-First Harness Integration
+
+- Bind plan task IDs to available native tracker references and use native scheduling without treating worker completion as parent acceptance or bypassing dependency joins. Preserve structured fallback without new mandatory files.
+- Prefer supported LSP and AST capabilities for semantic navigation and authorized refactors, with current-source validation and read-only review boundaries.
+- Prefer bounded native debugger observations when appropriate and authorized; retain logging/tracing fallback and hypothesis-driven evidence.
+- Match verification to the actual surface: browser, native desktop, CLI, or API. Unavailable required evidence remains unexercised rather than a fabricated pass.
+- Add manual capability scenarios covering tracking, dependency gates, code intelligence, debugging, UI evidence, and fallback behavior.
+
+## 2026-11-06: Native Interactive Clarification Transport
+
+- Route material interview and choice questions through the harness's exposed native clarification tool, using its actual schema and limits; retain concise text fallback only when the tool is absent or unavailable.
+- Apply the shared protocol to wizard, advisory, design, setup, and other DAW decision flows without redundant questions, duplicate questionnaires, or new approval gates. Cancellation remains unresolved and cannot authorize dependent work.
+- Preserve the explicit headless benchmark oracle adapter and add manual transport scenarios covering native tools, equivalent tools, fallback, cancellation, and adapter compatibility.
+
 ## 2026-11-06: Optional Parent-Owned Workflow Resume Checkpoint
 
 - Define an optional Markdown resume summary in the operations reference, reusing authorized artifacts or durable harness records without introducing a mandatory file, logger, database, or runtime.

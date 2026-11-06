@@ -77,13 +77,13 @@ Do NOT invoke `daw-verify` for:
 
 ### Rule 1: The Claim -> Check -> Actual Triad
 
-Every claim in a verification report must bind to an explicit check command and the actual observed output:
+Every claim in a verification report must bind to an explicit check and the actual observed evidence:
 
 1. **Claim:** What specific behavior, constraint, or AC is being validated.
-2. **Check:** The exact deterministic command executed (including arguments and working directory).
-3. **Actual:** The exact observed output, exit code, or response artifact. Never summarize with "verified" or "works" without showing the command output.
+2. **Check:** The exact check executed — a shell command, a native tool action (browser/computer/API probe), or an explicitly cited equivalent — including arguments, working directory, target surface, and relevant session/context (page, window, endpoint, account/session scope) where applicable. Discover the actual available tool, its real schema, and its permissions at runtime; NEVER require a specific client tool name.
+3. **Actual:** The exact observed output, exit code, response status, DOM/accessibility tree, screenshot, or other inspected artifact. Never summarize with "verified" or "works" without showing the evidence. Tool actions and their observations (navigation, clicks, typing, AX queries, screenshots, HTTP responses) count in the triad exactly as shell commands do; record the action, its context, and the observation, not only a shell invocation.
 
-Declare the expected exit code or response status, as applicable, and behavioral assertions before execution. Negative probes may expect a nonzero exit or an error response; they pass only when that exact expected rejection and its output are observed. Never revise an expectation merely to make a failed check pass.
+Declare the expected exit code, response status, or observable state, as applicable, before execution. Negative probes may expect a nonzero exit or an error response; they pass only when that exact expected rejection and its output are observed. Never revise an expectation merely to make a failed check pass.
 
 ### Rule 2: Fresh Failing Scenario (Before & After)
 
@@ -101,7 +101,8 @@ Declare the expected exit code or response status, as applicable, and behavioral
 ### Rule 4: No Mock-Based Victory
 
 - Mocks test unit-level isolation only.
-- Acceptance criteria must be validated against real runtime boundaries (real CLI execution, actual API responses, live UI DOM states).
+- Acceptance criteria must be validated against real runtime boundaries appropriate to the surface (real CLI execution, actual API responses, live UI DOM states — see §4 surface selection).
+- UI behavior MUST NOT be established solely by `curl`, source-code inspection, static descriptions, or mocks. A UI claim requires actual browser or desktop evidence matched to the claim and surface as specified in §4: semantic controls use DOM/AX when exposed; custom canvas, mirrored, or custom-drawn surfaces use actual pixels/screenshot/input, where missing AX alone does not block valid visual evidence. Do NOT force both DOM and screenshot for every UI claim.
 - If an external system cannot be contacted, mark the verification status explicitly as `Blocked` or `Unexercised`, never `Passed`.
 
 ---
@@ -110,16 +111,19 @@ Declare the expected exit code or response status, as applicable, and behavioral
 
 ### Step 1: Scope & Matrix Formulation
 
-Map all changes to required verification tiers:
+Map all changes to required verification tiers **by surface** — select the proof method that matches where the behavior actually lives, not a single universal probe:
 
-- **Smoke CLI:** Executable help text, flag parsing, exits on invalid arguments, exit 0 on primary happy path.
-- **Smoke API:** Endpoint responses, status codes, payload contract schemas, authentication error handling.
-- **Smoke UI:** Component rendering, user interaction, error boundary states, keyboard/accessibility focus.
+- **Web UI:** Actual browser evidence matched to the claim — live DOM and/or accessibility-tree observation for semantic controls when exposed, and/or screenshot plus real interaction (navigation, click, typing, form submission) against the running page. For layout/visual claims, a rendered screenshot may prove the visual property; for interaction claims, screenshot alone is insufficient. Do NOT require both DOM/AX and screenshot for every claim.
+- **Native desktop UI:** Actual computer-use evidence matched to the claim — AX tree queries for exposed semantic controls, and/or window screenshot plus real input interaction against the running application window. For custom canvas, mirrored, or custom-drawn surfaces use actual pixels/screenshot/input; missing AX alone is not a block on valid visual evidence. Do NOT require both AX and screenshot for every claim.
+- **CLI:** Real command execution — help text, flag parsing, exits on invalid arguments, exit 0 on primary happy path, observed stdout/stderr and exit codes.
+- **API:** Direct probes appropriate to the contract — endpoint responses, status codes, payload schemas, auth error handling, against a real (local or authorized) instance; `curl` or a typed HTTP client is acceptable here because the surface is the wire contract, not rendered UI.
 - **Regressions:** Full test suite for modified modules, plus cross-module consumer tests.
+
+For each matrix row record: surface, chosen native capability, discovered tool/schema/permissions, expected observable, and fallback if that capability is unavailable.
 
 ### Step 2: Execute Deterministic Checks
 
-Run bounded, reproducible commands. Prefer standard project runners (`pytest`, `npm test`, `cargo test`, `go test`):
+Run bounded, reproducible checks matched to the surface. Prefer standard project runners (`pytest`, `npm test`, `cargo test`, `go test`) for non-UI behavior, and the discovered native browser/computer capability for UI surfaces:
 
 ```bash
 # Example CLI verification
@@ -133,10 +137,21 @@ curl -sS -D - http://127.0.0.1:8080/health -o /dev/null
 pytest tests/ -v -k "test_feature"
 ```
 
+Web/desktop UI checks (via the actual discovered tool, never an assumed client name): route by surface and claim — use DOM/AX observation for semantic controls when exposed, and actual pixels/screenshot/input for custom canvas, mirrored, or custom-drawn surfaces; open the running surface, perform the real interaction where the claim requires it, and capture the one-or-more artifacts that match the claim as the observed evidence. Do NOT force both DOM/AX and screenshot for every UI claim. Record the tool action, target/context, and observation in the check record.
+
+**Capability discovery & honest fallback:**
+
+- Discover actual tools, real schema, and permissions before acting; adapt to what the harness actually exposes. NEVER invent or require a specific client tool name or capability.
+- If the relevant native tool is unavailable, use an authorized actual equivalent (e.g. a different real browser/computer tool, or manual evidence actually inspected by the verifier) and record it as the check method.
+- If no authorized actual equivalent exists and the surface is required, mark the check `Blocked` (capability unavailable) or `Unexercised` (not run) — NEVER fabricate a visual pass, screenshot, DOM, or interaction that was not actually observed.
+- Keep shell commands for non-UI surfaces (CLI, API wire contract, test suites); do not force UI verification through shell-only proxies.
+- Verification is read-only analysis: execute tests and probes only, NEVER implement code edits. Do not perform unsolicited consequential clicks, sends, orders, purchases, or other external side effects, and NEVER bypass provider safety checks; consequential UI actions require explicit approval, otherwise stop at observation.
+
 Observe and record:
 
-- Standard output (`stdout`) and standard error (`stderr`).
-- Process exit code.
+- Standard output (`stdout`) and standard error (`stderr`) for command checks.
+- Process exit code or HTTP response status for command/API checks.
+- DOM/accessibility tree content, screenshot artifact reference, and interaction results for UI checks.
 - File modifications or side effects (if verifying disk operations).
 
 ### Step 3: Categorize Results Explicitly
@@ -170,7 +185,7 @@ Inspect the actual codebase and latest runtime evidence against authoritative co
 
 Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable as complete JSON BEFORE concluding the workflow or advancing stages per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized workflow artifact, or an explicit inline fallback). Direct-user responses default to concise natural language. Rich verification checks, latest CLI runtime evidence (commands, exit codes, observed output snippets), regression counts, and diagnostic observations are preserved under `evidence` and `details`:
 
-- **Mandatory Runtime Evidence:** `details.checks` MUST include actual executed commands, expected exit codes, observed exit codes, and observed output snippets. Fabricated, dry-run, or mock evidence is prohibited.
+- **Mandatory Runtime Evidence:** `details.checks` MUST include the actual executed check (shell command, native tool action, or explicitly cited equivalent), its target surface and session/context, expected exit code/status/observable state, observed exit code/status, and observed output/observation snippets (DOM/AX tree, screenshot reference, HTTP response, stdout/stderr). For UI checks record the tool actions performed and their observations, not only a shell invocation. Fabricated, dry-run, or mock evidence is prohibited; unavailable native capability is reported honestly as `blocked`/`unexercised`, never as a fabricated visual pass. Shell remains the proof method for non-UI (CLI/API/test-suite) surfaces.
 
 ```json
 {
