@@ -79,7 +79,7 @@ The advisor serves as a conversational front door and Socratic sounding board fo
 
 ## 4. Output Contract
 
-Every completion of `daw-ask` delivers a structured handoff payload adhering to the canonical suite envelope. Rich diagnostic summaries, recommendations, and frontier trade-offs are preserved under `details`:
+Every completion of `daw-ask` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return or an explicit inline checkpoint fallback; read-only modules never create unasked files). Direct-user responses default to concise natural language. Rich diagnostic summaries, recommendations, and frontier trade-offs are preserved under `details`:
 
 ```json
 {

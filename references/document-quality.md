@@ -248,3 +248,139 @@ Tasks must be tailored to the document's actual target reader role and scope rat
 ## 8. CLI & Validator Reference
 
 For detailed command-line arguments, exit codes, JSON envelope specifications, and integration patterns, refer to the canonical validator reference in `references/validation.md`.
+
+---
+
+<a id="feature-delivery-contract"></a>
+
+## 9. Feature Delivery Contract
+
+This section defines the canonical procedural contract governing end-to-end feature delivery across the Deterministic Agentic Workflow (DAW) specification matrix. It integrates core specification-driven development mechanisms into existing DAW modules, preserving DAW's root router governance, read-only review/ask boundaries, fail-closed human authorization, parent-owned acceptance records, and default user-facing report separation. It requires no new route stages, modules, external daemons, or synthetic file formats.
+
+Existing project file naming, issue tracking, and directory structures are respected; there is no mandate to create artificial `spec.md`, `plan.md`, `tasks.md`, or `constitution.md` files when equivalent canonical documents (`prd.md`, `frd.md`, `blueprint.md`, `roadmap.md`) already exist. Trivial settled bug fixes or localized patches may keep mappings inline without forcing multi-document expansion.
+
+<a id="a-governance-authoring"></a><a id="a-governance-and-authoring-alignment"></a>
+
+### A. Governance & Authoring Alignment
+
+1. **Consume Real Project Principles:** Authoring modules (`daw-design`, `daw-wizard`, or manual drafting) MUST consume actual project governance, architecture baselines, and design requirements from existing repository documents (e.g., `blueprint.md`, `constitution.md`, architectural decision records, or existing specifications). Never invent organizational policies, arbitrary owners, fictional approvals, or vanity metrics.
+2. **Distinguish What/Why from How:** Specifications (e.g., `prd.md`, `frd.md`) MUST articulate business requirements, user problem statements, and acceptance constraints (_what_ and _why_), leaving technical implementation mechanisms, schema layouts, and algorithms (_how_) to architecture and execution plans.
+3. **Record Source Provenance & Status:** Trace every principle or constraint to its authoritative repository source or human input. Explicitly distinguish _proposed/default_ options from _decided_ architectural choices.
+4. **Impact Analysis on Principle Changes:** When a foundational principle, architectural constraint, or design decision is modified, the authoring agent MUST enumerate all affected documents, tasks, and acceptance evidence. Authorized artifacts must be synchronized. Silent overriding of established principles or sneaking feature implementation into governance-only edits is strictly prohibited.
+5. **Preserve Existing Scope Guard:** Speculative additions, unrequested refactorings, or unauthorized scope creep remain strictly blocked by existing scope guards.
+
+<a id="b-clarify"></a><a id="b-clarification-and-technical-uncertainty-resolution"></a>
+
+### B. Clarification & Technical Uncertainty Resolution
+
+1. **Repo Inspection First:** Before querying the human operator or creating clarification tickets, agents MUST inspect existing repository facts, codebase structures, and documentation (consulting commit history when needed). Never ask questions that repository files or existing specifications already answer.
+2. **Prioritize by Impact × Uncertainty:** Rank unresolved ambiguities by $\text{Impact} \times \text{Uncertainty}$. Do not ask low-leverage questions about stylistic preferences, variable naming, or internal module boundaries. Do not present false dichotomies.
+3. **Structured Question Batching:** For dependent architectural trade-offs, ask one question at a time to avoid cascading invalidation. For genuinely independent decisions, batch up to 5 clear, high-leverage choices per round (respecting DAW's batching conventions without global artificial caps).
+4. **Research Technical Uncertainties First:** If an ambiguity stems from technical feasibility, library capabilities, or API behaviors, research technical facts before consulting the user. Record the resulting decision, technical rationale, considered alternatives, and primary sources directly into the appropriate existing document section (e.g., in `prd.md`, `blueprint.md`, or `frd.md`; no mandatory standalone `research.md`).
+5. **Authoritative Specification Updates & Read-Only Separation:** Clarification answers MUST be recorded into the authoritative specification by the authorized authoring module (`daw-design`/`daw-wizard`). Conflicting text must be reconciled and affected acceptance criteria updated. Unresolved items remain explicit unknowns that block only dependent scope. Read-only inquiry modules (`daw-ask`) MUST NOT write files; they return proposed exact text updates to the parent orchestrator for routing to the authorized authoring module.
+
+<a id="c-feature-slice"></a><a id="c-feature-slicing-and-behavioral-contract-oracles"></a>
+
+### C. Feature Slicing & Behavioral Contract Oracles
+
+1. **Stable Identifier Preservation:** Preserve existing stable identifiers for requirements, user stories, and acceptance criteria (`REQ-xxx`, `US-xxx`, `AC-xxx`). If identifiers are absent in legacy documents, generate unique, scoped identifiers and retain them consistently across all downstream artifacts.
+2. **Prioritized Demonstrable Behavior Stories:** Decompose features into prioritized, independently demonstrable and testable behavior slices. Each story must define verifiable contract oracles using Given/When/Then or explicit input, output, error state, and postcondition assertions.
+3. **Transactional & Safety Invariants:** Do not force artificial deployment independence for inseparable transactional, data-integrity, or security invariants that must land together atomically.
+4. **Explicit Out-of-Scope & Measurable Non-Functional Criteria:** Define explicit out-of-scope boundaries to prevent scope expansion. Non-functional, performance, security, and negative/edge-case criteria must be empirically measurable with verified or proposed target provenance.
+5. **Infrastructure Task Justification & KPI Boundaries:** Supporting infrastructure or refactoring tasks may exist without an end-user story ONLY when backed by an explicit, justified prerequisite dependency. Business outcome goals and high-level KPIs do not serve as build/runtime acceptance criteria unless bounded by a concrete, observable system measurement boundary.
+
+<a id="d-traceability-task"></a><a id="d-traceability-dependency-graph-and-parallel-safety"></a>
+
+### D. Traceability, Dependency Graph & Parallel Safety
+
+1. **Compact End-to-End Traceability Matrix:** Existing feature plans and roadmaps (`roadmap.md`, `plan.md`) MUST maintain a compact traceability mapping linking: `Requirement / AC ID` -> `User Story (if applicable)` -> `Task ID` -> `Target File Paths` -> `Dependencies` -> `Verification Command / Expected Outcome` -> `Observed Status / Evidence Reference`. This may be formatted as a concise Markdown table or structured task fields.
+2. **Strict Gap vs. N/A Semantics:** Marking an acceptance criterion as `N/A` is permitted ONLY with an explicit, reasoned rationale demonstrating why it is non-buildable or genuinely out-of-scope. A missing task mapping is a blocking specification gap, never an implicit `N/A`.
+3. **Empty Evidence Before Execution:** Evidence references and status records MUST remain empty or explicitly unexercised until the verification command actually runs. A checked task checkbox (`[x]`) or the existence of a command string does NOT constitute proof of completion.
+4. **Many-to-Many Task Coverage:** A single task may satisfy multiple acceptance criteria; artificial 1-to-1 task proliferation is discouraged.
+5. **Strict Dependency Order & Safe Parallelism:** Foundational setup and infrastructure dependencies must strictly precede dependent user story tasks. Tasks marked for parallel execution (`[P]`) are permitted ONLY when they involve disjoint target file writes AND share no concurrent data mutation or runtime execution dependencies. The orchestrator must reject dependency cycles, missing prerequisites, and shared ownership conflicts before dispatching parallel subagents; independent authorized tasks may proceed concurrently.
+
+<a id="e-requirements-quality-checklist"></a><a id="e-requirements-quality-checklist-and-review-separation"></a>
+
+### E. Requirements-Quality Checklist & Review Separation
+
+1. **Reviewer-Owned Quality Judgment:** The requirements-quality checklist represents independent reviewer judgment regarding prose completeness, clarity, testability, consistency, and verifiability. It is fundamentally distinct from the builder's task execution checklist and runtime acceptance proofs.
+2. **No Extra Files or Schema Modifications:** Quality evaluation adapts existing document quality criteria (Section 2/3 of this specification) and review rubrics without requiring auxiliary checklist files or altering the outer JSON schema.
+3. **Prohibition of Self-Approval:** Implementing builder subagents and authoring agents MUST NOT check off reviewer criteria to approve their own work. Reviewer gates require independent evaluation.
+4. **No Blanket Overrides of Gate Failures:** Known blocking requirement gaps, missing acceptance criteria, or transition gate failures cannot be bypassed by generic user utterances like "proceed", "looks good", or "continue anyway". Legitimate changes in scope require explicit specification updates.
+5. **No Requests to Relax Test Rigor:** Agents MUST NOT ask the user or reviewer to weaken tests, waive proof requirements, or remove acceptance criteria simply to bypass stubborn failures.
+
+<a id="f-prebuild-cross-artifact-analysis"></a><a id="f-prebuild-cross-artifact-analysis-and-readiness-checkpoint"></a>
+
+### F. Prebuild Cross-Artifact Analysis & Readiness Checkpoint
+
+1. **Plan Self-Check vs. Independent Readiness Review:**
+   - **Plan Self-Check:** During `daw-plan`, the planning agent performs an internal readiness self-check ensuring that tasks cover all requirement IDs, dependencies are acyclic, and verification commands are specified.
+   - **Independent Readiness Checkpoint:** Before initiating code-mutating implementation (`daw-build`), the parent orchestrator dispatches an independent, read-only conformity review (`daw-review`) scoped strictly to the current revisions of the specification, architecture, and plan artifacts.
+   - **No Synthetic Route Stages or Recursion:** This readiness check operates as a bounded, parent-orchestrated checkpoint. It does NOT insert a new stage into the canonical routing pipeline, does NOT invoke recursive router calls, and does NOT declare a code audit or completed postbuild review.
+2. **Cross-Artifact Evaluation Scope:** The readiness review compares:
+   - Scope and governance alignment across `prd.md`, `blueprint.md`, and `roadmap.md`.
+   - Contradictions, terminology mismatches, or ambiguities between specs and plan.
+   - Orphan tasks (tasks with no requirement source) and unmapped criteria (requirements with no task).
+   - Dependency ordering and parallel dispatch safety (`[P]` flag safety).
+   - Source freshness (verifying cited files and commit baselines exist and match).
+   - Requirements-quality checklist compliance.
+3. **Structured Finding Format:** Readiness findings MUST be reported in compact Markdown containing:
+   `Finding ID | Severity (blocking / nonblocking) | Location | Consequence | Concrete Repair Action`.
+   If coverage ratios or percentages are cited, the exact numerator, denominator, and excluded items must be stated; fabricated or guessed percentages are strictly prohibited.
+4. **Deterministic Gate Outcomes & Route-Required Postbuild Review Preservation:**
+   - Blocking findings (e.g., missing mandatory criteria, circular dependencies, unsafe parallel writes) halt the workflow as `blocked` until repaired.
+   - Nonblocking advisories are recorded for parent visibility.
+   - The parent orchestrator owns final acceptance of readiness findings.
+   - Route-required postbuild review remains distinct; a prebuild checkpoint cannot satisfy it. For routes that explicitly mandate postbuild review (`feature`, `bugfix`), passing this prebuild readiness checkpoint NEVER replaces or waives postbuild `daw-review`, which audits the actual modified codebase and runtime evidence after implementation. Do NOT insert `daw-review` into routes that do not require it (e.g., `patch` pipeline is `daw-plan` -> `daw-build` -> `daw-verify`). Verification is always performed per the active route.
+5. **Direct Fallback with Evidence Limits:** If an independent subagent reviewer cannot be spawned, the orchestrator performs an honest, direct cross-artifact check in the current session, explicitly documenting the limitation in the handoff evidence.
+
+<a id="g-convergence-change-impact"></a><a id="g-convergence-drift-analysis-and-scoped-invalidation"></a>
+
+### G. Convergence, Drift Analysis & Scoped Invalidation
+
+1. **Three-Way Drift Inspection:** Adoption (`daw-setup`) and verification (`daw-verify`) modules MUST inspect three data sources: (1) actual working tree code, (2) authoritative specification/contract documents, and (3) current observable runtime evidence.
+2. **Four-State Convergence Classification:** Features and requirements must be classified into one of four deterministic states:
+   - `implemented_verified`: Code exists and fresh runtime verification evidence satisfies the acceptance oracle.
+   - `implemented_unverified`: Code exists, but verification has not run, evidence is stale, or tests are missing.
+   - `missing`: Required code, configuration, or tests do not exist in the working tree.
+   - `contradicted`: Existing code or tests directly violate authoritative specification constraints.
+   - (_Blocked items_ lacking dependencies or authorization are tracked as `blocked`).
+3. **Evidence Over Artifact Existence:** The existence of source files, green tests from prior commits, or checked markdown checkboxes does NOT prove convergence. Only fresh, observable runtime execution against the current code revision constitutes proof.
+4. **Parent-Authorized Plan Updates Without Duplication:** When drift is detected, the parent orchestrator authorizes targeted task updates. The planning agent MUST preserve existing task IDs and history, append only genuine uncovered work within accepted scope, and avoid duplicating already pending tasks or repeating identical missing work across iterations. Review and verification modules MUST NOT perform automatic code edits or unprompted scope expansions.
+5. **Scoped Invalidation Mechanics:**
+   - **Code Mutations:** When source code is modified, all affected runtime verification evidence and postbuild reviews are invalidated. Re-verification and review must re-execute proportionally against the updated revision.
+   - **Formal Document Mutations:** When formal, accepted specification documents mutate, they MUST re-enter the existing five-edge document transition gate (`review-rework` $\rightarrow$ `rework-review` $\rightarrow$ `review-ready`). Agents MUST NOT invent a non-existent transition named `rework`.
+   - **Code-Only Changes Do Not Invalidate Docs:** Modifying implementation code does not invalidate accepted specification documents or force specifications back through the document quality transition gate unless the specification itself is altered.
+   - **Targeted Approval Invalidation:** Prior operator approvals are invalidated ONLY when their specific action, target environment, code revision, or operational scope changes—never by blanket, unrelated workspace updates.
+6. **Bounded Repair Cycles:** Repair and review iterations are bounded by existing workflow retry limits (e.g., maximum 3 attempts); unbounded or infinite convergence loops are strictly prohibited.
+
+<a id="h-pause-resume"></a><a id="h-scoped-pauseresume-and-canonical-block-state"></a>
+
+### H. Scoped Pause/Resume & Canonical Block State
+
+1. **Use Existing Canonical Statuses:** Pausing and resuming operations utilize existing canonical handoff and acceptance statuses (`blocked`, `in_progress`, `ready`, `completed`, `failed`). Do not create synthetic or ad-hoc status strings.
+2. **Canonical Block on Missing Information:** When execution cannot proceed due to missing material decisions, unanswered human clarifications, failed preflight checks, or ungranted high-risk approvals, the affected node MUST halt with canonical status `blocked`.
+3. **Structured Pause Record in Handoff & Acceptance:** The pausing agent or parent orchestrator MUST record the halt in the existing authorized record (parent acceptance record or module handoff details):
+   - `blocked_reason`: Specific cause of the block.
+   - `responsible_party`: Human operator, architect, or external dependency owner.
+   - `pending_question_or_decision`: Exact question or prerequisite needed.
+   - `next_permitted_action`: Concrete action permitted upon unblocking.
+   - `current_revisions`: Pinned commit hash or file hashes of current artifacts.
+   - `pending_dependencies`: Outstanding tasks or prerequisites.
+   - `verified_evidence`: Evidence collected prior to the pause.
+4. **Non-Interactive Execution Rules:** In non-interactive or automated environments, the absence of an immediate human answer MUST NOT be treated as tacit approval. The workflow halts as `blocked`.
+5. **Pre-Dispatch Revalidation on Resume:** When a paused workflow is resumed, the orchestrator MUST re-evaluate the execution context before dispatching tasks:
+   - Verify that the blocking condition is resolved.
+   - Re-check that target revisions, scope boundaries, and preflight prerequisites remain valid.
+   - Verify that required human approvals have been explicitly granted at the point of risk.
+6. **No Phantom Daemon Guarantees:** Agents must not promise persistent background monitoring, automated process wake-ups, or daemon supervisors unless the host harness natively provides and demonstrates them.
+
+<a id="i-integration"></a><a id="i-local-toolchain-integration-and-reusable-verification"></a>
+
+### I. Local Toolchain Integration & Reusable Verification
+
+1. **Reuse Existing Local Tooling & Conventions:** Execution and verification MUST reuse the project's native build systems, test suites, linter configurations, issue templates, and discovered CLI commands (e.g., `npm test`, `pytest`, `cargo test`, `make`). No external skill package, framework, or proprietary toolchain is required.
+2. **Execution and Inspection Mandatory:** Merely formatting, echoing, or printing a verification command or hook is NOT execution. Verification requires executing the actual command, inspecting exit codes, capturing stdout/stderr, and verifying persistent state side effects on disk or environment.
+3. **Local Overrides Cannot Weaken Core Gates:** Local project conventions, custom scripts, or template overrides MAY specialize execution details, but MUST NOT weaken or bypass canonical safety invariants, preflight checks, fail-closed risk gating, or semantic verification rules.
+4. **No Autonomous External Mutations:** Creating external GitHub issues, pushing Git branches, opening pull requests, or triggering remote deployments requires explicit human authorization. Agents MUST NOT perform automated external mutations autonomously.
+5. **Documented Adaptation & Intentional Exclusions:** When adopting upstream workflows (such as Spec Kit patterns), documentation must explicitly map adopted mechanisms and record intentional exclusions (e.g., not adopting upstream tests-optional default or generic checklist bypass; preserving DAW behavioral proof gates and rejecting persistent background daemons) with pinned source citations, without claiming universal perfection.

@@ -176,7 +176,7 @@ When work in an isolated worktree is finished:
 
 ## 5. Output Contract
 
-Every completion of `daw-workspace` delivers a structured handoff payload adhering to the canonical suite envelope. Rich workspace state, branch configuration, and resource risks are preserved under `details`:
+Every completion of `daw-workspace` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, or an explicit inline fallback). Direct-user responses default to concise natural language. Rich workspace state, branch configuration, and resource risks are preserved under `details`:
 
 ```json
 {

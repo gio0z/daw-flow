@@ -26,11 +26,17 @@ Invoke `daw-verify` when:
 - Pre-handoff verification is required before opening a PR, delivering to user, or marking a milestone complete.
 - A regression sweep is needed across affected packages, CLI endpoints, or API surfaces.
 - Fresh failure evidence must be captured before/after a fix.
+- Conducting convergence assessment and change impact verification against actual codebase, authoritative specifications, and latest runtime execution evidence.
 
 Do NOT invoke `daw-verify` for:
 
+- Writing implementation code, editing application source, or fixing failing tests directly (the verifier identifies missing, unverified, or contradicted behavior and returns evidence to the parent orchestrator; verifiers NEVER implement code).
+- Claiming mock runs, dry-runs, or existing unverified source files as empirical passes.
+- Relaxing test assertions, suppressing error codes, or deleting tests to manufacture a pass.
+- Overriding failing tests or blocking verification criteria with generic user "proceed" instructions.
 - Workspace branching/worktree management (use `daw-workspace`).
-- Code review without runtime execution (use `daw-review`).
+- Code review or structural coupling analysis without runtime execution (use `daw-review` or `daw-untangle`).
+- Substituting structural analysis or static review passes for empirical runtime verification (structural analysis establishes boundary hypotheses; runtime behavior requires deterministic execution).
 - Architectural design or document drafting (use `daw-design` or `daw-plan`).
 
 ---
@@ -54,7 +60,16 @@ Do NOT invoke `daw-verify` for:
    - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
    - Before running test commands with potential side-effects, ensure preflight risk rules from `../../references/operations.md` are evaluated.
    - Verification uses read-only tests and non-destructive probes. High-risk live testing, load tests, or external service calls require interactive approval per operations.md §2; halt with `status: "blocked"` if unapproved. Local unit/integration suites require no production credentials.
+   - **Feature Delivery Contract Alignment (§G):** Verification follows the canonical convergence and change impact rules in [Feature Delivery Contract §G](../../references/document-quality.md#feature-delivery-contract). Verification inspects actual code + authoritative contracts and current evidence; source existence, passing old tests, or task checkboxes (`[x]`) are NEVER completion proof alone.
+   - **Distinguishing Formal Document Rework Edges from Code-Only Evidence Invalidation:**
+     - **Formal Document Rework:** Authoritative document mutations require the formal five-edge document transition gate (`review-rework` -> `rework-review` via `python3 scripts/validate.py docs`).
+     - **Code-Only Evidence Invalidation:** Any modification to source code, environment, or configuration invalidates prior runtime execution evidence and test passes for affected paths. Verification must execute fresh deterministic commands against current revisions without modifying or rerunning formal document transitions unless specifications changed.
    - For worker graphs, verify actual behavior on the current artifact revision and require accepted current evidence from every mandatory dependency. Retained conversation, worker exit, or an earlier revision's pass is not proof. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). Expected negative tool exits (e.g. exit code 2 on invalid arguments) count as valid passing evidence rather than worker transport failures. Final workflow completion requires all required stages/criteria accepted; a successful verify stage cannot complete the workflow if another required stage remains pending. The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); worker claims are untrusted observations. Small tasks track decisions inline. Prior evidence is invalidated upon relevant changes to criteria, scope, or environment.
+   - **Structural vs. Runtime Evidence Distinction & Parent Checkpoint Disposition:**
+     - Structural analysis or code review (from `daw-review` or `daw-untangle`) evaluates static design, boundary conformity, and coupling characteristics, NEVER empirical proof of runtime behavior or end-to-end execution. `daw-verify` establishes runtime truth exclusively through deterministic command execution, test suites, CLI/API/UI probes, and observed outputs.
+     - `daw-verify` evaluates the parent's checkpoint disposition across prerequisite stages for the current artifact revision without pretending that structural analysis proves runtime behavior.
+     - Code modifications dispatched for structural corrections or review findings invalidate prior runtime evidence for affected artifacts, requiring fresh verification runs against current code.
+     - A pass in structural review does not substitute for runtime verification, nor does runtime verification waive the parent-owned prefinal coupling check per [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint).
 
 ---
 
@@ -133,11 +148,27 @@ Categorize every item in the verification matrix into one of four states:
 3. **Blocked:** Check could not run due to missing environment, absent credentials, or uninstalled dependencies.
 4. **Unexercised:** Check was skipped, omitted, or only simulated via mock. Unexercised or blocked checks cannot become an accepted pass, and any unexercised required criterion prevents parent stage acceptance.
 
+### Step 4: Convergence & Change Impact Assessment (§G)
+
+Inspect the actual codebase and latest runtime evidence against authoritative contracts to classify all requirements and acceptance criteria into five canonical convergence categories per [Feature Delivery Contract §G](../../references/document-quality.md#feature-delivery-contract):
+
+1. **`implemented_verified`**: Behavior is present in current code AND verified with fresh observable runtime evidence.
+2. **`implemented_unverified`**: Code exists on disk, but lacks fresh runtime execution evidence (or is only covered by mocks/dry-run/stale runs).
+3. **`missing`**: Required behavior, acceptance criterion, or error handling is absent from current code.
+4. **`contradicts`**: Code implements behavior that directly conflicts with the specification, invariant, or security boundary.
+5. **`blocked`**: Check cannot run due to missing environment, credentials, or dependency.
+
+**Verification Invariants:**
+
+- **Verification Non-Implementation Rule:** Verifiers discover and report truth; they NEVER write implementation code, patch bugs, or auto-edit plans. All findings return to the parent orchestrator to route to `daw-build` or `daw-plan`.
+- **Metrics Coverage Denominator Rule:** Denominator includes all buildable requirements and acceptance criteria in scope. Exclude ONLY justified non-buildable/out-of-scope criteria (such as post-launch business KPIs) with explicit written justification. Unresolved gaps or unmapped criteria are NEVER silently excluded from the denominator.
+- **Zero Relaxation of Tests or Proofs:** Never suppress test failures, comment out tests, or weaken assertions to manufacture a passing grade. Generic user "proceed" instructions cannot override failing tests or blocking verification criteria.
+
 ---
 
 ## 5. Output Contract
 
-Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable as complete JSON BEFORE concluding the workflow. When running sequentially in a single agent session, display this complete JSON envelope. Rich verification checks, latest CLI runtime evidence (commands, exit codes, observed output snippets), regression counts, and diagnostic observations are preserved under `evidence` and `details`:
+Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable as complete JSON BEFORE concluding the workflow or advancing stages per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized workflow artifact, or an explicit inline fallback). Direct-user responses default to concise natural language. Rich verification checks, latest CLI runtime evidence (commands, exit codes, observed output snippets), regression counts, and diagnostic observations are preserved under `evidence` and `details`:
 
 - **Mandatory Runtime Evidence:** `details.checks` MUST include actual executed commands, expected exit codes, observed exit codes, and observed output snippets. Fabricated, dry-run, or mock evidence is prohibited.
 
@@ -200,6 +231,21 @@ Every completion of `daw-verify` delivers a structured handoff payload adhering 
       "passed": 42,
       "failed": 0,
       "skipped": 0
+    },
+    "convergence": {
+      "implemented_verified": ["AC-01", "AC-02"],
+      "implemented_unverified": [],
+      "missing": [],
+      "contradicted": [],
+      "blocked": []
+    },
+    "coverage": {
+      "total_scoped_criteria": 2,
+      "justified_exclusions": 0,
+      "denominator": 2,
+      "verified_criteria": 2,
+      "unverified_gaps": 0,
+      "coverage_ratio": "2/2"
     },
     "limitations": []
   }

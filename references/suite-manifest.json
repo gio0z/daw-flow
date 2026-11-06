@@ -41,6 +41,10 @@
     "daw-wizard": {
       "path": "skills/daw-wizard/SKILL.md",
       "description": "Interactive greenfield requirements interview, architecture scoping & specification generation"
+    },
+    "daw-untangle": {
+      "path": "skills/daw-untangle/SKILL.md",
+      "description": "Read-only structural analysis, change coupling & boundary investigation"
     }
   },
   "routes": {
@@ -93,6 +97,12 @@
       "documentation_only": false,
       "read_only": true,
       "stages": ["daw-review"],
+      "evaluates_workspace": false
+    },
+    "untangle": {
+      "documentation_only": false,
+      "read_only": true,
+      "stages": ["daw-untangle"],
       "evaluates_workspace": false
     },
     "ask": {

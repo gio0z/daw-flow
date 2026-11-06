@@ -23,7 +23,7 @@ MAX_INPUT_BYTES = 1024 * 1024  # 1 MiB bounded input limit
 MAX_MODULE_BYTES = 256 * 1024  # 256 KiB bounded module read limit
 
 VALID_ENUMS: dict[str, frozenset[str]] = {
-    "intent": frozenset({"bootstrap", "adopt", "feature", "bugfix", "patch", "review", "ask", "setup"}),
+    "intent": frozenset({"bootstrap", "adopt", "feature", "bugfix", "patch", "review", "untangle", "ask", "setup"}),
     "requirements": frozenset({"clear", "unclear", "unknown"}),
     "risk": frozenset({"low", "high", "unknown"}),
     "workspace": frozenset({"in-place", "isolated", "unknown"}),
@@ -42,6 +42,7 @@ MANIFEST_MODULE_KEYS = frozenset({
     "daw-ask",
     "daw-setup",
     "daw-wizard",
+    "daw-untangle",
 })
 
 # Invariant stage definitions per intent (v1 fixed canonical policy)
@@ -55,6 +56,7 @@ CANONICAL_ROUTE_STAGES: dict[str, Any] = {
     "bugfix": ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-verify"],
     "patch": ["daw-build", "daw-verify"],
     "review": ["daw-review"],
+    "untangle": ["daw-untangle"],
     "ask": ["daw-ask"],
     "setup": ["daw-setup"],
 }
@@ -189,7 +191,7 @@ def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) 
 
 
 def _validate_module_entries(modules: Any) -> list[dict[str, str]]:
-    """Validate manifest modules object and all 10 entries."""
+    """Validate manifest modules object and all 11 entries."""
     findings: list[dict[str, str]] = []
     if not isinstance(modules, dict):
         return [{"code": "MANIFEST_INVALID_MODULES", "message": "Manifest modules must be a JSON object."}]
@@ -256,7 +258,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
 
         # Invariant checks for flags
         expected_doc = (r_name in ("bootstrap", "adopt", "setup"))
-        expected_ro = (r_name in ("review", "ask"))
+        expected_ro = (r_name in ("review", "untangle", "ask"))
         expected_ws = (r_name in ("feature", "bugfix", "patch"))
 
         if r_def.get("documentation_only") is not expected_doc:
@@ -332,7 +334,7 @@ def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[
 
 
 def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[dict[str, str]]:
-    """Verify that all 10 canonical modules exist on disk within root."""
+    """Verify that all 11 canonical modules exist on disk within root."""
     findings: list[dict[str, str]] = []
     modules = manifest.get("modules", {})
     for mod_name in sorted(MANIFEST_MODULE_KEYS):
@@ -345,7 +347,7 @@ def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[di
 
 
 def check_suite(root: pathlib.Path | str | None = None) -> list[dict[str, str]]:
-    """Validate suite manifest and verify all 10 canonical modules on disk within root."""
+    """Validate suite manifest and verify all 11 canonical modules on disk within root."""
     resolved_root = find_suite_root(root)
     manifest, findings = load_manifest(resolved_root)
     if findings:
@@ -473,7 +475,7 @@ def resolve_route(
             interactive_approval_required=interactive_approval_required,
         )
 
-    # All 10 core suite modules must exist on disk
+    # All 11 core suite modules must exist on disk
     module_findings = check_suite_modules(resolved_root, manifest)
     if module_findings:
         return create_response(

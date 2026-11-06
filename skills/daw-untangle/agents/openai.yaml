@@ -1,0 +1,4 @@
+interface:
+  display_name: "DAW Untangle"
+  short_description: "Analyze code coupling, hidden dependencies, and architectural seams"
+  default_prompt: "Use $daw-untangle to perform a read-only change-coupling analysis on the specified files or module."

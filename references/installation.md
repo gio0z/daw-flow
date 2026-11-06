@@ -1,6 +1,6 @@
 # Installation and Agent Compatibility
 
-DAW is distributed as one complete root skill with ten bundled modules. Install from a complete checkout or extracted release using Python 3.10+. The installer uses only the standard library and performs no network access.
+DAW is distributed as one complete root skill with eleven bundled modules. Install from a complete checkout or extracted release using Python 3.10+. The installer uses only the standard library and performs no network access.
 
 ## Install
 
@@ -34,10 +34,10 @@ skills/
 │   ├── templates/
 │   └── skills/daw-build/SKILL.md
 ├── daw-build -> deterministic-agentic-workflow/skills/daw-build
-└── ... nine other module aliases
+└── ... ten other module aliases
 ```
 
-The copy survives removal of the original checkout. All ten modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
+The copy survives removal of the original checkout. All eleven modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
 
 ## Client locations
 
@@ -83,10 +83,10 @@ Updates read the checkout that contains the invoked installer. Refresh that chec
 
 ### Migration from historical releases
 
-Installations created with historical module sets (such as the 8-module release) are supported for status inspection, updates, and removal:
+Installations created with historical module sets (such as the 8-module or 10-module releases) are supported for status inspection, updates, and removal:
 
 - `status`: validates the installed bundle against historical known alias subsets without requiring manual receipt changes.
-- `install --update`: stages the full 10-module bundle, verifies existing alias symlinks and file inventory, creates symlinks for newly introduced modules (`daw-setup` and `daw-wizard`), and writes an updated receipt containing all canonical modules. Existing collisions with newly added module names abort the update to preserve foreign skills.
+- `install --update`: stages the full 11-module bundle, verifies existing alias symlinks and file inventory, creates symlinks for newly introduced modules (`daw-untangle`, alongside previously introduced `daw-setup` and `daw-wizard`), and writes an updated receipt containing all canonical modules. Existing collisions with newly added module names abort the update to preserve foreign skills.
 - `uninstall`: cleanly removes historical installations by unlinking only the aliases recorded in the previous receipt and removing the suite bundle.
 
 `--dry-run` inspects the source and destination without creating files or directories. An actual update stages and validates the new bundle before replacement. The installer records file hashes and alias ownership in `.daw-install.json` inside its installed bundle. Updated, added, or missing installed files and changed aliases block both replacement and removal. Preserve your edits outside the installation and resolve the discrepancy before retrying; there is no force-overwrite option. Unrelated skills are left untouched.

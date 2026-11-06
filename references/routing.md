@@ -9,25 +9,26 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 ## 1. Intent Precedence & Routing Hierarchy
 
-Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 8 finite intents:
+Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 9 finite intents:
 
 | Precedence | Intent      | Classification Criteria                                                                                 | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
 | :--------: | :---------- | :------------------------------------------------------------------------------------------------------ | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   **1**    | `review`    | Diff review, security posture audit, boundary compliance check.                                         |    Yes    |    No    | `daw-review`                                                                                                                                           |
-|   **2**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                                          |    Yes    |    No    | `daw-ask`                                                                                                                                              |
-|   **3**    | `setup`     | Interactive configuration setup, tool command discovery, and repo convention block authoring.           |    No     |   Yes    | `daw-setup`                                                                                                                                            |
-|   **4**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                            |    No     |   Yes    | `daw-wizard` -> `daw-design` -> `daw-plan`                                                                                                             |
-|   **5**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                                 |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                             |
-|   **6**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, and regression test.                                      |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
-|   **7**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes (requires `requirements: "clear"`). |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
-|   **8**    | `feature`   | New capability or functional evolution requiring plan, build, review, and verification.                 |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
+|   **2**    | `untangle`  | Explicit read-only structural analysis, coupling/cohesion assessment, modular boundary investigation.   |    Yes    |    No    | `daw-untangle`                                                                                                                                         |
+|   **3**    | `ask`       | Conversational architecture guidance, Q&A, trade-off analysis.                                          |    Yes    |    No    | `daw-ask`                                                                                                                                              |
+|   **4**    | `setup`     | Interactive configuration setup, tool command discovery, and repo convention block authoring.           |    No     |   Yes    | `daw-setup`                                                                                                                                            |
+|   **5**    | `bootstrap` | Greenfield specification generation from a product brief in empty directory.                            |    No     |   Yes    | `daw-wizard` -> `daw-design` -> `daw-plan`                                                                                                             |
+|   **6**    | `adopt`     | Reverse-engineering existing codebase to author missing specifications.                                 |    No     |   Yes    | `daw-design` -> `daw-plan`                                                                                                                             |
+|   **7**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, security review, regression verification.                 |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
+|   **8**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes (requires `requirements: "clear"`). |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
+|   **9**    | `feature`   | New capability or functional evolution requiring plan, implementation, review, verification.            |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
+
+### Precedence Rules & Invariants
 
 - When user intent is evaluation, code audit, or PR review, `review` takes precedence.
+- When user intent is explicit structural analysis, coupling investigation, modular boundary assessment, or change-coupling inspection, `untangle` takes precedence. Strictly read-only; ignores unknown risk or workspace preferences; no `daw-workspace`, approval execution, or mutation. Dispatches to `daw-untangle`. (Note: refactoring implementation requests themselves are NOT silently routed to untangle; mutating refactoring uses standard feature/patch routes after scope is accepted. Untangle is an explicit bounded investigation, never an extra mandatory stage on all requests or an unsolicited whole-codebase cleanup mandate). Governed by [references/change-coupling.md](change-coupling.md).
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
-- Read-only user intent always wins: `review` and `ask` ignore risk and workspace preferences and never mutate code or specifications.
-- **Read-Only `daw-ask` vs. Authorized `daw-design` Docs Handoff:** `daw-ask` is strictly read-only. It answers queries, explores trade-offs, and inspects the decision frontier, but it **never** writes or modifies workspace documents or specs. When conversational guidance reveals that new or modified specification documents are required, the workflow transitions to an explicitly authorized `daw-design` stage (e.g., under `bootstrap`, `adopt`, or `feature` intents). Direct questions and small settled changes do not trigger the structured grilling ceremony.
-
-### Workspace Isolation & Preflight Invariants
+- Read-only user intent always wins: `review`, `untangle`, and `ask` ignore risk and workspace preferences and never mutate code or specifications.
 
 If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfix`, `patch`, `feature`):
 
@@ -41,7 +42,7 @@ If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfi
 
 ## 2. Declarative Suite Manifest Policy & Route Engine
 
-Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 8 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades.
+Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 9 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades (schema enum additions remain additive within schema_version: 1).
 
 ### Strict Envelope Parsing & Limits
 
@@ -55,6 +56,7 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 | :------------------ | :------------------------------------------------------------------------ | :------------------------------------------------------------------------------------- |
 | `ask`               | `daw-ask`                                                                 | Read-only; ignores risk and workspace.                                                 |
 | `review`            | `daw-review`                                                              | Read-only; ignores risk and workspace.                                                 |
+| `untangle`          | `daw-untangle`                                                            | Read-only; ignores risk and workspace. Strictly non-mutating structural analysis.      |
 | `setup`             | `daw-setup`                                                               | Documentation-only; allows unclear requirements.                                       |
 | `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                | Documentation-only; allows unclear requirements.                                       |
 | `adopt`             | `daw-design` -> `daw-plan`                                                | Documentation-only; preserves user code.                                               |
@@ -211,8 +213,21 @@ All authored documentation must satisfy the quality criteria defined in the cano
 - **Deterministic Transition Gate (`scripts/validate.py docs`):** Documents advance through an explicit 5-edge state machine (`intake-authoring` -> `authoring-review` -> `review-ready` / `review-rework` -> `rework-review`).
 - **Parent-Owned Scope & State:** The parent orchestrator specifies the exact selected document target set via `--documents` (normalized set equality; no mandatory 13-doc requirement) and persists actual workflow state. The validator is a stateless, read-only CLI check.
 - **Evidence Grounding:** Authoring and review transitions require exact line-range quotes and SHA-256 digests matching UTF-8 source files in `--project-root`.
-- **Mutation Invalidation:** Review verdicts (`review-ready`) are pinned to exact document and source file hashes. Any modification of a document or source file invalidates prior eligibility, requiring explicit re-entry via `rework`.
+- **Mutation Invalidation:** Review verdicts (`review-ready`) are pinned to exact document and source file hashes. Any modification of an accepted formal document invalidates prior eligibility, requiring explicit re-entry through the existing five-edge gate (`review-rework` -> `rework-review` -> `review-ready`). Code-only changes invalidate affected runtime verification and postbuild reviews without forcing unchanged documents through doc quality gates. Approvals are invalidated only when their action, target, revision, or scope changes.
 - **Explicit Command Gates:** The validator is invoked explicitly at workflow transition boundaries; it does not install background daemons, supervisors, or runtime pre-tool hooks.
+
+#### 9. Feature Delivery Contract & Routing Integration
+
+The lifecycle of feature delivery within DAW routes integrates the procedural requirements of [Feature Delivery Contract](document-quality.md#feature-delivery-contract):
+
+1. **Artifact & Revision Selection:** Routing evaluates actual repository files and current commit/file revisions before dispatching stages. Pre-existing specifications and plans (`prd.md`, `roadmap.md`) satisfy matrix requirements; no synthetic filenames are mandated.
+2. **Prebuild Readiness Checkpoint vs. Postbuild Review:**
+   - _Prebuild Readiness Checkpoint:_ For feature/spec-dependent builds, the parent orchestrator dispatches read-only `daw-review` scoped strictly to current specification and plan revisions before `daw-build`. This evaluates cross-artifact consistency, orphan tasks, unmapped criteria, and parallel execution safety (`[P]` flag safety) without inserting synthetic stages into the manifest and without module recursion.
+   - _Plan Self-Check:_ Planning (`daw-plan`) performs its own internal check for requirement coverage and acyclic dependencies before handoff.
+   - _Route-Required Postbuild Review:_ For routes that explicitly include postbuild review (`feature`, `bugfix`), postbuild `daw-review` audits modified code, diffs, and fresh runtime evidence; a prebuild checkpoint cannot satisfy it. Do not insert `daw-review` into routes that do not require it (such as `patch`, which runs `daw-plan` -> `daw-build` -> `daw-verify`). Verification always runs per the active route pipeline.
+3. **Scoped Pause/Resume with Canonical Statuses:** Execution halts use canonical handoff and acceptance statuses (`blocked`, `in_progress`, `ready`, `completed`, `failed`). When blocked on missing material decisions or ungranted approvals, the affected node halts as `blocked` and records reason, responsible party, question, next permitted action, revisions, and evidence in parent acceptance or handoff details. Resuming revalidates prerequisites, scope, and approvals.
+4. **Governance & Template Override Scope Guard:** Discovered local scripts, commands, and template overrides cannot weaken core safety gates or acceptance criteria. No feature implementation during governance-only edits.
+5. **Authorized Command Execution:** Verification commands must actually execute and be inspected empirically; echoing commands or checked task boxes do not constitute proof.
 
 ---
 
@@ -446,7 +461,7 @@ All authored documentation must satisfy the quality criteria defined in the cano
    - Never expand project scope based solely on generic suggestions in specialist skill files.
 2. **No Recursive Routing & Progressive Disclosure of Supporting Resources:**
    - Under no circumstances may an agent reading `routing.md` invoke `deterministic-agentic-workflow` as a child task. Routing is a top-level deterministic mapping, executed once per planning stage.
-   - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 10 public execution modules (`skills/daw-*/`). Supporting resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
+   - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 11 public execution modules (`skills/daw-*/`). Supporting resources (`references/change-coupling.md`, `references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
    - Supporting references grant no new execution permissions or tools, and loading them does not spawn background workers.
    - **Targeted Reference Lookups:** When consulting reference manuals (`routing.md`, `operations.md`), agents MUST use progressive disclosure—querying or reading ONLY the specific section heading or line range needed rather than ingesting entire multi-thousand-line references upfront.
    - Parent agents retain full control over delegation. If an independent assessment of builder-readiness is warranted, the parent delegates to the existing `daw-review` module rather than recursively re-dispatching design or creating ad-hoc wrapper skills.
@@ -456,13 +471,13 @@ All authored documentation must satisfy the quality criteria defined in the cano
 
 ## 5. Canonical Module Handoff Contract
 
-This section defines the canonical output envelope produced by all 10 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`).
+This section defines the canonical output envelope produced by all 11 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`).
 
 > **Contract Scope Note:** This schema defines the **runtime module handoff contract** returned across module completion stages. It is distinct from the top-level route decision payload emitted by `scripts/route.py` and the task verification envelope checked by `scripts/validate.py`.
 
 ### Canonical Handoff Schema
 
-> **Observable Transition Checkpoint Invariant:** Canonical output handoffs MUST be emitted and observable as complete JSON envelopes BEFORE advancing to the next stage, not deferred to final retrospective prose. In a single session executing stages sequentially, the agent MUST display the checkpoint handoff envelope at the end of each stage before loading or executing the next stage. If subagent tools or external delegators are unavailable, execute directly via honest direct fallback in the current session.
+> **Observable Transition Checkpoint Invariant:** Canonical output handoffs MUST be delivered and observable as complete JSON envelopes BEFORE advancing to the next stage, not deferred to final retrospective prose or remembered only in thoughts. Full actual JSON MUST be delivered and inspectable by the parent orchestrator via the preferred transport mechanism (or an explicit inline fallback checkpoint if no structured transport exists; see [User-Facing Reports & Handoff Transport](#user-facing-reports--handoff-transport)). The agent MUST NOT unconditionally dump full raw JSON into normal user-facing chat output unless explicitly requested. If subagent tools or external delegators are unavailable, execute directly via honest direct fallback in the current session.
 
 Every execution module returns a JSON object adhering to this structure:
 
@@ -527,6 +542,56 @@ Every execution module returns a JSON object adhering to this structure:
 
 8. **`details` (object, required):**
    - Module-specific domain payload (e.g. diagnostics, test summaries, review findings, workspace branches). Details preserve rich information defined by the current active module's output contract (such as `tasks` with `target_files` and `verification_command` in `daw-plan`, separate `stage_1_conformity` and `stage_2_technical_audit` in `daw-review`, and `checks` with runtime evidence in `daw-verify`), but remain subordinate to the outer `status`.
+
+### User-Facing Reports & Handoff Transport
+
+This section defines the canonical governance rules separating internal machine-readable handoffs from user-facing presentations across the DAW suite.
+
+#### 1. Separation of Concerns & Internal Handoff Rigor
+
+- **Internal Canonical Integrity:** Canonical output handoffs require the complete JSON envelope defined in [Canonical Handoff Schema](#canonical-handoff-schema). All outer fields (`objective`, `input_paths`, `output_paths`, `acceptance_criteria`, `evidence`, `status`, `handoff_to`, `details`) remain mandatory. The full actual JSON MUST be delivered and inspectable by the parent orchestrator before any downstream stage transition, not deferred to a final summary or remembered only in internal model thoughts.
+- **User-Facing Separation:** Internal JSON handoffs are intended for deterministic workflow orchestration and parent acceptance. They MUST NOT be unconditionally dumped into conversational replies to human users.
+
+#### 2. Transport Hierarchy & Preference Order
+
+When executing module handoffs across stages, workers, or subagents, agents MUST adhere to this explicit transport preference hierarchy:
+
+1. **Primary Transport (Preferred): Actual Module / Tool / Subagent Return:**
+   - Deliver the canonical JSON envelope via the structured return value of the execution tool, subagent yield mechanism, or explicit harness-native message/checkpoint channel. The parent orchestrator inspects the structured return directly.
+2. **Secondary Transport: Authorized Workflow Artifact:**
+   - When authorized by the workflow or task contract, the canonical JSON handoff may be written to an explicitly designated artifact file on disk.
+   - The exact artifact reference MUST be supplied in the completion notification and its content inspected by the parent orchestrator before transition.
+   - _Strict Authorization & Read-Only Safety:_ Fabricated hidden channels are prohibited. There is NO implicit authorization to create disk files. Read-only modules (`daw-ask`, `daw-review`, `daw-untangle`, diagnostic audits) are strictly prohibited from writing unrequested transport files to disk and must use structured tool returns or inline fallbacks.
+3. **Fallback Transport: Clearly Labeled Inline JSON Fallback Checkpoint:**
+   - When no real non-chat transport exists and no authorized artifact is available (such as direct execution in a single chat session without subagent return structures), the agent MUST emit a complete, clearly labeled inline JSON checkpoint in the transcript BEFORE proceeding to downstream execution.
+   - This checkpoint MUST be explicitly identified as an internal fallback checkpoint for observability (e.g. `### Internal Handoff Checkpoint (Observable Fallback)`), distinct from the user report. A natural-language summary NEVER replaces the required canonical handoff envelope.
+
+#### 3. Default User-Facing Reports Contract
+
+Default user-facing responses from orchestrators or directly invoked modules MUST be concise natural language in the user's language, structured into these four bounded parts:
+
+1. **Result & Artifacts:** High-level summary of the stage outcome and relevant created/modified artifact paths.
+2. **Exercised Verification & Limits:** Checks and tests actually exercised, observed empirical outcomes, and tool/session limits. Prior evidence or transcripts provided to the agent MUST be labeled as provided/retained, never rerun or claimed as fresh executions. Preserve reported transition names and outcomes (e.g., "review-ready eligible") exactly as supplied without relabeling them as earlier or later workflow states or certifying semantics.
+3. **Unresolved Decisions & Scope:** Any pending ambiguities, open decisions, or blocked criteria, explicitly identifying their affected scope and whether they are blocking or non-blocking.
+4. **Next Concrete Action:** Exactly one unambiguous, actionable next step.
+
+_User-Facing Presentation Constraints:_
+
+- Normal final replies MUST NOT duplicate the full JSON envelope or lengthy raw command logs.
+- **Explicit Format Request Exception:** If the user explicitly requests JSON, machine-readable output, or exact CLI output (or when the module is invoked under an exact CLI output contract), preserve the requested format and CLI output contracts unchanged.
+- When an inline JSON fallback checkpoint is required for observability under Fallback Transport, it must be clearly labeled as a fallback checkpoint and separated from the concise natural-language user report.
+
+#### 4. Discrete State & Scope Distinctions
+
+Agents and parent orchestrators MUST maintain clear semantic distinctions between five separate lifecycle states:
+
+1. **Stage Pass:** The worker or module self-reports that its stage-specific criteria were satisfied (`status: "pass"`).
+2. **Gate Eligibility:** Preflight, dependency joins, and prerequisite criteria are satisfied to enter an evaluation gate.
+3. **Parent Acceptance:** The parent orchestrator independently inspects primary observable evidence against expected outcomes and accepts the stage (`accepted`).
+4. **Workflow Completion:** All required route criteria are accepted, and zero required downstream, review, or verification tasks remain pending or blocked.
+5. **Application / Runtime Readiness:** The system is compiled, packaged, deployed, or actively operating in its target runtime environment.
+
+_Inference Guardrail:_ Structural documentation gates (such as completing specification drafts) do NOT imply semantic or business correctness, and do NOT certify global application or runtime readiness. Unresolved decisions or local failures block only their affected work scope, not automatically the entire project. When certainty cannot be established from empirical facts, report uncertainty truthfully rather than inventing blocker classifications.
 
 ## 6. Direct Module Invocation & Governance Loader Sequence
 

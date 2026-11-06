@@ -99,7 +99,7 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 
 ## 4. Output Contract
 
-Every completion of `daw-debug` delivers a structured handoff payload adhering to the canonical suite envelope. Rich diagnostic findings, hypothesis ledger, and root-cause analysis are preserved under `details`:
+Every completion of `daw-debug` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, authorized artifact, or an explicit inline checkpoint fallback). Direct-user responses default to concise natural language. Rich diagnostic findings, hypothesis ledger, and root-cause analysis are preserved under `details`:
 
 ```json
 {

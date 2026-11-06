@@ -80,7 +80,7 @@ def source_entries() -> list[Path]:
     return entries
 
 
-HISTORICAL_MODULES = frozenset({
+HISTORICAL_8_MODULES = frozenset({
     "daw-design",
     "daw-plan",
     "daw-debug",
@@ -90,7 +90,7 @@ HISTORICAL_MODULES = frozenset({
     "daw-workspace",
     "daw-ask",
 })
-HISTORICAL_ROUTES = {
+HISTORICAL_8_ROUTES = {
     "bootstrap": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
     "adopt": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
     "feature": {"documentation_only": False, "read_only": False, "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"], "stages_unclear": ["daw-design", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
@@ -99,6 +99,37 @@ HISTORICAL_ROUTES = {
     "review": {"documentation_only": False, "read_only": True, "stages": ["daw-review"], "evaluates_workspace": False},
     "ask": {"documentation_only": False, "read_only": True, "stages": ["daw-ask"], "evaluates_workspace": False},
 }
+
+HISTORICAL_10_MODULES = frozenset({
+    "daw-design",
+    "daw-plan",
+    "daw-debug",
+    "daw-build",
+    "daw-review",
+    "daw-verify",
+    "daw-workspace",
+    "daw-ask",
+    "daw-setup",
+    "daw-wizard",
+})
+HISTORICAL_10_ROUTES = {
+    "bootstrap": {"documentation_only": True, "read_only": False, "stages": ["daw-wizard", "daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "adopt": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "feature": {"documentation_only": False, "read_only": False, "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"], "stages_unclear": ["daw-design", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "bugfix": {"documentation_only": False, "read_only": False, "stages": ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "patch": {"documentation_only": False, "read_only": False, "stages": ["daw-build", "daw-verify"], "evaluates_workspace": True},
+    "review": {"documentation_only": False, "read_only": True, "stages": ["daw-review"], "evaluates_workspace": False},
+    "ask": {"documentation_only": False, "read_only": True, "stages": ["daw-ask"], "evaluates_workspace": False},
+    "setup": {"documentation_only": True, "read_only": False, "stages": ["daw-setup"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+}
+
+HISTORICAL_MODULES = HISTORICAL_8_MODULES
+HISTORICAL_ROUTES = HISTORICAL_8_ROUTES
+
+HISTORICAL_PROFILES = (
+    (HISTORICAL_8_MODULES, HISTORICAL_8_ROUTES),
+    (HISTORICAL_10_MODULES, HISTORICAL_10_ROUTES),
+)
 
 
 def is_valid_historical_suite(root: Path) -> bool:
@@ -112,8 +143,22 @@ def is_valid_historical_suite(root: Path) -> bool:
     if not isinstance(data, dict) or data.get("schema_version") != 1 or data.get("suite") != SUITE:
         return False
     modules = data.get("modules")
-    if not isinstance(modules, dict) or set(modules.keys()) != HISTORICAL_MODULES:
+    if not isinstance(modules, dict):
         return False
+    routes = data.get("routes")
+    if not isinstance(routes, dict):
+        return False
+
+    matched_profile = None
+    for expected_modules, expected_routes in HISTORICAL_PROFILES:
+        if set(modules.keys()) == expected_modules and set(routes.keys()) == set(expected_routes.keys()):
+            matched_profile = (expected_modules, expected_routes)
+            break
+
+    if matched_profile is None:
+        return False
+
+    expected_modules, expected_routes = matched_profile
     for mod_name, mod_info in modules.items():
         if not isinstance(mod_info, dict) or set(mod_info.keys()) != {"path", "description"}:
             return False
@@ -124,10 +169,7 @@ def is_valid_historical_suite(root: Path) -> bool:
         mod_file = root / mod_info["path"]
         if not mod_file.is_file():
             return False
-    routes = data.get("routes")
-    if not isinstance(routes, dict) or set(routes.keys()) != set(HISTORICAL_ROUTES.keys()):
-        return False
-    for r_name, r_expected in HISTORICAL_ROUTES.items():
+    for r_name, r_expected in expected_routes.items():
         if routes.get(r_name) != r_expected:
             return False
     return True

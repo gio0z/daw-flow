@@ -1,7 +1,22 @@
 # Quality Assurance & Semantic Verification Matrix: [Feature / System]
 
-> **Fill-in Guidance:** Fill this template using verified test cases, executable reproduction steps, and observable semantic evidence. Equivalent existing test suites or test reports may be linked directly. Routine bugfixes and minor patches do NOT require a full new `qa.md`; routine changes can reuse existing test suites, reproduction scripts, or an inline verification record. Mark N/A with rationale when covered by existing test suites. Define an independent observable test oracle boundary distinguishing unexercised capabilities from empirical passes. Negative verification must prove semantic denial and zero data leakage appropriate to the actual interface (e.g. exit code, permission exception, or HTTP status per system design). Do not fabricate test passes, empirical screen-reader compatibility claims, or mock output traces. Unresolved test criteria block only impacted verification sign-off. Never include secret values or credentials in templates. Preserve exact risk point confirmation and never invent commands.
-
+> **Fill-in Guidance:** Fill this template using verified test cases, executable reproduction steps, and observable semantic evidence per [Feature Delivery Contract §E, §F, §G](../references/document-quality.md#feature-delivery-contract). Equivalent existing test suites or test reports may be linked directly. Routine bugfixes and minor patches do NOT require a full new `qa.md`; routine changes can reuse existing test suites, reproduction scripts, or an inline verification record. Mark N/A with rationale when covered by existing test suites. Define an independent observable test oracle boundary distinguishing unexercised capabilities from empirical passes. Negative verification must prove semantic denial and zero data leakage appropriate to the actual interface (e.g. exit code, permission exception, or HTTP status per system design). Do not fabricate test passes, empirical screen-reader compatibility claims, or mock output traces. Unresolved test criteria block only impacted verification sign-off. Never include secret values or credentials in templates. Preserve exact risk point confirmation and never invent commands.
+>
+> **Requirements-Quality Checklist vs. Runtime Test Acceptance (§E):**
+>
+> - The requirements-quality checklist below is a reviewer-owned judgment artifact ("unit tests for requirements writing"). It validates prose completeness, clarity, consistency, and verifiability.
+> - A builder or implementation author CANNOT tick reviewer criteria (`[x]`) to self-approve.
+> - Known blocking requirements, failing test suites, or gate failures MUST NEVER be overridden with generic user "proceed" or requests to relax tests/proofs.
+>
+> **Distinguishing Formal Document Rework Edges from Code-Only Evidence Invalidation:**
+>
+> - **Formal Document Rework:** Modifying authoritative specification documents changes their SHA-256 and invalidates prior transition eligibility, requiring formal transition (`review-rework` -> `rework-review` via `python3 scripts/validate.py docs`).
+> - **Code-Only Evidence Invalidation:** Modifying application code, configuration, or environment invalidates prior test execution evidence and acceptance verdicts for affected paths. Fresh deterministic tests must be rerun proportionally without modifying document transition records unless specifications changed.
+>
+> **Verification Non-Implementation Boundary (§G):**
+>
+> - Verification identifies missing, unverified, or contradicted behavior and returns findings to the parent orchestrator. The verifier has NO implementation role and NEVER edits source code to fix defects.
+>
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
 > **Scope:** [Semantic verification, negative testing, cross-tenant isolation, regression tests]
@@ -11,7 +26,7 @@
 > **Assumptions:** [Test database isolation, deterministic seed data, sandbox credentials]
 > **Open Decisions:** [Material test coverage gaps — block verification sign-off until resolved]
 > **Acceptance Criteria IDs:** [QA-01, QA-02, ...]
-> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05`, `qa-01`..`qa-03`).
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md#feature-delivery-contract) (common `DQ-01`..`DQ-05`, `qa-01`..`qa-03`, §E, §F, §G).
 
 ---
 
@@ -23,14 +38,27 @@ _Routine bugfixes do NOT require a full new `qa.md`. Existing test suites or inl
 - **Verification Environment:** [Local isolated container, Staging, CI pipeline]
 - **Test Data Strategy:** [Deterministic fixtures, generated test seeds, clean teardown]
 
-## 2. Semantic Acceptance Matrix
+## 2. Requirements-to-Test Traceability & Convergence Matrix
 
-_Every acceptance criterion must map to an observable semantic check, NOT merely a generic success indicator or HTTP 200._
+_Map each requirement/acceptance criterion to its implementing story, task, target source paths, and deterministic verification command per [Feature Delivery Contract §D, §G](../references/document-quality.md#feature-delivery-contract). Source existence, passing old tests, or task checkboxes are never completion alone._
 
-| AC ID   | Scenario & Input State                 | Expected Observable State / Output                        | Test Case / Script                | Verification Evidence                      |
-| :------ | :------------------------------------- | :-------------------------------------------------------- | :-------------------------------- | :----------------------------------------- |
-| `QA-01` | [Valid creation payload with tenant A] | [Entity persisted with tenant_id=A, audit record emitted] | `tests/path/test_create.ext`      | `[Sanitized log output / DB row evidence]` |
-| `QA-02` | [Duplicate idempotency key submitted]  | [Original entity returned, no duplicate entity created]   | `tests/path/test_idempotency.ext` | `[Persistence count == 1 evidence]`        |
+### 2.1 Coverage Denominator Accounting
+
+- **Total Declared Criteria (N):** [Count of all declared requirements and ACs in scope]
+- **Justified Non-Buildable / Out-of-Scope (M):** [Count of criteria excluded from buildable denominator with explicit rationale, e.g. post-launch business KPIs without test oracles]
+- **Unresolved Gaps (K):** [Count of unmapped or unresolved criteria — strictly retained in denominator, NEVER silently excluded]
+- **Effective Buildable Denominator (N - M):** [N minus M]
+- **Empirically Verified Passing (P):** [Count of criteria with fresh passing runtime evidence]
+- **Actual Verified Coverage Ratio:** `P / (N - M)` [Report exact fraction; no synthetic 100% metrics]
+
+### 2.2 Traceability & Verification Status
+
+| AC / Req ID | User Story | Task ID(s) | Touchpoint Source Paths | Verification Command / Oracle       | Observed Status                          | Evidence Ref / Commit SHA          |
+| :---------- | :--------- | :--------- | :---------------------- | :---------------------------------- | :--------------------------------------- | :--------------------------------- |
+| `QA-01`     | `US-01`    | `TASK-01`  | `src/auth/session.py`   | `pytest tests/auth/test_session.py` | `Passed` (`implemented_verified`)        | `pytest exited 0 (commit abc1234)` |
+| `QA-02`     | `US-01`    | `TASK-02`  | `src/auth/token.py`     | `pytest tests/auth/test_token.py`   | `Unexercised` (`implemented_unverified`) | `[Awaiting fresh test run]`        |
+
+_(Observed Status must be one of: `Passed` (implemented/verified), `Failing`, `Blocked`, `Unexercised` (implemented-unverified), `Missing`, or `Contradicted`)._
 
 ## 3. Negative & Boundary Testing
 
@@ -51,7 +79,23 @@ _Explicitly verify that invalid, out-of-order, or malicious actions fail safely 
 - [ ] Integration & negative tests pass: `[N] passed, 0 failed`
 - [ ] Concrete evidence artifacts linked (test runner output, CLI logs, sanitized response traces — NO credentials or secrets).
 
-## 6. Document Quality & Review Checks
+## 6. Convergence Gap & Invalidation Ledger
+
+### 6.1 Change Invalidation & Rerun Tracking
+
+| Invalidation Event | Modified Files / Revisions | Affected Test Cases / ACs | Rerun Command                       | Fresh Result / Evidence |
+| :----------------- | :------------------------- | :------------------------ | :---------------------------------- | :---------------------- |
+| Code modification  | `src/auth/session.py`      | `QA-01`                   | `pytest tests/auth/test_session.py` | `Passed (exited 0)`     |
+
+### 6.2 Convergence Defect & Remediation Routing (§G)
+
+_Record gaps discovered during verification. The verifier NEVER implements fixes directly; all items route via parent orchestrator to `daw-plan` or `daw-build`._
+
+| Finding ID | Source Ref | Gap Type (`missing` / `partial` / `contradicts` / `unrequested`) | Severity (`BLOCKER` / `HIGH` / `MEDIUM` / `LOW`) | Observed Evidence                                 | Recommended Parent Routing                           |
+| :--------- | :--------- | :--------------------------------------------------------------- | :----------------------------------------------- | :------------------------------------------------ | :--------------------------------------------------- |
+| `GAP-01`   | `QA-02`    | `partial`                                                        | `HIGH`                                           | Token expiration check missing edge case handling | Route to `daw-build` to implement boundary condition |
+
+## 7. Document Quality & Review Checks
 
 _Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
 

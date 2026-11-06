@@ -33,7 +33,7 @@ def make_request(
 
 
 def setup_suite_fixture(base_dir: pathlib.Path) -> pathlib.Path:
-    """Create a fully valid suite fixture with manifest and all 10 modules."""
+    """Create a fully valid suite fixture with manifest and all 11 modules."""
     manifest_src = REPO_ROOT / "references" / "suite-manifest.json"
     manifest_dst = base_dir / "references" / "suite-manifest.json"
     manifest_dst.parent.mkdir(parents=True, exist_ok=True)
@@ -166,6 +166,16 @@ class TestRouteSuite(unittest.TestCase):
         self.assertEqual(res["stages"], ["daw-setup"])
         self.assertTrue(res["constraints"]["documentation_only"])
         self.assertFalse(res["constraints"]["read_only"])
+
+        # 13. Untangle (read-only structural analysis, stages [daw-untangle])
+        req = make_request(intent="untangle", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-untangle"])
+        self.assertTrue(res["constraints"]["read_only"])
+        self.assertFalse(res["constraints"]["documentation_only"])
+        self.assertFalse(res["constraints"]["interactive_approval_required"])
+        self.assertFalse(res["constraints"]["authorization_granted"])
     def test_missing_stage_module_blocks_route(self):
         # Remove a core module (daw-workspace) even when requesting patch
         ws_file = self.suite_root / "skills" / "daw-workspace" / "SKILL.md"
@@ -180,6 +190,135 @@ class TestRouteSuite(unittest.TestCase):
         wizard_file.unlink()
         findings = route.check_suite(self.suite_root)
         self.assertTrue(any(f["code"] == "MODULE_NOT_FOUND" and "daw-wizard" in f["message"] for f in findings))
+
+    def test_check_suite_missing_untangle_module(self):
+        untangle_file = self.suite_root / "skills" / "daw-untangle" / "SKILL.md"
+        untangle_file.unlink()
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MODULE_NOT_FOUND" and "daw-untangle" in f["message"] for f in findings))
+
+    def test_untangle_route_behavior_and_flag_handling(self):
+        # Requirements unknown -> proceeds without blocking, stages [daw-untangle]
+        req = make_request(intent="untangle", requirements="unknown", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-untangle"])
+        self.assertTrue(any("Requirements unknown for untangle" in r for r in res["reasons"]))
+
+        # Requirements unclear -> proceeds without blocking
+        req = make_request(intent="untangle", requirements="unclear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-untangle"])
+
+        # High or unknown risk ignored because untangle is read-only
+        for r_risk in ("high", "unknown"):
+            req = make_request(intent="untangle", requirements="clear", risk=r_risk, workspace="in-place")
+            res = route.resolve_route(req, root=self.suite_root)
+            self.assertEqual(res["status"], "ready")
+            self.assertEqual(res["stages"], ["daw-untangle"])
+            self.assertFalse(res["constraints"]["interactive_approval_required"])
+            self.assertTrue(any("Read-only intent 'untangle' ignores risk classification" in r for r in res["reasons"]))
+
+        # Workspace unknown or isolated does not prepend daw-workspace because untangle does not evaluate workspace
+        for ws in ("unknown", "isolated"):
+            req = make_request(intent="untangle", requirements="clear", risk="low", workspace=ws)
+            res = route.resolve_route(req, root=self.suite_root)
+            self.assertEqual(res["status"], "ready")
+            self.assertEqual(res["stages"], ["daw-untangle"])
+            self.assertTrue(any("Intent 'untangle' does not evaluate workspace isolation" in r for r in res["reasons"]))
+
+    def test_untangle_manifest_tamper_and_invariants(self):
+        manifest_file = self.suite_root / "references" / "suite-manifest.json"
+        clean_manifest_text = (REPO_ROOT / "references" / "suite-manifest.json").read_text(encoding="utf-8")
+
+        # 1. Missing daw-untangle module
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["modules"].pop("daw-untangle", None)
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_MISSING_MODULES" for f in findings))
+
+        # 2. Missing untangle route
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"].pop("untangle", None)
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_MISSING_ROUTES" for f in findings))
+
+        # 3. Untangle route read_only false -> invariant violation
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"]["untangle"]["read_only"] = False
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings))
+
+        # 4. Untangle route documentation_only true -> invariant violation
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"]["untangle"]["documentation_only"] = True
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings))
+
+        # 5. Untangle route evaluates_workspace true -> invariant violation
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"]["untangle"]["evaluates_workspace"] = True
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings))
+
+        # 6. Untangle route stages mutated
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"]["untangle"]["stages"] = ["daw-untangle", "daw-build"]
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings))
+
+        # 7. Untangle route extra unexpected key -> shape invalid
+        manifest_data = json.loads(clean_manifest_text)
+        manifest_data["routes"]["untangle"]["unexpected_extra"] = True
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_SHAPE_INVALID" for f in findings))
+
+        # Restore clean manifest
+        manifest_file.write_text(clean_manifest_text, encoding="utf-8")
+    def test_cli_rejects_unknown_flags(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        cmd = [sys.executable, script_path, "--unknown-flag", "--root", str(self.suite_root)]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("unrecognized arguments", proc.stderr)
+
+    def test_side_effect_free_dispatch_untangle(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        req_file = self.suite_root / "untangle-request.json"
+        req_data = make_request(intent="untangle", requirements="clear", risk="low", workspace="in-place")
+        req_file.write_text(json.dumps(req_data), encoding="utf-8")
+
+        before_files = {
+            p.relative_to(self.suite_root).as_posix(): p.stat().st_mtime_ns
+            for p in self.suite_root.rglob("*")
+            if p.is_file()
+        }
+
+        cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root)]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["status"], "ready")
+        self.assertEqual(data["stages"], ["daw-untangle"])
+        self.assertTrue(data["constraints"]["read_only"])
+
+        after_files = {
+            p.relative_to(self.suite_root).as_posix(): p.stat().st_mtime_ns
+            for p in self.suite_root.rglob("*")
+            if p.is_file()
+        }
+
+        self.assertEqual(set(before_files.keys()), set(after_files.keys()))
+        for path, mtime in before_files.items():
+            self.assertEqual(mtime, after_files[path], f"File modified during dispatch: {path}")
 
     def test_requirements_and_workspace_handling(self):
         # Unknown requirements for feature -> needs-input, stages empty

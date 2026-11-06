@@ -27,6 +27,8 @@ The design module governs structural analysis, architectural evaluation, domain 
 - **Fact-Based Exploration & Grounded Reality:** Inspect existing files, dependencies, schemas, and constraints before proposing architecture. Never invent agreement or synthetic domain terminology; distinguish observed facts from legitimately proposed new concepts.
 - **Workflow Transition Gate vs. Hook Claims:** Document-quality validation operates as an explicit deterministic workflow transition gate (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition TRANSITION --documents PATH [PATH ...] --format text|json`) invoked by the orchestrator/parent. It does NOT claim or use automatic harness hook interception, daemon supervisors, or runtime monkeypatching. If Python 3 is unavailable, the gate must honestly halt with canonical `status: "blocked"` (never emit a fake pass).
 - **Nonrecursive Dispatch & Downstream Handoff:** `daw-design` performs structural analysis, interactive elicitation, specification drafting, and readiness inspection; it never executes code, performs recursive module dispatch, or invokes sub-skills directly (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent). Orchestration remains strictly with the parent router.
+- **Scope Guard (Governance & Architecture vs. Implementation):** Classify every user input as either architecture/governance content or a separate non-governance intent. If input includes feature implementation, code generation, refactoring, building, or deployment requests, `daw-design` MUST NOT execute them. Extract them as deferred intents under `details.next_actions`. Do not create or modify application source code, feature routes, components, or test files during design or governance authoring.
+- **Canonical Shared Procedural Contract:** Adhere to the shared delivery contract defined in [Canonical Document Quality & Workflow Transition Guide](../../references/document-quality.md#feature-delivery-contract) (specifically [Governance Alignment](../../references/document-quality.md#a-governance-and-authoring-alignment), [Clarification & Uncertainty Resolution](../../references/document-quality.md#b-clarification-and-technical-uncertainty-resolution), and [Feature Slicing & Behavioral Oracles](../../references/document-quality.md#c-feature-slicing-and-behavioral-contract-oracles)).
 
 ---
 
@@ -47,6 +49,7 @@ The design module governs structural analysis, architectural evaluation, domain 
   - Read [Domain Modeling Protocol](references/domain-modeling.md) ONLY when domain terminology is overloaded, ambiguous across modules, or ADR gating applies; skip for standard extensions with established vocabulary.
   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) whenever authoring or updating formal specifications from the canonical 13-document matrix.
   - Read [Builder-Readiness Protocol](references/builder-readiness.md) ONLY before substantive design handoff (new services, modified data schemas, multi-module refactoring) to inspect material seams; skip for minimal, routine, or localized changes.
+  - Read [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) ONLY when evaluating multi-module refactoring boundaries, decomposing tightly coupled components, or auditing proposed architecture for hidden links and surplus indirection; skip for routine or localized additions.
 - **Mandatory Governance Loading:**
   - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
   - Before performing any state mutations or file writes, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
@@ -70,18 +73,25 @@ The design module governs structural analysis, architectural evaluation, domain 
 ### Step 2: Formulate Invariants, Scope, and Non-Goals
 
 1. State system invariants: functional boundaries, security rules, performance expectations, and data consistency boundaries.
-2. Define explicit non-goals to prevent scope creep.
+2. Define explicit non-goals to prevent scope creep. Distinguish business what/why from technical how. Never invent policies, owners, approvals, or unobservable vanity metrics.
 3. Identify integration touchpoints with existing modules or persistence layers.
 4. Ground analysis strictly in verified facts versus user decisions; do not invent fictional constraints.
+5. **Governance Change Impact & Sync:** When a principle or architectural foundation changes, do not silently override existing specifications or sneak in code edits. Identify affected downstream documents, tasks, and evidence, and produce a structured sync impact report (`details.sync_impact_report`):
+   - Version change / revision bump
+   - Modified principles or decisions (old title/concept -> new title/concept)
+   - Added or removed constraints and sections
+   - Downstream artifacts to sync (specifications, roadmaps, task lists, test suites, evidence ledgers).
 
 ### Step 3: On-Demand Shared Grilling (Interactive Clarification)
 
 1. When requirements are ambiguous, trade-offs depend on unstated business priorities, or conflicting constraints arise, trigger the [Shared Grilling Protocol](../../references/grilling.md).
-2. Ground all fact-discoverable items through codebase inspection before asking the user.
-3. Elicit in bounded rounds (maximum 5 prioritized questions per round) ordered by the decision dependency frontier.
-4. Frame questions with concrete agent recommendations and technical rationales when evaluating trade-offs; prompt for open user preferences when new business direction is required without forcing arbitrary assumptions.
-5. Waive formal grilling for direct questions, routine engineering details, or small settled changes.
-6. Conclude grilling when open decisions are resolved or deferred; preserve internal grilling classification under `details` (never use non-canonical values for top-level `status`). If a material blocker remains, exit with canonical `status: "blocked"`.
+2. **Technical Research Before User Inquiries:** Before querying the operator about technical uncertainties, non-destructively research workspace code, dependencies, schemas, and official documentation. Record architectural decisions, technical rationale, alternatives considered, and authoritative citations directly in the appropriate existing specification section (e.g. `techstack.md`, ADR section in architecture doc, or `blueprint.md`) — no mandatory separate `research.md`.
+3. Ground all fact-discoverable items through codebase inspection before asking the user.
+4. Elicit in bounded rounds (maximum 5 prioritized questions per round) ordered by `impact × uncertainty`. Sequence dependent trade-offs **one at a time** along the active decision frontier; batch only independent choices up to 5 per round.
+5. Frame questions with concrete agent recommendations and technical rationales when evaluating trade-offs; prompt for open user preferences when new business direction is required without forcing arbitrary assumptions. Avoid false dichotomies, answered questions, or internal naming queries.
+6. Waive formal grilling for direct questions, routine engineering details, or small settled changes.
+7. **Safe Answer Reinjection:** `daw-design` is the authorized specification write module. When receiving user answers from interactive grilling or read-only inquiry handoffs (from `daw-ask` or parent handoff via `details.elicitation_updates`), `daw-design` safely reinjects answers into the authoritative specifications, reconciles conflicting text, updates affected acceptance criteria, and marks remaining unknowns to block only dependent scope.
+8. Conclude grilling when open decisions are resolved or deferred; preserve internal grilling classification under `details` (never use non-canonical values for top-level `status`). If a material blocker remains, exit with canonical `status: "blocked"`.
 
 ### Step 4: Alternatives, Trade-Offs & ADR Conjunctive Gating
 
@@ -90,6 +100,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 3. **ADR Conjunctive Gating:** Author an Architecture Decision Record (ADR) only when all three conjunctive conditions are met: (1) hard-to-reverse / high replacement cost, (2) non-obvious trade-offs requiring historical context, and (3) genuine architectural trade-offs across competing quality attributes per [Domain Modeling Protocol](references/domain-modeling.md). If any condition is absent, record material choices in an authorized existing specification (e.g. `blueprint.md`); trivial implementation choices require no record.
 4. Track provenance explicitly: label items as `[Observed Fact]`, `[Human Decision]`, or `[Agent Recommendation]`. Agents may legitimately propose new domain concepts required by the design.
 5. If past architectural decisions are modified, supersede the previous record with explicit linkage; NEVER rewrite or erase historical records.
+6. **Change-Coupling & Deep Module Alignment:** When designing subsystem interfaces, apply the principles in `../../references/change-coupling.md`: ask "should these pieces change together?", favor deep modules with narrow interfaces over shallow pass-through abstractions, and preserve legitimate protocol retries, security wrappers, and transaction boundaries.
 
 ### Step 5: Proportional Specification Authoring
 
@@ -106,9 +117,14 @@ The design module governs structural analysis, architectural evaluation, domain 
    - **Review to Rework (`review-rework` / `rework-review`):** If any required criterion is rejected (`decision: "not_accepted"`), execute `review-rework`, perform targeted rework, and transition back via `rework-review`.
    - **Mutation Invalidation:** Any modification to specification text alters its SHA-256 hash and invalidates prior `review-ready` eligibility.
    - **QA Review Limitation:** Human comprehension remains unexercised without live people; automated review evaluates structural and evidence compliance only.
-7. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
-8. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
-9. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
+7. **Prioritized Feature Slicing & Measurable Oracles:** When authoring feature specifications (PRD, FRD, Blueprint):
+   - Preserve existing stable story, requirement, and acceptance criteria IDs (`US-01`, `PRD-01`, `FRD-01`). If absent, generate scoped unique IDs and retain them.
+   - Structure features into prioritized, independently demonstrable/testable behavior stories (P1, P2...) with Given/When/Then or equivalent exact input/output/error/state oracles.
+   - Do not force deploy independence for inseparable safety or transaction invariants. Supporting infrastructure tasks can lack stories only with explicit prerequisite justification.
+   - Distinguish business outcomes/KPIs from build/runtime acceptance criteria (a KPI cannot serve as runtime acceptance without an observable, testable measurement boundary).
+8. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
+9. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
+10. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
 
 ### Step 6: Builder-Readiness Assessment & Seam Inspection
 
@@ -132,7 +148,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 
 ## 4. Output Contract
 
-Every completion of `daw-design` delivers a structured handoff payload adhering to the canonical suite envelope. Rich architectural analysis, domain modeling, and builder-readiness facts are preserved under `details`:
+Every completion of `daw-design` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, authorized artifact, or an explicit inline checkpoint fallback). Direct-user responses default to concise natural language. Rich architectural analysis, domain modeling, and builder-readiness facts are preserved under `details`:
 
 ```json
 {
@@ -195,7 +211,18 @@ Every completion of `daw-design` delivers a structured handoff payload adhering 
     "consequential_decisions": {
       "requires_user_approval": false,
       "items": []
-    }
+    },
+    "sync_impact_report": {
+      "version_change": "1.0.0 -> 1.1.0",
+      "modified_principles": [],
+      "added_sections": ["Session Token Refresh Invariants"],
+      "removed_sections": [],
+      "downstream_artifacts_to_sync": [
+        "docs/specs/roadmap.md",
+        "docs/specs/qa.md"
+      ]
+    },
+    "next_actions": []
   }
 }
 ```
@@ -214,6 +241,10 @@ Before finalizing handoff from `daw-design`, verify:
 - [ ] Consequential user decisions segregated from routine engineering decisions.
 - [ ] For substantive designs, builder-readiness seams evaluated with zero unresolved blocking unknowns.
 - [ ] Changed architectural decisions supersede rather than rewrite historical records.
+- [ ] Input classified per Scope Guard; non-governance/implementation requests extracted to `next_actions` without source code mutations.
+- [ ] Governance or principle changes include structured sync impact reporting with downstream artifacts flagged for synchronization.
+- [ ] Feature requirements structured as prioritized, independently testable user journeys (P1, P2...) with exact Given/When/Then oracles.
+- [ ] Canonical shared delivery contract (`references/document-quality.md#feature-delivery-contract` sections A, B, and C) satisfied.
 - [ ] No recursive module dispatch attempted; independent review recommendations directed to parent router.
 
 ---

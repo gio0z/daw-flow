@@ -309,10 +309,11 @@ class InstallTests(unittest.TestCase):
 
         manifest_path = bundle / "references" / "suite-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for mod in ("daw-setup", "daw-wizard"):
+        for mod in ("daw-setup", "daw-wizard", "daw-untangle"):
             manifest["modules"].pop(mod, None)
             shutil.rmtree(bundle / "skills" / mod, ignore_errors=True)
         manifest["routes"].pop("setup", None)
+        manifest["routes"].pop("untangle", None)
         manifest["routes"]["bootstrap"]["stages"] = ["daw-design", "daw-plan"]
         if manifest_module_override:
             mod_name, new_path = manifest_module_override
@@ -332,12 +333,12 @@ class InstallTests(unittest.TestCase):
                 if fm_count == 1:
                     out.append(l)
                     continue
-                if "daw-setup" in l or "daw-wizard" in l:
+                if "daw-setup" in l or "daw-wizard" in l or "daw-untangle" in l:
                     continue
                 out.append(l)
             f_path.write_text("".join(out))
 
-        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard")]
+        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard", "daw-untangle")]
         for m in eight_modules:
             alias = self.skills / m
             alias.symlink_to(installer.alias_path(m), target_is_directory=True)
@@ -405,13 +406,13 @@ class InstallTests(unittest.TestCase):
                     self.assertTrue((self.skills / m).is_symlink())
     def test_historical_eight_alias_receipt_status_update_and_uninstall(self):
         bundle = self.installed()
-        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard")]
+        eight_modules = [m for m in MODULES if m not in ("daw-setup", "daw-wizard", "daw-untangle")]
         self.assertEqual(len(eight_modules), 8)
         receipt_file = bundle / ".daw-install.json"
         receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
         receipt["aliases"] = eight_modules
         receipt_file.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-        for added in ("daw-setup", "daw-wizard"):
+        for added in ("daw-setup", "daw-wizard", "daw-untangle"):
             (self.skills / added).unlink()
 
         # Status is ready
@@ -483,7 +484,7 @@ class InstallTests(unittest.TestCase):
         # Also verify uninstalling directly from 8-alias legacy state
         receipt["aliases"] = eight_modules
         receipt_file.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-        for added in ("daw-setup", "daw-wizard"):
+        for added in ("daw-setup", "daw-wizard", "daw-untangle"):
             (self.skills / added).unlink()
         uninst = self.cli("uninstall")
         self.assertEqual(uninst.returncode, 0, uninst.stdout + uninst.stderr)
@@ -491,6 +492,132 @@ class InstallTests(unittest.TestCase):
         for m in eight_modules:
             self.assertFalse((self.skills / m).exists())
 
+
+    def setup_true_historical_ten_payload(self):
+        if not self.symlinks:
+            self.skipTest("Directory symlinks unavailable; root-only installation is tested separately")
+        entries = installer.source_entries()
+        bundle = self.skills / SUITE
+        bundle.mkdir(parents=True)
+        for entry in entries:
+            target = bundle / entry.name
+            if entry.is_dir():
+                shutil.copytree(entry, target, ignore=installer.ignore_copy)
+            else:
+                shutil.copy2(entry, target)
+
+        manifest_path = bundle / "references" / "suite-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["modules"].pop("daw-untangle", None)
+        shutil.rmtree(bundle / "skills" / "daw-untangle", ignore_errors=True)
+        manifest["routes"].pop("untangle", None)
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+        for f_name in ("SKILL.md", "AGENTS.md"):
+            f_path = bundle / f_name
+            lines = f_path.read_text().splitlines(keepends=True)
+            out = []
+            fm_count = 0
+            for l in lines:
+                if l.strip() == "---" and fm_count < 2:
+                    fm_count += 1
+                    out.append(l)
+                    continue
+                if fm_count == 1:
+                    out.append(l)
+                    continue
+                if "daw-untangle" in l:
+                    continue
+                out.append(l)
+            f_path.write_text("".join(out))
+
+        ten_modules = [m for m in MODULES if m != "daw-untangle"]
+        self.assertEqual(len(ten_modules), 10)
+        for m in ten_modules:
+            alias = self.skills / m
+            alias.symlink_to(installer.alias_path(m), target_is_directory=True)
+
+        receipt = {
+            "schema_version": 1,
+            "suite": SUITE,
+            "version": "0.1.0",
+            "aliases": ten_modules,
+            "files": installer.inventory(bundle),
+        }
+        (bundle / installer.RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        return bundle, ten_modules
+
+    def test_historical_ten_module_status(self):
+        bundle, ten_modules = self.setup_true_historical_ten_payload()
+        status = self.cli("status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertEqual(json.loads(status.stdout)["status"], "ready")
+        for m in ten_modules:
+            self.assertTrue((self.skills / m).is_symlink())
+        self.assertFalse((self.skills / "daw-untangle").exists())
+
+    def test_historical_ten_module_update(self):
+        bundle, ten_modules = self.setup_true_historical_ten_payload()
+        update = self.cli("install", "--update")
+        self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+        self.assertEqual(json.loads(update.stdout)["status"], "updated")
+        for m in MODULES:
+            self.assertTrue((self.skills / m).is_symlink())
+        self.assertTrue((self.skills / "daw-untangle").is_symlink())
+        status_after = self.cli("status")
+        self.assertEqual(status_after.returncode, 0, status_after.stdout + status_after.stderr)
+        self.assertEqual(json.loads(status_after.stdout)["status"], "ready")
+
+    def test_historical_ten_module_uninstall(self):
+        bundle, ten_modules = self.setup_true_historical_ten_payload()
+        uninst = self.cli("uninstall")
+        self.assertEqual(uninst.returncode, 0, uninst.stdout + uninst.stderr)
+        self.assertFalse(bundle.exists())
+        for m in ten_modules:
+            self.assertFalse((self.skills / m).exists())
+
+    def test_foreign_untangle_alias_collision_pre_mutation_on_update(self):
+        bundle, ten_modules = self.setup_true_historical_ten_payload()
+        conflict = self.skills / "daw-untangle"
+        conflict.mkdir(parents=True)
+        (conflict / "custom_tool.py").write_text("# user owned tool\n", encoding="utf-8")
+
+        colliding_update = self.cli("install", "--update")
+        self.assertEqual(colliding_update.returncode, 1)
+        self.assertIn("already used by another skill", colliding_update.stdout + colliding_update.stderr)
+
+        # Pre-mutation guarantee: conflict file preserved, bundle intact, existing aliases intact
+        self.assertTrue((conflict / "custom_tool.py").is_file())
+        self.assertEqual((conflict / "custom_tool.py").read_text(encoding="utf-8"), "# user owned tool\n")
+        self.assertTrue(bundle.is_dir())
+        for m in ten_modules:
+            self.assertTrue((self.skills / m).is_symlink())
+
+    def test_foreign_untangle_alias_collision_on_fresh_install(self):
+        self.skills.mkdir(parents=True, exist_ok=True)
+        conflict = self.skills / "daw-untangle"
+        conflict.write_text("existing unmanaged content", encoding="utf-8")
+
+        fresh_install = self.cli("install")
+        self.assertEqual(fresh_install.returncode, 1)
+        self.assertIn("already used by another skill", fresh_install.stdout + fresh_install.stderr)
+        self.assertEqual(conflict.read_text(encoding="utf-8"), "existing unmanaged content")
+        self.assertFalse((self.skills / SUITE).exists())
+
+    def test_historical_ten_module_tampered_preserves_suite(self):
+        bundle, ten_modules = self.setup_true_historical_ten_payload()
+        (bundle / "SKILL.md").write_text("tampered content", encoding="utf-8")
+
+        tampered_update = self.cli("install", "--update")
+        self.assertEqual(tampered_update.returncode, 1)
+        self.assertIn("Installed files were changed", tampered_update.stdout + tampered_update.stderr)
+
+        tampered_status = self.cli("status")
+        self.assertEqual(tampered_status.returncode, 1)
+
+        tampered_uninstall = self.cli("uninstall")
+        self.assertEqual(tampered_uninstall.returncode, 1)
+        self.assertTrue(bundle.is_dir())
 
 if __name__ == "__main__":
     unittest.main()

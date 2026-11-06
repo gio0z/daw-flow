@@ -15,6 +15,7 @@
   - [`skills/daw-ask/SKILL.md`](skills/daw-ask/SKILL.md): Read-only architectural guidance & consultation (original advisor; no persona impersonation).
   - [`skills/daw-setup/SKILL.md`](skills/daw-setup/SKILL.md): Interactive configuration setup, tool command discovery & project conventions.
   - [`skills/daw-wizard/SKILL.md`](skills/daw-wizard/SKILL.md): Interactive greenfield requirements interview & initial specification document authoring.
+  - [`skills/daw-untangle/SKILL.md`](skills/daw-untangle/SKILL.md): Read-only system coupling analysis, hidden dependency mapping & bounded boundary unentanglement.
 - **Route Engine & Policy:**
   - [`scripts/route.py`](scripts/route.py): Read-only, zero-dependency suite routing engine and `--check-suite` structural validator.
   - [`references/suite-manifest.json`](references/suite-manifest.json): Declarative routing policy table and module mapping schema.
@@ -35,6 +36,7 @@
   - [`references/operations.md`](references/operations.md): Operational execution invariants, fail-closed boundaries, baseline hashing, rollback evidence, and the harness-native persistent worker graph contract.
   - [`references/installation.md`](references/installation.md): Environment discovery paths, packaging layout, sibling symlink distribution, and skill registration.
   - [`references/task-contract.example.json`](references/task-contract.example.json): Canonical JSON task-contract example envelope.
+  - [`references/change-coupling.md`](references/change-coupling.md): Change-coupling taxonomy, dependency tracing heuristics, and boundary unentanglement reference.
   - [`references/route-request.example.json`](references/route-request.example.json): Canonical JSON route request example envelope.
 - - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md).
 - **Standalone Repository Specifications:**

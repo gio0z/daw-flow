@@ -111,7 +111,7 @@ Exact block format:
 
 ## 4. Output Contract
 
-Every completion of `daw-setup` delivers a structured handoff payload adhering to the canonical suite envelope. `setup` is a single-stage terminal route: on `status: "pass"` it returns `handoff_to: null`.
+Every completion of `daw-setup` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before concluding the stage per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, or an explicit inline fallback). Direct-user responses default to concise natural language. `setup` is a single-stage terminal route: on `status: "pass"` it returns `handoff_to: null`.
 
 ```json
 {

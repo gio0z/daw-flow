@@ -1,6 +1,6 @@
 # Master Blueprint: [Feature / System Name]
 
-> **Fill-in Guidance:** Fill this template using verified repository terms and observable facts. Equivalent existing architecture or planning docs may be linked or referenced directly. The 13 specification types represent an available matrix, NOT a mandatory creation bundle. Mark N/A with rationale for unneeded documents. Do not fabricate architecture decisions, milestones, or approvals. Distinguish user requirements and observed source facts from author-proposed defaults using a concise provenance ledger or explicit labels. Unresolved items that represent material gaps block only impacted execution paths, not unrelated work.
+> **Fill-in Guidance:** Fill this template using verified repository terms and observable facts adhering to the canonical shared procedural contract in [Canonical Document Quality & Workflow Transition Guide](../references/document-quality.md#feature-delivery-contract). Equivalent existing architecture or planning docs may be linked or referenced directly. The 13 specification types represent an available matrix, NOT a mandatory creation bundle. Mark N/A with rationale for unneeded documents. Do not fabricate architecture decisions, milestones, or approvals. Distinguish user requirements and observed source facts from author-proposed defaults using a concise provenance ledger or explicit labels (`[User Requirement]`, `[Observed Fact]`, `[Proposed Default]`). Record proposed/default vs decided. Unresolved items that represent material gaps block only impacted execution paths, not unrelated work.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
@@ -10,15 +10,15 @@
 > **Open Decisions:** [Material questions — block impacted execution paths until resolved]
 > **Acceptance Criteria IDs:** [AC-01, AC-02, ...]
 > **Reader & Core Task:** [Systems Architect / Lead Engineer / Implementer] — Locate architectural boundaries, cross-specification routing, subsystem responsibilities, shared contracts, and decision risk boundaries without requiring ambient memory.
-> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05` and `blueprint-01`..`03`).
+> **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05` and `blueprint-01`..`03`) and [Feature Delivery Contract](../references/document-quality.md#feature-delivery-contract) (specifically [Governance Alignment](../references/document-quality.md#a-governance-and-authoring-alignment), [Clarification](../references/document-quality.md#b-clarification-and-technical-uncertainty-resolution), and [Feature Slicing](../references/document-quality.md#c-feature-slicing-and-behavioral-contract-oracles)).
 
 ---
 
 ## 1. Executive Summary & Objective
 
 - **Problem Statement:** [Concrete issue or requirement being addressed]
-- **Target Outcome:** [Observable state after completion]
-- **Explicit Non-Goals:** [What this effort will NOT do]
+- **Target Outcome:** [Observable state after completion — focus on architectural outcomes]
+- **Explicit Non-Goals & Scope Guard:** [What this effort will NOT do. Code generation and implementation tasks are deferred intents, not executed during blueprint authoring]
 
 ## 2. Document Routing & Artifact Map
 
@@ -44,16 +44,35 @@ _Mark existing repo docs, aliases, selected additions, or N/A with rationale._
 
 - **Auto-Executable (Agent):** [Deterministic actions within verified local sandbox, e.g., local tests, lint, scoped edits]
 - **Requires Explicit Human Approval:** [Schema migration, authentication/authorization changes, secret modifications, external API mutations, release deployment. Document approval provider, user identity, and bound revision; doc presence never substitutes for explicit approval.]
+- **Inseparable Safety & Transaction Invariants:** [Core architectural transactions or safety invariants that cannot be split into independent deployments without compromising data integrity.]
 
-## 4. Execution Phases & Milestones
+## 4. Governance Sync & Provenance Ledger
 
-- [ ] **Phase 1: Contract Baseline** — Review required specs, resolve material gaps, establish preflight gates.
-- [ ] **Phase 2: Scaffolding & Bounded Tools** — Reuse verified existing repo CLI/scripts; wrap only if absent.
-- [ ] **Phase 3: Implementation** — Implement core changes against verified acceptance criteria.
-- [ ] **Phase 4: Semantic Verification** — Run acceptance test matrix with concrete before/after evidence.
+### 4.1 Provenance & Decision State
+
+| ID / Topic    | Classification       | Content / Decision                                  | Status   | Impacted Components |
+| :------------ | :------------------- | :-------------------------------------------------- | :------- | :------------------ |
+| `ARCH-DEC-01` | `[Decided]`          | [Confirmed architectural invariant or boundary]     | Settled  | All                 |
+| `ARCH-DEF-01` | `[Proposed Default]` | [Author-proposed configuration or pattern default]  | Proposed | Component B         |
+| `ARCH-OQ-01`  | `[Open Decision]`    | [Material architectural gap; blocks dependent path] | Blocked  | Component C only    |
+
+### 4.2 Governance Sync Impact Report (Applicable on Principle / Architecture Amendments)
+
+- **Revision / Version Change:** [e.g. 1.0.0 -> 1.1.0]
+- **Modified Principles / Decisions:** [List modified principles: old concept -> new concept]
+- **Added Sections / Constraints:** [New architectural boundaries or invariants]
+- **Removed Sections / Constraints:** [Deprecated concepts or superseded rules]
+- **Downstream Artifacts to Synchronize:** [List affected specifications, roadmaps, task lists, and tests]
+
+## 5. Execution Phases & Prioritized Story Milestones
+
+- [ ] **Phase 1: Contract Baseline & Infra Prerequisites** — Review required specs, resolve material gaps, establish preflight gates, execute prerequisite DB/schema baselines.
+- [ ] **Phase 2: Core Behavior Slice (P1 MVP / US-01)** — Implement the foundational, independently testable user journey with exact input/output/error/state oracles.
+- [ ] **Phase 3: Secondary Behavior Slices (P2 / US-02)** — Implement incremental user journeys and advanced options.
+- [ ] **Phase 4: Semantic Verification & Boundary Tests** — Run acceptance test matrix against negative, edge, and non-functional criteria.
 - [ ] **Phase 5: Release Hand-off** — Operational readiness verification per runbook.
 
-## 5. Document Quality & Review Checks
+## 6. Document Quality & Review Checks
 
 _Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
 

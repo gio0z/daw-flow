@@ -17,8 +17,10 @@ This reference defines the canonical shared grilling protocol for Deterministic 
    - Elicitation proceeds in bounded rounds.
    - Each round MUST contain at most **5 focused questions**.
    - Wait for operator response between rounds.
-   - Prioritize questions by impact on observable behavior and contracts.
+   - **Question Ranking by Impact × Uncertainty:** Rank candidate questions by multiplying the question's observable impact on system boundaries, user journeys, contract definitions, security posture, or test design by the degree of factual uncertainty (unresolvable from codebase inspection). Highest `impact × uncertainty` questions are addressed first.
+   - **Dependent Trade-Offs vs. Independent Batching:** When choices have causal dependencies, sequence dependent questions **one at a time** along the active dependency frontier (never query downstream parameters before the upstream prerequisite fork is decided). Independent orthogonal choices may be batched together up to the **5-question limit** per round.
    - Direct questions, factual consultations, or small settled changes do NOT trigger multi-round grilling ceremony; answer or confirm directly.
+   - **No False Dichotomies:** Present genuine, viable architectural alternatives with transparent trade-offs. Avoid strawman options designed to force a predetermined conclusion.
 
 3. **Active Decision Dependency Frontier:**
    - Decisions form a directed dependency graph where downstream choices depend on upstream choices.
@@ -37,7 +39,17 @@ This reference defines the canonical shared grilling protocol for Deterministic 
    - **No Invented Technical Guarantees:** Recommendation rationales cannot claim technical guarantees from a product label (e.g. asserting a pattern eliminates race conditions or guarantees determinism without proof). Distinguish desired behavioral intent from implementation proof, and preserve user-specified requirements across branches rather than dismissing them as unnecessary.
    - NEVER fabricate user agreement or claim an operator made a choice they did not make.
 
-6. **Exit State & Stage-Scoped Blocker Invariant:**
+6. **Safe Answer Reinjection & Read-Only Inquiry Handoff:**
+   - Read-only inquiry modules (`daw-ask` or interactive clarification sessions) MUST NOT perform direct specification file writes or mutations.
+   - Read-only inquiries capture resolved answers, structured user choices, and proposed exact specification updates in their handoff payload (under `details.elicitation_updates` or canonical handoff).
+   - The authoritative authoring module (`daw-wizard` or `daw-design`) is the sole authorized writer. It safely reinjects user answers into authoritative specifications, reconciles conflicting text, updates affected acceptance criteria, cleans up superseded assumptions, and marks remaining unknowns to block only dependent feature paths.
+
+7. **Technical Research Before User Inquiries:**
+   - Before asking the operator questions about technical uncertainties, the agent MUST research workspace facts, dependencies, schemas, and official framework patterns.
+   - Ground technical choices before querying the user. Record architectural decisions, rationale, alternatives considered, and authoritative citations directly in the appropriate existing specification section (e.g., `techstack.md`, ADR section in architecture docs, or `blueprint.md`) — no mandatory separate `research.md`.
+   - Adhere to the canonical shared procedural contract in [Canonical Document Quality & Workflow Transition Guide](document-quality.md#feature-delivery-contract) (specifically [Clarification & Uncertainty Resolution](document-quality.md#b-clarification-and-technical-uncertainty-resolution)).
+
+8. **Exit State & Stage-Scoped Blocker Invariant:**
    - Grilling concludes with an internal decision state recorded under `details.decision_state`: `settled`, `deferred`, or `blocked`.
    - The suite handoff envelope status remains standard (`pass`, `fail`, `blocked`).
    - Never report core path as clear (`deferred`) while foundational upstream choices or exclusions remain unresolved.
@@ -72,6 +84,7 @@ Before framing any questions:
    - **(3) No Premature Parameters:** Are downstream numeric parameters, timeouts, or intervals held back until upstream prerequisite decisions resolve?
    - **(4) No Invented Guarantees:** Does the rationale avoid claiming absolute technical guarantees (e.g. "eliminates race conditions", "guarantees determinism") from mere product patterns without proof? Qualify claims when support is bounded.
    - **(5) Preserve Requirements:** Are user-specified requirements preserved across branches rather than assumed away?
+   - **(6) No False Dichotomies:** Are choices genuinely distinct and mutually exclusive with honest trade-offs rather than manufactured strawmen?
      Correct any detected violations in the draft before sending.
 4. Wait for the operator's response before proceeding to downstream questions.
 
@@ -120,8 +133,8 @@ Before framing any questions:
 
 ## 4. Integration Contract with DAW Modules
 
-| Module       | Usage Mode                                            | Constraints                                                                                                                                                                                                                                                                                |
-| :----------- | :---------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `daw-ask`    | Conversational advisor, read-only Socratic front door | Evaluates decisions, recommendations, and trade-offs. Strictly read-only; no file mutations. Simple questions answer immediately without multi-round ceremony. May return `status: "pass"` while noting downstream implementation blockers in `details`.                                   |
-| `daw-wizard` | Greenfield interactive specification interview        | Applies grilling protocol across 6 greenfield phases. Max 5 questions/round with wait between rounds. Refuses existing codebases (`blocked` -> `daw-design`). Retains DESIGN.md visual style rule and 8-item agent-ready checklist. Cannot declare spec-ready if material blockers remain. |
-| `daw-design` | Deep architectural modeling & spec generation         | Applies grilling during architectural trade-offs and domain boundary definition. Evaluates builder-readiness gate before handoff.                                                                                                                                                          |
+| Module       | Usage Mode                                            | Constraints                                                                                                                                                                                                                                                                                                                                                                                                              |
+| :----------- | :---------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `daw-ask`    | Conversational advisor, read-only Socratic front door | Evaluates decisions, recommendations, and trade-offs. Strictly read-only; no file mutations. Simple questions answer immediately without multi-round ceremony. Returns proposed specification deltas under `details.elicitation_updates` to parent for safe reinjection by authoring modules. May return `status: "pass"` while noting downstream implementation blockers in `details`.                                  |
+| `daw-wizard` | Greenfield interactive specification interview        | Applies grilling protocol across 6 greenfield phases. Max 5 questions/round with wait between rounds. Sequences dependent trade-offs 1 at a time; batches independent up to 5. Refuses existing codebases (`blocked` -> `daw-design`). Retains DESIGN.md visual style rule and 8-item agent-ready checklist. Reinjects answers directly into authoritative specs; cannot declare spec-ready if material blockers remain. |
+| `daw-design` | Deep architectural modeling & spec generation         | Applies grilling during architectural trade-offs, governance impact sync, and domain boundary definition. Researches technical uncertainties before querying user. Safe reinjection target for answers from `daw-ask` or parent handoff. Evaluates builder-readiness gate before handoff.                                                                                                                                |

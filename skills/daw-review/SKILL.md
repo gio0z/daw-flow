@@ -19,6 +19,11 @@ Invoke `daw-review` when:
 - Re-evaluating previously flagged review findings after an orchestrator-directed fix cycle.
 - Auditing security, input validation, error handling, or performance regression risks in modified code.
 - Auditing specification documents and evaluating workflow transitions (`review-ready`, `review-rework`) for selected canonical specifications.
+- Conducting parent-requested proportional independent prebuild cross-artifact conformity review (readiness checkpoint) for spec-dependent or nontrivial features before build. (Prebuild readiness is a bounded review checkpoint, NOT a completed postbuild route `daw-review` or runtime proof. It does not advance the postbuild code review stage of the route, nor does it insert a new route stage into `../../references/routing.md` or cause module recursion; routine settled patches do not mandate an extra prebuild review stage).
+- Conducting structural cohesion and change-coupling checks as part of Stage 2 review on modified diffs where applicable (feature and bugfix routes per `../../references/routing.md`).
+  - **Reusing Accepted Current Review:** When the current matching scope and artifact revision have already been reviewed and accepted by the parent orchestrator, the parent reuses that accepted review evidence without triggering a duplicate review.
+  - **Patch Route Proportionality:** Patch routes remain `build -> verify`; the parent orchestrator performs a bounded proportional diff check without mandating an extra `daw-review` stage or reviewer for routine patches or one-line fixes.
+  - **Non-Code / Docs-Only Changes:** Tasks with no code or structural impact (documentation-only, comment-only, formatting) record an explicit inline N/A rationale rather than triggering a code review stage.
 
 **Do NOT use `daw-review` for:**
 
@@ -47,8 +52,18 @@ Before conducting a code review:
    - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Findings must be grounded in source proof or static verification of the current revision; independent review is strictly required only when the active route specifies it, and read-only review never forces unnecessary runtime execution when static proof is appropriate. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); reviewer findings serve as primary observations, not self-executing acceptance. Small tasks record reviews inline.
 
 6. **Document Quality Reference & Review Invariants:**
-   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json` when reviewing formal specifications.
+   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md#feature-delivery-contract) (§E, §F, §G) and `references/document-quality-rubric.json` when reviewing formal specifications.
    - **Independent Evaluation vs. Author Self-Grading:** The reviewer/parent evaluates semantic clarity, task accessibility for fresh readers/agents, and empirical evidence validity. Authors cannot self-grade unlock or grant themselves a pass; review exits require an independent `reviewer` identifier and explicit per-check `decision`: `accepted` | `not_accepted`.
+   - **Requirements-Quality Checklist vs. Execution Task Checkboxes & Runtime Acceptance (§E):**
+     - Requirements-quality checklists serve as "unit tests for requirements writing" — validating the completeness, clarity, consistency, verifiability, and coverage of requirements prose across domains.
+     - **Reviewer-Owned Judgment:** Checklists and requirements reviews are strictly reviewer-owned artifacts. The author, builder, or implementation agent CANNOT tick reviewer criteria or checklist markers (`[x]`) to self-approve.
+     - **No Generic Override:** Known blocking requirements or quality gate failures MUST NEVER be overridden with a generic user "proceed", "continue", or "LGTM" without satisfying the underlying criterion or formal documented scope revision. No request to relax tests, proofs, or review gates is permitted.
+   - **Distinguishing Formal Document Rework Edges from Code-Only Evidence Invalidation:**
+     - **Formal Document Rework Edges:** When an authoritative specification document (e.g. PRD, FRD, Blueprint, QA Matrix) is modified, its SHA-256 hash changes and invalidates prior `review-ready` eligibility. The document must transition through formal workflow edges: `review-rework` -> `rework-review` via `python3 scripts/validate.py docs` (or the direct Python stdlib fallback).
+     - **Code-Only Evidence Invalidation:** When source code, environment, or configuration changes occur during build or fix iterations, affected Stage 1/Stage 2 review evidence and runtime test acceptance results are invalidated and must be rerun proportionally for affected paths, WITHOUT triggering formal document rework edges unless the authoritative specification itself was modified.
+   - **Independent Reviewer Capability & Direct Fallback:**
+     - Independent review is strictly required when the active route specifies it.
+     - If an independent reviewer subagent capability is unavailable in the environment/harness, execute an explicit direct fallback under the parent orchestrator with documented evidence limits; never invent a fictitious reviewer persona or claim independent review where none occurred.
    - **Workflow Transition Gate vs. Hook Claims:** Review transitions are verified deterministically via:
      `python3 scripts/validate.py docs <RECORD> --project-root <ROOT> --transition review-ready|review-rework --documents <DOC_PATH> [<DOC_PATH> ...] --format text|json`
      This is a portable read-only CLI command, not an automatic harness interceptor hook or daemon supervisor.
@@ -58,6 +73,7 @@ Before conducting a code review:
    - **Mutation Invalidation:** Modifying any specification document changes its SHA-256 hash and immediately invalidates any prior `review-ready` eligibility.
    - **Proportionality & Python Fallback:** Trivial inline changes without formal specifications do not require document review transition records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
    - **QA Review Limitation:** Document quality review verifies structural evidence eligibility, coverage, and citation presence. Human comprehension remains unexercised without live people (`[UNEXERCISED: NO HUMAN PARTICIPANTS]`).
+7. **Structural Coupling Reference:** Consult [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) during Stage 2 technical audit when evaluating whether structural changes introduce hidden links, needless wrappers, or surplus taxonomy.
 
 ---
 
@@ -97,9 +113,50 @@ _Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity 
    - Prefer boring, clear, readable design over clever or needless abstractions.
    - Delete dead weight: ensure deprecated shims, obsolete comments, and unused functions were removed (clean cutover).
    - Reject arbitrary code restyling or formatting churn on untouched lines.
-5. **Concrete Evidence vs. Subjective Taste:**
+5. **Structural Cohesion & Change-Coupling Audit (Parent Prefinal Check Alignment):**
+   - Audit modified code against [Change Coupling Reference](../../references/change-coupling.md) and [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint): check for accidental co-change, circular dependencies, leaky abstractions, shotgun surgery risks, or surplus taxonomy (shallow wrappers, speculative interfaces) while preserving legitimate retries, security guards, and transaction boundaries.
+   - **Finding Disposition:**
+     - **Material Findings:** Direct correctness, security, invariant violations, broken encapsulation, or circular dependencies BLOCK review acceptance (`CHANGES_REQUESTED` or `status: "fail"`).
+     - **Unrelated Improvements:** Observations regarding out-of-scope code or non-blocking cosmetic improvements must NOT be conflated with blocking findings or trigger unsolicited refactoring; report them separately as informational notes for parent consideration.
+   - **Non-Code / Docs-Only Changes:** For documentation or non-code changes without structural impact, record an explicit inline N/A rationale.
+   - **Escalation to `daw-untangle`:** If the structural check reveals deep, hidden, or unclear architectural entanglements across distant subsystems that cannot be settled from diff inspection alone, recommend that the parent escalate to `daw-untangle` (scoped strictly to the affected area, not the whole repository).
+6. **Concrete Evidence vs. Subjective Taste:**
    - Every flagged issue must cite specific file paths, line numbers, and an objective technical reason or static code proof.
    - Reject subjective stylistic preferences that do not impact correctness, maintainability, or established project conventions.
+
+### Prebuild Cross-Artifact Conformity Review (Readiness Checkpoint Mode)
+
+When requested by the parent orchestrator prior to build dispatch, `daw-review` operates as an independent, read-only prebuild readiness checkpoint comparing proposed specifications, architecture, and task manifests per [Feature Delivery Contract §F](../../references/document-quality.md#feature-delivery-contract):
+
+1. **Scope & Governance Alignment:**
+   - Verify that proposed roadmap tasks and implementation plans align with foundational governance principles (`constitution.md`, `blueprint.md`, or project guidelines) without unrequested scope creep or policy violations.
+2. **Bidirectional Traceability & Gap Analysis:**
+   - Trace Requirements / Acceptance Criteria -> User Stories -> Task IDs -> Touchpoint File Paths.
+   - Identify **Orphan Tasks** (tasks lacking requirement justification or prerequisite justification).
+   - Identify **Unmapped Criteria** (requirements or acceptance scenarios lacking implementing tasks).
+3. **Dependency & Parallel Safety:**
+   - Verify that all task dependencies strictly precede dependent tasks in execution order.
+   - Verify that parallel markers (`[P]`) are applied ONLY to tasks modifying disjoint file paths with zero shared mutable state or runtime dependencies.
+   - Reject dependency cycles, unknown prerequisite IDs, and shared file ownership conflicts before dispatch.
+4. **Source Freshness & Revision Alignment:**
+   - Verify that all touchpoints cite currently verified repository paths and commit revisions, not stale assumptions or deprecated conventions.
+5. **Requirements-Quality Evaluation:**
+   - Audit requirements prose against the reviewer-owned quality rubric for ambiguity, untestable adjectives ("fast", "intuitive", "robust"), missing negative/edge scenarios, and ungrounded KPI claims.
+6. **Structured Findings Format:**
+   - Report findings using compact Markdown with:
+     - `Finding ID`: Stable identifier (e.g., `PRE-01`).
+     - `Severity`: `BLOCKER` (fails readiness; prevents build dispatch for affected scope), `HIGH`, `MEDIUM`, `LOW`.
+     - `Location`: `artifact_path:line`.
+     - `Consequence`: Concrete impact on build safety, requirements drift, or runtime ambiguity.
+     - `Remediation`: Actionable repair instruction for the author or planner.
+7. **Metrics Coverage Denominator Accounting:**
+   - When reporting requirement coverage (e.g., tasks per requirement or test oracle definitions), the denominator MUST include all declared requirements and acceptance criteria.
+   - Exclude ONLY justified non-buildable or out-of-scope criteria (such as post-launch business KPIs or external SLAs lacking test oracle boundaries, each with explicit written justification).
+   - Unresolved gaps or missing mappings must NEVER be silently excluded from the denominator to artificially inflate coverage percentages. A missing mapping is an explicit gap, not an implicit N/A. No synthetic/fake 100% metrics.
+8. **Readiness Checkpoint Gate:**
+   - Blocking findings fail prebuild readiness (`status: "fail"`, `details.review_verdict: "CHANGES_REQUESTED"` or `"CONTRADICTION_HALT"`), preventing build dispatch for affected scope and routing back to authoring or planning.
+   - Nonblocking findings are reported to the parent orchestrator, which retains sole authority over stage acceptance.
+   - **Explicit Scope Boundary:** Passing a prebuild readiness review does NOT satisfy the postbuild code review requirement or claim runtime proof. Canonical postbuild code review remains required for feature and bugfix routes per active routing rules in `references/routing.md` (patch routes proceed directly from build to verification), and `daw-verify` remains required for runtime verification once code is implemented.
 
 ---
 
@@ -120,13 +177,20 @@ To ensure review loops remain deterministic and avoid both premature halts and e
      2. Immediately stop the review loop.
      3. Surface the explicit conflict to the parent orchestrator / user for a binding decision.
 
+4. **Revision Invalidation & Route-Driven Corrections:**
+   - Any code edits or fixes dispatched to address review findings invalidate prior affected review passes and runtime verification evidence for the modified artifacts.
+   - The parent orchestrator routes authorized corrections through the existing `plan` -> `build` route before rechecking the current diff prior to final completion.
+5. **Independent Reviewer Fallback Limitations:**
+   - When an independent reviewer subagent is unavailable, state the explicit fallback limitations directly and do not pretend independent acceptance.
+
 ---
 
 ## 5. Output Contract
 
-Every completion of `daw-review` delivers a structured handoff payload adhering to the canonical suite envelope. The canonical handoff payload MUST be emitted and observable BEFORE advancing to the next stage (`daw-verify`). When running sequentially in a single agent session, display this complete JSON envelope before proceeding. Rich audit findings, conformity status, and stage-gate verdicts are preserved under `details`.
+Every completion of `daw-review` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable BEFORE advancing to the next stage (`daw-verify`) per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return or an explicit inline checkpoint fallback; read-only modules never create unasked files). Direct-user responses default to concise natural language rather than raw JSON. Rich audit findings, conformity status, and stage-gate verdicts are preserved under `details`.
 
 - **Separate Stage 1 & Stage 2 Requirements:** `details` MUST contain explicit and separate verdicts and evidence for Stage 1 (`stage_1_conformity`) and Stage 2 (`stage_2_technical_audit`). Conflating both stages into a single unseparated verdict is invalid.
+- **Review Mode Support:** `details.review_mode` explicitly distinguishes `"postbuild_code_review"` (default, evaluating implemented code diffs) from `"prebuild_readiness"` (evaluating proposed specifications, architecture, and task manifests for spec-dependent features). In `prebuild_readiness` mode, `review_verdict` evaluates cross-artifact readiness (`stage_1_conformity` reports requirements/story/task coverage and `stage_2_technical_audit` reports dependency/parallel safety). The orchestrator uses this checkpoint to gate build dispatch; postbuild code review (where required by the active route, e.g. feature and bugfix routes) and runtime verification remain strictly required after build completion.
 
 ```json
 {
@@ -194,7 +258,8 @@ The review phase is complete when:
 2. If Stage 1 passed, Stage 2 has examined correctness, security, performance, and maintainability. If Stage 1 failed, the report records Stage 2 as `SKIPPED` or `LIMITED_SECURITY_TRIAGE`, states the unexamined scope, and includes any evident security or data-loss findings. A failed conformity review is complete with outer `status: "fail"`; it never receives a passing verdict.
 3. Every finding includes an objective technical rationale and evidence (no subjective taste or unsourced assertions).
 4. Detailed review verdict is recorded under `details.review_verdict` (`PASSED`, `CHANGES_REQUESTED`, `CONTRADICTION_HALT`, or `REPLAN_REQUIRED`).
-5. No automated or uncoordinated file modifications were performed by this skill.
+5. For prebuild readiness reviews (scoped to spec-dependent and nontrivial features), cross-artifact traceability, orphan task detection, unmapped criteria, and dependency/parallel safety are fully recorded, with explicit notice that postbuild review remains required where mandated by the active route.
+6. No automated or uncoordinated file modifications were performed by this skill.
 
 ---
 

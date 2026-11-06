@@ -26,9 +26,14 @@ The wizard module conducts a structured, interactive specification interview for
 
 ### Non-Goals & Invariants
 
-- **Interactive Question Pacing:** Ask at most 5 focused questions per round, each with a recommended default. Never overwhelm the user with long interrogations.
-- **No Redundant Questions:** Before each round, drop every candidate question already answered by the brief, an earlier answer, or a recorded default. Re-asking settled facts is the largest measured precision loss in clarification studies (CONTRA, arXiv 2610.01769).
-- **Behavior-Changing Questions First:** Rank candidates by whether different plausible answers would change observable behavior (entry point and interface names, input/output formats, persistence location, validation and error behavior, ordering, limits). Ask those in the earliest rounds regardless of phase; LLM interviewers otherwise surface key questions late and miss over half of implicit requirements (ReqElicitGym, arXiv 2602.18306).
+- **Interactive Question Pacing & Bounded Rounds:** Ask at most 5 focused questions per round, each with a recommended default. Never overwhelm the user with long interrogations.
+- **Question Ranking by Impact × Uncertainty:** Rank candidate questions by multiplying observable impact on system boundaries, user journeys, contract definitions, security posture, or test design by factual uncertainty. Prioritize behavior-changing and contract-defining questions in early rounds regardless of phase.
+- **Dependent Trade-Offs vs. Independent Batching:** When choices have causal dependencies, sequence dependent questions **one at a time** along the active decision frontier (upstream scope and architecture before downstream parameters). Independent orthogonal choices may be batched together up to the 5-question limit per round.
+- **No Redundant Questions & Fact-First Discovery:** Before each round, inspect workspace evidence and drop every candidate question already answered by the brief, an earlier answer, or a recorded default. Re-asking settled facts is the largest measured precision loss in clarification studies (CONTRA, arXiv 2610.01769).
+- **Distinguish Business What/Why from Technical How:** Separate business problems, user journeys, and functional outcomes from technical implementation how. Never invent policies, owners, approvals, or unobservable vanity metrics.
+- **Safe Answer Reinjection:** Reinject operator answers directly into drafted specifications, reconcile conflicting requirements, update affected acceptance criteria, and mark remaining unknowns to block only dependent feature scope.
+- **Prioritized Feature Slices & Measurable Oracles:** Preserve stable IDs (`US-01`, `PRD-01`, `FRD-01`). Feature requirements must specify prioritized independently demonstrable/testable user stories (P1, P2...) with Given/When/Then or equivalent exact input/output/error/state oracles. Do not force deploy independence for inseparable safety or transaction invariants.
+- **Canonical Procedural Contract:** Adhere to the shared delivery contract defined in [Canonical Document Quality & Workflow Transition Guide](../../references/document-quality.md#feature-delivery-contract) (specifically [Governance Alignment](../../references/document-quality.md#a-governance-and-authoring-alignment), [Clarification & Uncertainty Resolution](../../references/document-quality.md#b-clarification-and-technical-uncertainty-resolution), and [Feature Slicing & Behavioral Oracles](../../references/document-quality.md#c-feature-slicing-and-behavioral-contract-oracles)).
 - **Visual Style via DESIGN.md:** For projects with a visual UI, do not interview the user about colors, fonts, or spacing. Ask once whether they have a `DESIGN.md` (or an equivalent design system file) to attach.
   - _Attached:_ copy it verbatim to the project root as `DESIGN.md`, treat its tokens as normative, and reference it from the UI specs. Never rewrite or "improve" it.
   - _Declined:_ offer to draft one following the open [DESIGN.md format](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md): YAML front-matter tokens (`colors`, `typography`, `rounded`, `spacing`, `components`) followed by the sections `## Overview`, `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components`, `## Do's and Don'ts` in that order, each section at most once. Derive it from at most 3 questions (brand mood/personality, light/dark and primary color preference, density and target devices) with proposed defaults; use WCAG 2.2 AA contrast unless the user specifies AAA. Present the draft for confirmation before writing it.
@@ -58,7 +63,7 @@ The wizard module conducts a structured, interactive specification interview for
    - Load the canonical shared grilling protocol (`../../references/grilling.md`) for structured elicitation, bounded question rounds (<=5 questions/round), active decision frontier management, and blocker escalation. Loading protocol references grants no additional permissions or tools and spawns no background workers.
    - Before writing specification files to disk, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
    - Respect repository spec conventions from DAW configuration if present (default: `docs/specs/`).
-   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) whenever authoring formal specifications across the 13-document matrix.
+   - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and adhere to its shared procedural contract (`references/document-quality.md#feature-delivery-contract`) whenever authoring formal specifications across the 13-document matrix.
 
 ---
 
@@ -103,7 +108,7 @@ _(Note: User-facing UI specifications in Phase 4 are omitted for headless CLI or
 
 ## 4. Output Contract
 
-Every completion of `daw-wizard` delivers a structured handoff payload adhering to the canonical suite envelope:
+Every completion of `daw-wizard` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized spec artifacts, or an explicit inline fallback). Direct-user responses default to concise natural language summarizing interview status and generated specifications:
 
 ```json
 {
