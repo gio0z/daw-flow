@@ -1,5 +1,17 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-06: Optional Parent-Owned Workflow Resume Checkpoint
+
+- Define an optional Markdown resume summary in the operations reference, reusing authorized artifacts or durable harness records without introducing a mandatory file, logger, database, or runtime.
+- Preserve workflow identity, scope revisions, parent acceptance, canonical handoff/evidence references, unresolved findings, and correction state across resume. Revalidate predecessor inputs before success-dependent dispatch; scoped corrections still use validated failure findings under existing limits.
+- Link the summary from handoff transport without treating it as a new transport or replacement envelope, and add manual unchanged-revision, scoped-invalidation, and fresh-session scenarios.
+
+## 2026-11-06: Patch Routing Consistency and Wizard Metric Validation
+
+- Align patch pipeline references with the canonical `daw-build` -> `daw-verify` route.
+- Replace the illustrative repair-attempt cap with a link to the existing review retry protocol; retry policy is unchanged.
+- Reject negative or boolean judge question counts, redundant counts exceeding total counts, and elicited requirement IDs absent from the scenario. Preserve valid zero-count boundaries and existing score formulas, with behavioral regression coverage.
+
 ## 2026-11-06: Repository Structural Separation and Operational Packaging
 
 - **Operational Package Separation:** Formally separate the self-contained installed operational runtime package from developer tooling, tests, fixtures, and repository documentation.

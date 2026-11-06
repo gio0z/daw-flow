@@ -331,7 +331,7 @@ Existing project file naming, issue tracking, and directory structures are respe
    - Blocking findings (e.g., missing mandatory criteria, circular dependencies, unsafe parallel writes) halt the workflow as `blocked` until repaired.
    - Nonblocking advisories are recorded for parent visibility.
    - The parent orchestrator owns final acceptance of readiness findings.
-   - Route-required postbuild review remains distinct; a prebuild checkpoint cannot satisfy it. For routes that explicitly mandate postbuild review (`feature`, `bugfix`), passing this prebuild readiness checkpoint NEVER replaces or waives postbuild `daw-review`, which audits the actual modified codebase and runtime evidence after implementation. Do NOT insert `daw-review` into routes that do not require it (e.g., `patch` pipeline is `daw-plan` -> `daw-build` -> `daw-verify`). Verification is always performed per the active route.
+   - Route-required postbuild review remains distinct; a prebuild checkpoint cannot satisfy it. For routes that explicitly mandate postbuild review (`feature`, `bugfix`), passing this prebuild readiness checkpoint NEVER replaces or waives postbuild `daw-review`, which audits the actual modified codebase and runtime evidence after implementation. Do NOT insert `daw-review` into routes that do not require it (e.g., `patch` pipeline is `daw-build` -> `daw-verify`). Verification is always performed per the active route.
 5. **Direct Fallback with Evidence Limits:** If an independent subagent reviewer cannot be spawned, the orchestrator performs an honest, direct cross-artifact check in the current session, explicitly documenting the limitation in the handoff evidence.
 
 <a id="g-convergence-change-impact"></a><a id="g-convergence-drift-analysis-and-scoped-invalidation"></a>
@@ -352,7 +352,7 @@ Existing project file naming, issue tracking, and directory structures are respe
    - **Formal Document Mutations:** When formal, accepted specification documents mutate, they MUST re-enter the existing five-edge document transition gate (`review-rework` $\rightarrow$ `rework-review` $\rightarrow$ `review-ready`). Agents MUST NOT invent a non-existent transition named `rework`.
    - **Code-Only Changes Do Not Invalidate Docs:** Modifying implementation code does not invalidate accepted specification documents or force specifications back through the document quality transition gate unless the specification itself is altered.
    - **Targeted Approval Invalidation:** Prior operator approvals are invalidated ONLY when their specific action, target environment, code revision, or operational scope changes—never by blanket, unrelated workspace updates.
-6. **Bounded Repair Cycles:** Repair and review iterations are bounded by existing workflow retry limits (e.g., maximum 3 attempts); unbounded or infinite convergence loops are strictly prohibited.
+6. **Bounded Repair Cycles:** Repair and review iterations are bounded by existing workflow retry limits (see the [Fix-and-Rereview Loop Protocol](../skills/daw-review/SKILL.md#4-fix-and-rereview-loop-protocol)); unbounded or infinite convergence loops are strictly prohibited.
 
 <a id="h-pause-resume"></a><a id="h-scoped-pauseresume-and-canonical-block-state"></a>
 

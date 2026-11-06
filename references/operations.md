@@ -424,6 +424,63 @@ never be presented as independent review.
    Late output cannot restart the graph. End-to-end completion requires the active
    route's final criteria and actual current-revision verification, not a worker exit.
 
+### Optional Workflow Resume Checkpoint
+
+A workflow that may need cross-session resume MAY keep one parent-owned Markdown summary,
+`Optional Workflow Resume Checkpoint`, listing current stage, accepted criteria,
+revision refs, inspectable handoff/evidence refs, and pending work. It is a summary,
+never a JSON replacement, authentication, approval token, canonical handoff
+replacement, second authority, or evidence truth; primary evidence remains the
+referenced canonical handoff and observation records. Prefer reusing an existing
+harness record or handoff artifact; one checkpoint per workflow only when needed.
+No automatic disk creation; persist only when cross-session resume is needed and
+an explicit task/repo/workflow authorization designates its path. Read-only modules
+never gain write authority from it. Harness-native records are preferred when
+durable, inspectable, and accessible next session.
+
+Objective/scope: resume the same workflow ID, active route, and scope. Non-goals: no
+new route, stage, mandatory file/path, SQLite store, logger, runtime, autonomous crash
+recovery, event log, retry/approval restoration, or new machinery. When retention is
+unavailable, the parent validates the checkpoint refs and supplies the available
+canonical handoffs and findings to a fresh worker — never the summary alone.
+Success-dependent dispatch requires complete, accepted predecessor inputs. A scoped
+corrective dispatch may instead consume validated failure findings under the existing
+correction rules; unavailable findings MUST NOT be invented. The parent reconstructs
+the applicable joins and pre-dispatch checks before dispatch.
+
+Content per stage: workflow ID; task/criterion IDs or existing stable criterion text
+(label the identifier as an ID or quote the actual criterion text); worker outcome
+using existing semantics only (`pass`/`fail`/`blocked` are worker claims, not new
+enums); parent acceptance (`accepted`/`not accepted`, or explicitly pending); artifact
+revisions per scope (e.g., `snapshot:docs/design.md#rev-…` or commit/hash);
+inspectable canonical handoff and primary evidence refs; unresolved
+findings/decisions with owner and affected scope; `next_permitted_action` (e.g.,
+`advance_to_next_stage`, `dispatch_correction`, or `blocked`); current round/allowed
+correction state and hypothesis/retry state when relevant; next pending stage when
+parent acceptance is not yet recorded. Illustrative excerpt only:
+
+```markdown
+## Optional Workflow Resume Checkpoint (illustrative, not an execution)
+
+- Workflow ID: wf-signed-sum-402; objective/scope: signed-sum CLI fix; route: daw-build→daw-verify
+- Stage task-402 (worker outcome `pass` claim / parent acceptance pending); artifact
+  `src/cli/signed_sum.py` @ `snapshot:src/cli/signed_sum.py#rev-b2`;
+  criterion `AC-1-signed-addition` (ID) inspected via primary evidence ref `obs-…-r2`;
+  handoff ref: canonical handoff for task-402 round 2; unresolved: none;
+  round 2; next pending stage: parent acceptance of task-402 not yet recorded;
+  next permitted action: parent_acceptance_review
+```
+
+Update rules: the parent updates this summary after an actual accepted transition,
+correction, or pause — not after every tool call and not from a worker claim alone.
+Resume algorithm: the parent reads current constraints, validates checkpoint refs
+against artifacts, compares artifact revisions per scope, and inspects referenced
+handoffs/primary evidence. Missing, unavailable, or stale evidence is treated as
+unverified, not as an accepted prerequisite; invalidate only the affected scope.
+Resume never resets retry state, restores an approval, or assumes prior worker IDs
+remain valid. The parent reconstructs mandatory predecessor joins and pre-dispatch
+checks before dispatching any work.
+
 ### Optional OMP Mapping
 
 When exposed by the host, `task` creates workers, `write agent://ID` continues a retained

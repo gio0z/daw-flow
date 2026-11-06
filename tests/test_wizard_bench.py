@@ -23,7 +23,7 @@ ORACLE = REPO_ROOT / "tools/evaluation/wizard_oracle.py"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.evaluation.wizard_bench import aggregate_summary, run_scenario
+from tools.evaluation.wizard_bench import aggregate_summary, evaluate_judge, run_scenario
 
 FAKE_AGENT_CODE = """import json
 import sys
@@ -446,6 +446,58 @@ class WizardBenchTests(unittest.TestCase):
         run_dir = output / "fixture-scenario-wizard-001"
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "interview_failed")
+
+    def test_evaluate_judge_rejects_invalid_counts_and_unknown_ids(self) -> None:
+        """Judge validation: negative/excess/bool counts and unknown elicited IDs raise ValueError."""
+        scenario = {
+            "hidden_requirements": [{"id": "R1"}, {"id": "R2"}],
+        }
+        base = {
+            "elicited_requirement_ids": ["R1"],
+            "redundant_question_count": 0,
+            "total_question_count": 1,
+            "checklist": {
+                "goal": True, "scope": True, "inputs_outputs": True, "data_changes": True,
+                "edge_cases": True, "acceptance_tests": True, "constraints": True, "no_change_list": True,
+            },
+            "unsupported_claims": [],
+        }
+        for changes in [
+            {"redundant_question_count": -1},
+            {"total_question_count": -1},
+            {"redundant_question_count": 5, "total_question_count": 1},
+            {"redundant_question_count": True},
+            {"total_question_count": False},
+            {"elicited_requirement_ids": ["R1", "INVENTED"]},
+        ]:
+            with self.subTest(changes=changes):
+                with self.assertRaises(ValueError):
+                    evaluate_judge({**base, **changes}, scenario)
+
+    def test_evaluate_judge_valid_boundaries_and_partial_ids(self) -> None:
+        """Judge validation: zero/zero and partial known IDs grade with unchanged formulas."""
+        scenario = {
+            "hidden_requirements": [{"id": "R1"}, {"id": "R2"}],
+        }
+        result = evaluate_judge(
+            {
+                "elicited_requirement_ids": ["R2"],
+                "redundant_question_count": 0,
+                "total_question_count": 0,
+                "checklist": {
+                    "goal": True, "scope": False, "inputs_outputs": False, "data_changes": False,
+                    "edge_cases": False, "acceptance_tests": False, "constraints": True, "no_change_list": False,
+                },
+                "unsupported_claims": ["claim"],
+            },
+            scenario,
+        )
+        self.assertEqual(result["status"], "graded")
+        self.assertEqual(result["ire"], 0.5)
+        self.assertEqual(result["checklist_score"], 2)
+        self.assertEqual(result["redundancy_ratio"], 0.0)
+        self.assertEqual(result["fabrication_count"], 1)
+        self.assertEqual(result["elicited_requirement_ids"], ["R2"])
 
     def test_judge_valid_malformed_and_ungraded(self) -> None:
         """Judge: valid judge JSON => IRE computed; malformed => error and nonzero CLI exit; no judge => ungraded and exit 0."""

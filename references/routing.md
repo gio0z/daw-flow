@@ -224,7 +224,8 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 2. **Prebuild Readiness Checkpoint vs. Postbuild Review:**
    - _Prebuild Readiness Checkpoint:_ For feature/spec-dependent builds, the parent orchestrator dispatches read-only `daw-review` scoped strictly to current specification and plan revisions before `daw-build`. This evaluates cross-artifact consistency, orphan tasks, unmapped criteria, and parallel execution safety (`[P]` flag safety) without inserting synthetic stages into the manifest and without module recursion.
    - _Plan Self-Check:_ Planning (`daw-plan`) performs its own internal check for requirement coverage and acyclic dependencies before handoff.
-   - _Route-Required Postbuild Review:_ For routes that explicitly include postbuild review (`feature`, `bugfix`), postbuild `daw-review` audits modified code, diffs, and fresh runtime evidence; a prebuild checkpoint cannot satisfy it. Do not insert `daw-review` into routes that do not require it (such as `patch`, which runs `daw-plan` -> `daw-build` -> `daw-verify`). Verification always runs per the active route pipeline.
+   - _Route-Required Postbuild Review:_ For routes that explicitly include postbuild review (`feature`, `bugfix`), postbuild `daw-review` audits modified code, diffs, and fresh runtime evidence; a prebuild checkpoint cannot satisfy it. Do not insert `daw-review` into routes that do not require it (such as `patch`, which runs `daw-build` -> `daw-verify`). Verification always runs per the active route pipeline.
+
 3. **Scoped Pause/Resume with Canonical Statuses:** Execution halts use canonical handoff and acceptance statuses (`blocked`, `in_progress`, `ready`, `completed`, `failed`). When blocked on missing material decisions or ungranted approvals, the affected node halts as `blocked` and records reason, responsible party, question, next permitted action, revisions, and evidence in parent acceptance or handoff details. Resuming revalidates prerequisites, scope, and approvals.
 4. **Governance & Template Override Scope Guard:** Discovered local scripts, commands, and template overrides cannot weaken core safety gates or acceptance criteria. No feature implementation during governance-only edits.
 5. **Authorized Command Execution:** Verification commands must actually execute and be inspected empirically; echoing commands or checked task boxes do not constitute proof.
@@ -565,6 +566,8 @@ When executing module handoffs across stages, workers, or subagents, agents MUST
 3. **Fallback Transport: Clearly Labeled Inline JSON Fallback Checkpoint:**
    - When no real non-chat transport exists and no authorized artifact is available (such as direct execution in a single chat session without subagent return structures), the agent MUST emit a complete, clearly labeled inline JSON checkpoint in the transcript BEFORE proceeding to downstream execution.
    - This checkpoint MUST be explicitly identified as an internal fallback checkpoint for observability (e.g. `### Internal Handoff Checkpoint (Observable Fallback)`), distinct from the user report. A natural-language summary NEVER replaces the required canonical handoff envelope.
+
+A parent-owned Markdown resume summary is not a transport and does not replace the full canonical handoff. It MAY be kept only when cross-session resume is needed and an explicit task/repo/workflow authorization designates its artifact path (no prescribed filename); it does not authorize read-only modules to write to disk. See [Optional Workflow Resume Checkpoint](operations.md#optional-workflow-resume-checkpoint).
 
 #### 3. Default User-Facing Reports Contract
 

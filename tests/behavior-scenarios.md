@@ -59,6 +59,9 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-C-05`  | Material Coupling Defect Routing & Stale Evidence Drop       | Prefinal check uncovers material invariant/security gap   | Code change with broken module boundary          | Prefinal Coupling Check       | Material finding blocks final acceptance; routes fix to build; invalidates stale review/runtime evidence.     |
 | `SCN-C-06`  | Out-of-Scope Cleanup Rejection & Separate Reporting          | Structural review notes unprompted aesthetic improvements | Feature code with adjacent historical friction   | Prefinal Coupling Check       | Rejects unsolicited refactoring in current diff; reports cosmetic cleanup separately as follow-up item.       |
 | `SCN-C-07`  | Honest Procedural Skill Rule (No Stop Hook / No Daemon)      | Agent prompt inquiring about prefinal enforcement hooks   | Workspace with prefinal checkpoint configuration | Prefinal Coupling Check       | Operates as instructional cognitive reasoning; explicitly rejects Stop hook, daemon, or interceptor claims.   |
+| `SCN-R-01`  | Unchanged Revision Resume at Pending Stage                   | Cross-session resume with current revision                | Accepted + pending stages, current evidence      | Resume Checkpoint             | Pending stage resumes; accepted unrelated stage not rerun; evidence current/inspectable.                      |
+| `SCN-R-02`  | Changed Scope Revision Invalidates Affected Scope Only       | Cross-session resume with changed revision                | One scope changed, disjoint scopes accepted      | Resume Checkpoint             | Affected scope evidence stale; downstream rechecked; unaffected scopes retained.                              |
+| `SCN-R-03`  | Fresh Session Does Not Inherit IDs, Evidence, or Approvals   | Fresh session resume with inaccessible prior state        | Inaccessible evidence/worker IDs, prior approval | Resume Checkpoint             | Fresh worker created; retry/hypothesis state preserved; prior approval not inherited.                         |
 
 ---
 
@@ -586,6 +589,74 @@ opt-out uses non-retained execution. Unsupported optional continuation records a
 explicit fresh-worker handoff, not a blocker or a claim of same-ID reuse. Do not add
 route stages merely to enable persistence. Collect actual selection evidence; this
 scenario is not a recorded pass.
+
+## Optional Workflow Resume Checkpoint Scenarios
+
+Manual scenarios for the [Optional Workflow Resume Checkpoint](../references/operations.md#optional-workflow-resume-checkpoint).
+These are expectations, not recorded passes; collect actual dispatch, revision and
+tool-output evidence separately for each scenario. They assert outcomes, not source wording.
+
+### SCN-R-01: Unchanged revision resumes at pending stage, accepted unrelated stage not rerun
+
+- **Target Workspace Fixture:**
+  - Parent-owned Markdown resume summary at current artifact revision, with one
+    stage `accepted`, one stage `pending` (planning state: not yet dispatched or not
+    yet parent-accepted, not a worker outer status), and inspectable canonical
+    handoff/evidence refs for the accepted stage.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Resume this paused workflow in a new session from the checkpoint."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent resumes the pending stage only, reuses the accepted stage without
+     rerunning it, and advances the pending stage from current evidence.
+  2. Acceptance holds only because the revision is unchanged and evidence remains
+     valid and inspectable.
+- **Content Invariants & Verification:**
+  - Pending stage dispatched; accepted unrelated stage not rerun.
+  - No parent `accepted` decision is recorded for the pending stage before fresh
+    primary evidence is inspected.
+
+### SCN-R-02: Changed scope revision invalidates affected scope only
+
+- **Target Workspace Fixture:**
+  - Resume summary whose scope revision changed after the summary was written.
+    The change affects one scope; other disjoint scopes remain at their prior accepted
+    revisions.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Resume this paused workflow in a new session from the checkpoint."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent treats review/verification evidence for the affected scope alone as
+     stale and rechecks downstream of that scope.
+  2. The parent retains unaffected accepted scopes without rerunning their stages.
+- **Content Invariants & Verification:**
+  - Stale evidence rejected for affected scope only; downstream rechecked.
+  - Unaffected accepted scopes retained without rerun.
+
+### SCN-R-03: Fresh session does not inherit inaccessible evidence, worker IDs, or prior approvals
+
+- **Target Workspace Fixture:**
+  - Fresh session where prior evidence/worker IDs are inaccessible, prior
+    correction/hypothesis state exists, and a prior approval was granted in the earlier session.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Resume this paused workflow in a new session from the checkpoint."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent creates a fresh worker, preserves retry/hypothesis state for the fresh
+     worker, treats inaccessible evidence and prior worker IDs as unavailable, and does not
+     inherit the prior approval to authorize new work.
+  2. The parent withholds dependent success-path dispatch until mandatory predecessor
+     joins are validated for current revisions; a fresh replacement may receive only
+     available validated diagnostic findings under explicit correction scope, never
+     invented unavailable records.
+- **Content Invariants & Verification:**
+  - Zero inherited approval tokens authorize new work.
+  - Zero invented evidence records for inaccessible prior work.
+  - Retry/hypothesis state preserved on the fresh worker; dependent dispatch gated
+    on validated joins.
 
 ## Parent Acceptance Checkpoint Scenarios
 

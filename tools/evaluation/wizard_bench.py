@@ -77,10 +77,22 @@ def evaluate_judge(judge_data: Any, scenario: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Judge output missing 'elicited_requirement_ids' list")
     if any(not isinstance(x, str) for x in judge_data["elicited_requirement_ids"]):
         raise ValueError("'elicited_requirement_ids' items must be strings")
-    if "redundant_question_count" not in judge_data or not isinstance(judge_data["redundant_question_count"], int):
+    if (
+        "redundant_question_count" not in judge_data
+        or not isinstance(judge_data["redundant_question_count"], int)
+        or isinstance(judge_data["redundant_question_count"], bool)
+    ):
         raise ValueError("Judge output missing integer 'redundant_question_count'")
-    if "total_question_count" not in judge_data or not isinstance(judge_data["total_question_count"], int):
+    if (
+        "total_question_count" not in judge_data
+        or not isinstance(judge_data["total_question_count"], int)
+        or isinstance(judge_data["total_question_count"], bool)
+    ):
         raise ValueError("Judge output missing integer 'total_question_count'")
+    if judge_data["redundant_question_count"] < 0 or judge_data["total_question_count"] < 0:
+        raise ValueError("Question counts must be non-negative")
+    if judge_data["redundant_question_count"] > judge_data["total_question_count"]:
+        raise ValueError("Redundant question count cannot exceed total question count")
     if "checklist" not in judge_data or not isinstance(judge_data["checklist"], dict):
         raise ValueError("Judge output missing 'checklist' object")
     for key in CHECKLIST_KEYS:
@@ -92,6 +104,9 @@ def evaluate_judge(judge_data: Any, scenario: dict[str, Any]) -> dict[str, Any]:
     hidden_reqs = scenario.get("hidden_requirements", [])
     hidden_ids = {r["id"] for r in hidden_reqs if isinstance(r, dict) and "id" in r}
     elicited_set = set(judge_data["elicited_requirement_ids"])
+    unknown_ids = elicited_set - hidden_ids
+    if unknown_ids:
+        raise ValueError(f"Elicited requirement IDs not in scenario hidden requirements: {sorted(unknown_ids)!r}")
 
     ire = len(elicited_set & hidden_ids) / len(hidden_ids) if hidden_ids else 0.0
     total_q = judge_data["total_question_count"]

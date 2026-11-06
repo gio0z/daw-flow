@@ -103,7 +103,7 @@ The suite provides `tools/evaluation/wizard_oracle.py`, a deterministic, zero-de
 - **Redundancy ratio**: Fraction of questions identified as redundant.
 - **Fabrication count**: Count of unsupported claims or fabricated requirements in specifications.
 
-When `--judge-command` is omitted, judge metrics are explicitly marked as `"ungraded"` (never guessed or fabricated).
+When `--judge-command` is omitted, judge metrics are explicitly marked as `"ungraded"` (never guessed or fabricated). Judge output is validated before grading: question counts must be non-negative integers (booleans rejected), redundant questions cannot exceed total questions, and every elicited requirement ID must exist in the scenario's hidden requirements; invalid judge output raises a runner error.
 
 ### Limitations and honesty rules
 
