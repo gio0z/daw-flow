@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ACCEPTANCE_SCRIPT = REPO_ROOT / "references" / "wizard-bench" / "expense-tracker" / "acceptance.py"
+ACCEPTANCE_SCRIPT = REPO_ROOT / "tests" / "fixtures" / "wizard-bench" / "expense-tracker" / "acceptance.py"
 
 EXPECTED_ALL_PASS = {
     "R1_entrypoint_exists": "pass",

@@ -67,7 +67,17 @@ class InstallTests(unittest.TestCase):
             self.assertTrue((alias.resolve().parents[1] / "references" / "operations.md").is_file())
         self.assertTrue((bundle / "templates" / "security.md").is_file())
         self.assertTrue((bundle / "LICENSE").is_file())
+        self.assertTrue((bundle / "VERSION").is_file())
+        self.assertTrue((bundle / "SKILL.md").is_file())
+        self.assertTrue((bundle / "scripts" / "package_layout.py").is_file())
         self.assertFalse((bundle / ".git").exists())
+        self.assertFalse((bundle / "tests").exists())
+        self.assertFalse((bundle / "docs").exists())
+        self.assertFalse((bundle / "tools").exists())
+        self.assertFalse((bundle / "README.md").exists())
+        self.assertFalse((bundle / "AGENTS.md").exists())
+        self.assertFalse((bundle / "scripts" / "evaluate.py").exists())
+        self.assertFalse((bundle / "scripts" / "wizard_bench.py").exists())
         for cmd in (["scripts/route.py", "--check-suite"], ["scripts/validate.py", "package"]):
             result = subprocess.run([sys.executable, str(bundle / cmd[0]), *cmd[1:]], cwd=self.base, env=self.env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
@@ -204,14 +214,32 @@ class InstallTests(unittest.TestCase):
         source = self.source_copy()
         external = self.base / "private.txt"
         external.write_text("private fixture")
-        (source / "scripts" / "external.txt").symlink_to(external)
+        (source / "references" / "external.txt").symlink_to(external)
         result = self.cli(source=source)
         self.assertEqual(result.returncode, 1)
         self.assertFalse(self.skills.exists())
 
+    def test_source_optional_agents_symlink_is_rejected(self):
+        if not self.symlinks:
+            self.skipTest("Symlinks unavailable")
+        source = self.source_copy()
+        external_agents = self.base / "external-agents"
+        external_agents.mkdir()
+        (external_agents / "metadata.txt").write_text("secret metadata")
+        agents_path = source / "agents"
+        if agents_path.is_dir() and not agents_path.is_symlink():
+            shutil.rmtree(agents_path)
+        elif agents_path.exists() or agents_path.is_symlink():
+            agents_path.unlink()
+        agents_path.symlink_to(external_agents, target_is_directory=True)
+        result = self.cli(source=source)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("symlink", result.stdout + result.stderr)
+        self.assertFalse(self.skills.exists())
+
     def test_install_into_source_resources_is_rejected(self):
         source = self.source_copy()
-        self.skills = source / "scripts" / "recursive"
+        self.skills = source / "references" / "recursive"
         result = self.cli(source=source)
         self.assertEqual(result.returncode, 1)
         self.assertFalse(self.skills.exists())
@@ -269,7 +297,7 @@ class InstallTests(unittest.TestCase):
         pycache1 = bundle / "scripts" / "__pycache__"
         pycache1.mkdir(parents=True, exist_ok=True)
         (pycache1 / "x.cpython.pyc").write_bytes(b"dummy")
-        pycache2 = bundle / "tests" / "__pycache__"
+        pycache2 = bundle / "skills" / "daw-build" / "__pycache__"
         pycache2.mkdir(parents=True, exist_ok=True)
         (pycache2 / "y.pyc").write_bytes(b"dummy")
 
@@ -301,10 +329,13 @@ class InstallTests(unittest.TestCase):
         bundle = self.skills / SUITE
         bundle.mkdir(parents=True)
         for entry in entries:
-            target = bundle / entry.name
+            rel = entry.relative_to(installer.SOURCE)
+            target = bundle / rel
             if entry.is_dir():
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(entry, target, ignore=installer.ignore_copy)
             else:
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(entry, target)
 
         manifest_path = bundle / "references" / "suite-manifest.json"
@@ -322,6 +353,8 @@ class InstallTests(unittest.TestCase):
 
         for f_name in ("SKILL.md", "AGENTS.md"):
             f_path = bundle / f_name
+            if not f_path.is_file():
+                continue
             lines = f_path.read_text().splitlines(keepends=True)
             out = []
             fm_count = 0
@@ -500,10 +533,13 @@ class InstallTests(unittest.TestCase):
         bundle = self.skills / SUITE
         bundle.mkdir(parents=True)
         for entry in entries:
-            target = bundle / entry.name
+            rel = entry.relative_to(installer.SOURCE)
+            target = bundle / rel
             if entry.is_dir():
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(entry, target, ignore=installer.ignore_copy)
             else:
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(entry, target)
 
         manifest_path = bundle / "references" / "suite-manifest.json"
@@ -515,6 +551,8 @@ class InstallTests(unittest.TestCase):
 
         for f_name in ("SKILL.md", "AGENTS.md"):
             f_path = bundle / f_name
+            if not f_path.is_file():
+                continue
             lines = f_path.read_text().splitlines(keepends=True)
             out = []
             fm_count = 0
@@ -618,6 +656,84 @@ class InstallTests(unittest.TestCase):
         tampered_uninstall = self.cli("uninstall")
         self.assertEqual(tampered_uninstall.returncode, 1)
         self.assertTrue(bundle.is_dir())
+
+    def test_installed_bundle_can_reinstall_from_itself(self):
+        bundle = self.installed()
+        second_skills = self.base / "second-project" / ".agents" / "skills"
+        result = self.cli("install", "--skills-dir", str(second_skills), source=bundle, custom=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        second_bundle = second_skills / SUITE
+        self.assertTrue((second_bundle / "SKILL.md").is_file())
+        self.assertFalse((second_bundle / "tests").exists())
+        self.assertFalse((second_bundle / "docs").exists())
+        self.assertTrue((second_bundle / "scripts" / "package_layout.py").is_file())
+        status = self.cli("status", "--skills-dir", str(second_skills), source=second_bundle, custom=False)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+
+    def test_legacy_full_eleven_migration_and_tamper_protection(self):
+        if not self.symlinks:
+            self.skipTest("Directory symlinks unavailable; root-only installation is tested separately")
+        bundle = self.skills / SUITE
+        bundle.mkdir(parents=True)
+        for name in ("SKILL.md", "README.md", "AGENTS.md", "LICENSE", "VERSION", "CHANGELOG.md", "references", "templates", "skills", "docs", "tests", "tools"):
+            src = ROOT / name
+            if not src.exists():
+                continue
+            dst = bundle / name
+            if src.is_dir():
+                shutil.copytree(src, dst, ignore=installer.ignore_copy)
+            else:
+                shutil.copy2(src, dst)
+        scripts_dir = bundle / "scripts"
+        scripts_dir.mkdir(exist_ok=True)
+        for s in ("install.py", "route.py", "validate.py", "doc_quality.py", "package_layout.py"):
+            if (ROOT / "scripts" / s).exists():
+                shutil.copy2(ROOT / "scripts" / s, scripts_dir / s)
+        for m in MODULES:
+            alias = self.skills / m
+            alias.symlink_to(installer.alias_path(m), target_is_directory=True)
+        inv = installer.inventory(bundle)
+        receipt = {
+            "schema_version": 1,
+            "suite": SUITE,
+            "version": (bundle / "VERSION").read_text(encoding="utf-8").strip(),
+            "aliases": list(MODULES),
+            "files": inv,
+        }
+        (bundle / installer.RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+        # 1. Status passes on legacy full 11
+        status = self.cli("status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        payload = json.loads(status.stdout)
+        self.assertEqual(payload["status"], "ready")
+
+        # 2. Tampering with any file in legacy bundle (even docs/tests) prevents update
+        test_file = bundle / "docs" / "tamper_test.txt"
+        test_file.parent.mkdir(exist_ok=True)
+        test_file.write_text("user edits", encoding="utf-8")
+        failed_update = self.cli("install", "--update")
+        self.assertEqual(failed_update.returncode, 1)
+        self.assertIn("preserving local work", failed_update.stdout + failed_update.stderr)
+        test_file.unlink()
+
+        # 3. Clean update migrates legacy bundle to new minimal bundle
+        update = self.cli("install", "--update")
+        self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+        self.assertEqual(json.loads(update.stdout)["status"], "updated")
+
+        # 4. In minimal bundle, dev files are absent and package_layout is present
+        self.assertFalse((bundle / "tests").exists())
+        self.assertFalse((bundle / "docs").exists())
+        self.assertFalse((bundle / "README.md").exists())
+        self.assertFalse((bundle / "AGENTS.md").exists())
+        self.assertTrue((bundle / "scripts" / "package_layout.py").is_file())
+        for m in MODULES:
+            self.assertTrue((self.skills / m).is_symlink())
+
+        # 5. Status passes after migration
+        status_after = self.cli("status")
+        self.assertEqual(status_after.returncode, 0, status_after.stdout + status_after.stderr)
 
 if __name__ == "__main__":
     unittest.main()

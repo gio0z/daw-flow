@@ -18,13 +18,19 @@ sys.dont_write_bytecode = True
 import route
 import validate
 
+try:
+    import package_layout
+except ImportError:
+    from scripts import package_layout
+
 
 SUITE = "deterministic-agentic-workflow"
 SOURCE = Path(__file__).resolve().parents[1]
 RECEIPT = ".daw-install.json"
 MODULES = tuple(sorted(route.MANIFEST_MODULE_KEYS))
-PAYLOAD = ("SKILL.md", "README.md", "AGENTS.md", "LICENSE", "VERSION", "scripts", "references", "templates", "skills", "tests", "docs", "agents")
-REQUIRED = set(PAYLOAD) - {"agents"}
+REQUIRED = package_layout.REQUIRED_FILES + package_layout.REQUIRED_DIRS
+OPTIONAL = package_layout.OPTIONAL_DIRS
+PAYLOAD = REQUIRED + OPTIONAL
 SKILL_DIRS = {
     "codex": (".agents/skills", ".agents/skills"),
     "claude": (".claude/skills", ".claude/skills"),
@@ -66,16 +72,25 @@ def source_entries() -> list[Path]:
     missing = [name for name in REQUIRED if not (SOURCE / name).exists()]
     if missing:
         raise InstallError("Source bundle is incomplete; use a complete release or checkout.")
-    entries = [SOURCE / name for name in PAYLOAD if (SOURCE / name).exists()]
+    entries = package_layout.operational_entries(SOURCE)
     for entry in entries:
         paths = [entry]
         if entry.is_dir() and not entry.is_symlink():
-            paths.extend(entry.rglob("*"))
+            for current, dirs, files in os.walk(entry, followlinks=False):
+                dirs[:] = [name for name in dirs if name not in IGNORED and not name.endswith((".pyc", ".pyo"))]
+                for name in dirs + files:
+                    if name in IGNORED or name.endswith((".pyc", ".pyo")):
+                        continue
+                    paths.append(Path(current) / name)
         for path in paths:
             if path.is_symlink():
                 raise InstallError("Source bundle contains a symlink; refusing to copy its target.")
             if not path.is_file() and not path.is_dir():
                 raise InstallError("Source bundle contains a non-regular entry.")
+            try:
+                path.resolve().relative_to(SOURCE.resolve())
+            except ValueError:
+                raise InstallError("Source bundle contains an entry that escapes source root.")
     ensure_valid_bundle(SOURCE)
     return entries
 
@@ -195,12 +210,17 @@ def payload_inventory(entries: list[Path]) -> dict[str, str]:
     for entry in entries:
         paths = [entry]
         if entry.is_dir():
-            for current, dirs, files in os.walk(entry):
+            for current, dirs, files in os.walk(entry, followlinks=False):
                 dirs[:] = [name for name in dirs if name not in ignore_copy(current, dirs)]
-                paths.extend(Path(current) / name for name in dirs + files if name not in ignore_copy(current, [name]))
+                for name in dirs + files:
+                    if name not in ignore_copy(current, [name]):
+                        paths.append(Path(current) / name)
         for path in paths:
-            relative = path.relative_to(SOURCE).as_posix()
-            records[relative] = "directory" if path.is_dir() else hashlib.sha256(path.read_bytes()).hexdigest()
+            rel = path.relative_to(SOURCE)
+            for parent in rel.parents:
+                if parent != Path("."):
+                    records[parent.as_posix()] = "directory"
+            records[rel.as_posix()] = "directory" if path.is_dir() else hashlib.sha256(path.read_bytes()).hexdigest()
     return records
 
 
@@ -297,7 +317,7 @@ def install(skills_dir: Path, update: bool, no_aliases: bool, dry_run: bool) -> 
     skills_dir = Path(skills_dir).expanduser().resolve()
     entries = source_entries()
     bundle = skills_dir / SUITE
-    if bundle == SOURCE or SOURCE.is_relative_to(bundle):
+    if bundle == SOURCE or SOURCE.is_relative_to(bundle) or bundle.is_relative_to(SOURCE) or skills_dir == SOURCE or skills_dir.is_relative_to(SOURCE):
         raise InstallError("Installation cannot replace or contain its source checkout.")
     if any(entry.is_dir() and skills_dir.is_relative_to(entry) for entry in entries):
         raise InstallError("Installation cannot be nested in source resources.")
@@ -317,10 +337,13 @@ def install(skills_dir: Path, update: bool, no_aliases: bool, dry_run: bool) -> 
             candidate = staging / SUITE
             candidate.mkdir()
             for entry in entries:
-                target = candidate / entry.name
+                rel = entry.relative_to(SOURCE)
+                target = candidate / rel
                 if entry.is_dir():
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copytree(entry, target, ignore=ignore_copy)
                 else:
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(entry, target)
             ensure_valid_bundle(candidate)
             if inventory(candidate) != receipt["files"]:

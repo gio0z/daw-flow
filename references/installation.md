@@ -28,6 +28,8 @@ The target directory contains a real copy of `deterministic-agentic-workflow/` a
 skills/
 ├── deterministic-agentic-workflow/
 │   ├── SKILL.md
+│   ├── LICENSE
+│   ├── VERSION
 │   ├── agents/openai.yaml
 │   ├── scripts/
 │   ├── references/
@@ -37,7 +39,7 @@ skills/
 └── ... ten other module aliases
 ```
 
-The copy survives removal of the original checkout. All eleven modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
+The copy survives removal of the original checkout. The installed operational bundle includes only runtime operational files (`SKILL.md`, `LICENSE`, `VERSION`, optional `agents/` metadata, operational `scripts/`, `references/`, `templates/`, and `skills/`). Repository developer resources (`docs/`, `tests/`, `tools/`, `CHANGELOG.md`, `README.md`, and evaluation harnesses) remain in the source repository and are not shipped in the installed bundle. All eleven modules remain required; optional external specialist skills are not required. Never install flat independent copies of `daw-*`: their root-relative governance and resource links require the complete bundle.
 
 ## Client locations
 

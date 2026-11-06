@@ -11,7 +11,7 @@ import unittest
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-RUNNER = REPO_ROOT / "scripts/evaluate.py"
+RUNNER = REPO_ROOT / "tools/evaluation/evaluate.py"
 MODULE_COUNT = len(json.loads((REPO_ROOT / "references/suite-manifest.json").read_text())["modules"])
 FAKE_AGENT = '''import pathlib
 import sys
@@ -103,6 +103,11 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertIn("MIT License", (installed / "LICENSE").read_text())
         self.assertTrue((installed / "VERSION").is_file())
         self.assertTrue((installed / "agents/openai.yaml").is_file())
+        self.assertFalse((installed / "tests").exists())
+        self.assertFalse((installed / "docs").exists())
+        self.assertFalse((installed / "README.md").exists())
+        self.assertFalse((installed / "AGENTS.md").exists())
+        self.assertFalse((installed / "tools").exists())
         identity = summary["results"][0]["suite_identity"]
         self.assertEqual(identity["version"], (installed / "VERSION").read_text().strip())
         self.assertEqual(identity["manifest_sha256"], hashlib.sha256((installed / "references/suite-manifest.json").read_bytes()).hexdigest())
@@ -111,9 +116,7 @@ class EvaluateRunnerTests(unittest.TestCase):
         result, summary, _ = self.evaluate("noop", case="review")
         self.assertEqual(result.returncode, 0, result.stderr)
         installed = pathlib.Path(summary["results"][0]["installed_suite"])
-        sys.path.insert(0, str(REPO_ROOT / "scripts"))
-        self.addCleanup(sys.path.remove, str(REPO_ROOT / "scripts"))
-        import evaluate
+        from tools.evaluation import evaluate
         original = evaluate.suite_identity(installed)
         os.utime(installed / "SKILL.md", ns=(1, 1))
         cache = installed / "scripts/__pycache__"
@@ -204,6 +207,17 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertEqual(check["observer"], "grader")
         self.assertEqual(run["human_review"]["status"], "ungraded")
 
+    def test_runner_cli_help_works_from_arbitrary_cwd(self):
+        res = subprocess.run(
+            [sys.executable, str(RUNNER), "--help"],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("--agent-command", res.stdout)
+        self.assertIn("--output-dir", res.stdout)
 
 if __name__ == "__main__":
     unittest.main()

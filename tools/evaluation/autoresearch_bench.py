@@ -17,7 +17,7 @@ import unittest
 
 sys.dont_write_bytecode = True
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def run_unit_tests() -> tuple[int, int]:
@@ -113,7 +113,7 @@ def run_cli_smoke_checks() -> tuple[int, int]:
 
         # 4. wizard oracle request
         total += 1
-        scenario_file = REPO_ROOT / "references" / "wizard-bench" / "bookmark-manager" / "scenario.json"
+        scenario_file = REPO_ROOT / "tests" / "fixtures" / "wizard-bench" / "bookmark-manager" / "scenario.json"
 
         questions_file = tmp_path / "questions.md"
         questions_file.write_text("1. What is the entrypoint bookmarks.py file?\n", encoding="utf-8")
@@ -121,7 +121,7 @@ def run_cli_smoke_checks() -> tuple[int, int]:
         proc = subprocess.run(
             [
                 sys.executable,
-                str(REPO_ROOT / "scripts" / "wizard_oracle.py"),
+                str(REPO_ROOT / "tools" / "evaluation" / "wizard_oracle.py"),
                 "--scenario",
                 str(scenario_file),
                 "--questions",
@@ -139,7 +139,11 @@ def run_cli_smoke_checks() -> tuple[int, int]:
     return total, passed
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if "-h" in args or "--help" in args:
+        print("usage: autoresearch_bench.py [-h]\n\nDeterministic regression harness for autoresearch.")
+        return 0
     unit_total, unit_passed = run_unit_tests()
     smoke_total, smoke_passed = run_cli_smoke_checks()
 

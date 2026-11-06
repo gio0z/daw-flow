@@ -399,7 +399,6 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
         "references/installation.md",
         "references/task-contract.example.json",
         "scripts/validate.py",
-        "tests/test_validate.py",
     ]
 
     for rf in required_files:

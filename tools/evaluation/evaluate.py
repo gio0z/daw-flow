@@ -21,10 +21,15 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-SUITE_PARTS = ("SKILL.md", "README.md", "AGENTS.md", "LICENSE", "VERSION", "scripts",
-               "references", "templates", "skills", "tests", "docs", "agents")
-REQUIRED_PARTS = set(SUITE_PARTS) - {"agents"}
+try:
+    from scripts.package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
+except ImportError:
+    from package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
+
 COPY_IGNORE_PATTERNS = (".git", "__pycache__", "*.pyc", ".pytest_cache", ".venv", ".DS_Store")
 CASES = ("patch", "review", "cli")
 PATCH_SOURCE = '''import argparse
@@ -93,35 +98,38 @@ def changed_paths(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
 
 
 def stage_suite(source: Path, destination: Path) -> None:
-    destination.mkdir(parents=True)
+    destination.mkdir(parents=True, exist_ok=True)
     ignored = shutil.ignore_patterns(*COPY_IGNORE_PATTERNS)
-    for name in SUITE_PARTS:
-        origin = source / name
-        if not origin.exists() and name not in REQUIRED_PARTS:
+    for entry in operational_entries(source):
+        if not entry.exists() and not entry.is_symlink():
             continue
-        target = destination / name
-        if origin.is_dir():
-            shutil.copytree(origin, target, symlinks=True, ignore=ignored)
+        rel = entry.relative_to(source)
+        target = destination / rel
+        if entry.is_symlink():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(os.readlink(entry), target)
+        elif entry.is_dir():
+            shutil.copytree(entry, target, symlinks=True, ignore=ignored)
         else:
-            shutil.copy2(origin, target)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(entry, target, follow_symlinks=False)
 
 
 def suite_identity(root: Path) -> dict[str, Any]:
     """Identify copied distributable bytes without depending on Git or mtimes."""
     records = {}
     ignored = shutil.ignore_patterns(*COPY_IGNORE_PATTERNS)
-    for name in SUITE_PARTS:
-        entry = root / name
-        if not entry.exists():
+    for entry in operational_entries(root):
+        if not entry.exists() and not entry.is_symlink():
             continue
         candidates = [entry]
-        if entry.is_dir():
+        if entry.is_dir() and not entry.is_symlink():
             candidates = []
             for directory, directories, files in os.walk(entry, followlinks=False):
                 excluded = ignored(directory, directories + files)
                 directories[:] = sorted(item for item in directories if item not in excluded)
-                candidates.extend(Path(directory) / item for item in files if item not in excluded)
-                candidates.extend(Path(directory) / item for item in directories if (Path(directory) / item).is_symlink())
+                candidates.extend(Path(directory) / item for item in sorted(files) if item not in excluded)
+                candidates.extend(Path(directory) / item for item in sorted(directories) if (Path(directory) / item).is_symlink())
         for path in candidates:
             relative = path.relative_to(root).as_posix()
             if path.is_symlink():
@@ -129,8 +137,10 @@ def suite_identity(root: Path) -> dict[str, Any]:
             else:
                 records[relative] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
     encoded = json.dumps(records, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    manifest_path = root / "references" / "suite-manifest.json"
+    manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest() if manifest_path.is_file() else None
     return {"version": (root / "VERSION").read_text(encoding="utf-8").strip(),
-            "manifest_sha256": hashlib.sha256((root / "references/suite-manifest.json").read_bytes()).hexdigest(),
+            "manifest_sha256": manifest_sha,
             "payload_sha256": hashlib.sha256(encoded).hexdigest(), "file_count": len(records)}
 
 
@@ -323,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent-command", required=True, help="JSON argv array; placeholders: {prompt_file}, {workspace}, {suite_root}. Prompt also arrives on stdin.")
     parser.add_argument("--output-dir", required=True, type=Path, help="New directory outside the source suite; evidence is retained.")
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    parser.add_argument("--root", type=Path, default=REPO_ROOT, help="Suite root directory containing operational files (default: repository root)")
     parser.add_argument("--case", choices=("all", *CASES), default="all")
     parser.add_argument("--mode", choices=("skill", "bare", "both"), default="skill")
     parser.add_argument("--runs", type=int, default=1)
@@ -342,8 +352,10 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output_dir.resolve()
     if output == source or source in output.parents:
         parser.error("--output-dir must be outside the source suite")
-    if any(not (source / part).exists() for part in REQUIRED_PARTS):
-        parser.error("--root must contain the complete distributable suite, including LICENSE, VERSION, tests and docs")
+    required = [source / f for f in REQUIRED_FILES] + [source / d for d in REQUIRED_DIRS]
+    missing = [entry for entry in required if not entry.exists() and not entry.is_symlink()]
+    if missing:
+        parser.error(f"--root must contain the operational suite (missing: {', '.join(str(m.relative_to(source)) for m in missing)})")
     try:
         output.mkdir(parents=True, exist_ok=False)
     except OSError as exc:

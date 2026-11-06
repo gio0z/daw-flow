@@ -1,6 +1,6 @@
 # Reproducible task evaluations
 
-`scripts/evaluate.py` runs three small task fixtures through an agent command you supply. It retains the prompts, workspaces, process outputs, snapshots, timings, and grading results. It uses Python 3.10+ standard library modules and requires no evaluation service.
+`tools/evaluation/evaluate.py` runs three small task fixtures through an agent command you supply. It retains the prompts, workspaces, process outputs, snapshots, timings, and grading results. It uses Python 3.10+ standard library modules and requires no evaluation service.
 
 The runner is opt-in: `--agent-command` is required, and the suite never selects an agent, starts paid calls, or adds permission-bypass flags. Unlike the read-only router and validator, this tool creates fixtures and executes processes. It is not a sandbox. Use a disposable environment and a client configuration suitable for running generated code.
 
@@ -9,7 +9,7 @@ The runner is opt-in: `--agent-command` is required, and the suite never selects
 Supply an executable adapter as a JSON argv array. The adapter receives the retained prompt path and workspace path as arguments; the same prompt is also available on stdin. It should run your chosen client in that workspace and return its exit code. The runner invokes the array directly with `shell=False`.
 
 ```bash
-python3 scripts/evaluate.py \
+python3 tools/evaluation/evaluate.py \
   --agent-command '["/absolute/path/to/your-agent-adapter", "{prompt_file}", "{workspace}"]' \
   --agent-label 'client/version; model; relevant configuration' \
   --output-dir /tmp/daw-evaluation-001 \
@@ -30,7 +30,7 @@ The adapter path is a placeholder for your existing client integration, not a bu
 
 `--case` selects one case or `all`. Fixture definitions and graders live in the runner so the small suite can be inspected together. Grader subprocesses are bounded to ten seconds and retain their own stdout/stderr. They do not depend on tests written by the agent. Unexpected output, failed imports, syntax errors, nonzero test exits, or a grader error fail the relevant check.
 
-For `skill` mode, each workspace receives the complete supported distribution at `.agents/skills/deterministic-agentic-workflow/`: the root skill, README, AGENTS contract, MIT LICENSE, VERSION, all ten modules, scripts, references, templates, tests, docs, and optional agent UI metadata. The copied payload matches the installer; Git metadata and caches are excluded. The prompt explicitly invokes that installed copy. For `bare` mode, patch/review fixtures contain no workspace-local DAW installation; the CLI case receives a tool copy under `tools/daw/`, outside the conventional skills directory. Each case, mode, and repetition uses a fresh directory.
+For `skill` mode, each workspace receives the suite staged at `.agents/skills/deterministic-agentic-workflow/`. The copied payload matches the installer; Git metadata and caches are excluded. The prompt explicitly invokes that installed copy. For `bare` mode, patch/review fixtures contain no workspace-local DAW installation; the CLI case receives a tool copy under `tools/daw/`, outside the conventional skills directory. Each case, mode, and repetition uses a fresh directory.
 
 `both` is a useful control, but it is not full isolation from the host. The agent inherits your environment, home configuration, credentials, global skills, and client hooks. A clean control requires a caller-provided clean harness/home/configuration without globally installed DAW instructions. Record those conditions in `--agent-label` and the human review. The runner does not infer a client's version or model from process output.
 
@@ -48,7 +48,7 @@ Every result retains `human_review.status: "ungraded"`. Snapshot preservation al
 
 ## Requirements interview benchmark (`wizard_bench.py`)
 
-`scripts/wizard_bench.py` evaluates greenfield requirements elicitation and downstream specification-driven implementation using the `daw-wizard` module. It tests an agent's ability to uncover hidden requirements from deliberately underspecified user briefs through structured dialogue before implementing code.
+`tools/evaluation/wizard_bench.py` evaluates greenfield requirements elicitation and downstream specification-driven implementation using the `daw-wizard` module. It tests an agent's ability to uncover hidden requirements from deliberately underspecified user briefs through structured dialogue before implementing code.
 
 ### Research basis and citations
 
@@ -64,7 +64,7 @@ The benchmark design and metric framework ground directly in recent requirements
 Each scenario is evaluated across two arms:
 
 1. **`wizard` arm**:
-   - **Interview phase**: The workspace is staged with the suite at `.agents/skills/deterministic-agentic-workflow`. To prevent accidental leakage of evaluation fixtures, the runner sanitizes the staged copy before agent execution: evaluation fixtures (`references/wizard-bench/`, configured scenario directories within the source, hidden `scenario.json` and `acceptance.py` files, and evaluation test suites) are removed, leaving documentation, routing, skills, and governance assets functional. In a multi-turn loop (up to `--max-turns`), the agent asks questions via `.daw-interview/questions.md`. The runner feeds these to the configured oracle (`--oracle-command`), captures the answers into `transcript.md`, and supplies the transcript to subsequent turns. The interview concludes when the agent writes specifications under `docs/specs/` without creating `questions.md`.
+   - **Interview phase**: The workspace is staged with the suite at `.agents/skills/deterministic-agentic-workflow`. To prevent accidental leakage of evaluation fixtures, the runner sanitizes the staged copy before agent execution: evaluation fixtures (`tests/fixtures/wizard-bench/`, configured scenario directories within the source, hidden `scenario.json` and `acceptance.py` files, and evaluation test suites) are removed, leaving documentation, routing, skills, and governance assets functional. In a multi-turn loop (up to `--max-turns`), the agent asks questions via `.daw-interview/questions.md`. The runner feeds these to the configured oracle (`--oracle-command`), captures the answers into `transcript.md`, and supplies the transcript to subsequent turns. The interview concludes when the agent writes specifications under `docs/specs/` without creating `questions.md`.
    - **Build phase**: A clean, isolated workspace is populated exclusively with `docs/specs/` (no suite staged, so the builder relies strictly on authored specifications). The agent implements the project.
    - **Acceptance phase**: The scenario's hidden `acceptance.py` executes against the build workspace and records check results.
 2. **`brief` arm** (baseline control):
@@ -75,8 +75,8 @@ Each scenario is evaluated across two arms:
 Resolve the reference oracle before starting the runner; oracle commands execute from the disposable interview workspace, not this repository:
 
 ```bash
-ORACLE_PATH="$(pwd)/scripts/wizard_oracle.py"
-python3 scripts/wizard_bench.py \
+ORACLE_PATH="$(pwd)/tools/evaluation/wizard_oracle.py"
+python3 tools/evaluation/wizard_bench.py \
   --agent-command '["/path/to/agent-adapter", "{prompt_file}", "{workspace}"]' \
   --oracle-command "[\"python3\", \"$ORACLE_PATH\", \"--scenario\", \"{scenario_file}\", \"--questions\", \"{questions_file}\"]" \
   --judge-command '["/path/to/judge-adapter", "{scenario_file}", "{transcript_file}", "{specs_dir}"]' \
@@ -88,7 +88,7 @@ Command placeholders (`{prompt_file}`, `{workspace}`, `{suite_root}`, `{scenario
 
 ### Reference oracle (`wizard_oracle.py`)
 
-The suite provides `scripts/wizard_oracle.py`, a deterministic, zero-dependency reference oracle for testing and CI. It extracts questions from markdown lists, computes stopword-filtered keyword overlap against hidden scenario requirements, and returns the requirement's answer if the overlap meets the threshold, or `out_of_scope_answer` otherwise.
+The suite provides `tools/evaluation/wizard_oracle.py`, a deterministic, zero-dependency reference oracle for testing and CI. It extracts questions from markdown lists, computes stopword-filtered keyword overlap against hidden scenario requirements, and returns the requirement's answer if the overlap meets the threshold, or `out_of_scope_answer` otherwise.
 
 **Off-topic policy**: `out_of_scope_answer` is a neutral refusal that discloses no hidden requirement. A question matching no requirement (for example, an unrelated query) must not reveal entrypoint names, storage formats, commands, options, or other hidden constraints; supplying such detail there would leak the evaluation fixture and defeat IRE measurement. Keep the refusal minimal and free of new requirements. Requirements that do match keywords must still return their full expected answer.
 
@@ -116,7 +116,7 @@ When `--judge-command` is omitted, judge metrics are explicitly marked as `"ungr
 
 ## Persistent Worker Graph Pilot
 
-This opt-in manual protocol exercises the [harness-native graph contract](operations.md#persistent-worker-graphs-harness-native).
+This opt-in manual protocol exercises the [harness-native graph contract](../../references/operations.md#persistent-worker-graphs-harness-native).
 The existing `evaluate.py` cases do not exercise retained worker identity. Passing their
 plumbing checks is not evidence that a model follows this graph protocol.
 
@@ -145,12 +145,12 @@ plumbing checks is not evidence that a model follows this graph protocol.
 Record artifacts outside the source suite without credentials. This demonstrates only
 observed session continuation and behavior, not durable recovery, hard scheduler
 enforcement, or broad model quality. The additional stale-result, unavailable-capability,
-join and stop scenarios in [behavior scenarios](../tests/behavior-scenarios.md#persistent-worker-graph-scenarios)
+join and stop scenarios in [behavior scenarios](../../tests/behavior-scenarios.md#persistent-worker-graph-scenarios)
 remain unexercised until their own observations are collected.
 
 ## Specification-Driven Behavioral Evaluation & Smoke Verification Protocol
 
-This evaluation protocol defines empirical behavioral verification methods for the specification-driven mechanisms adopted from GitHub Spec Kit (pinned upstream commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) and governed by [`references/document-quality.md#feature-delivery-contract`](document-quality.md#feature-delivery-contract).
+This evaluation protocol defines empirical behavioral verification methods for the specification-driven mechanisms adopted from GitHub Spec Kit (pinned upstream commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) and governed by [`references/document-quality.md#feature-delivery-contract`](../../references/document-quality.md#feature-delivery-contract).
 
 Because DAW avoids third-party test runners, background daemon interceptors, and synthetic evaluation frameworks, specification-driven conformance is verified through reproducible manual behavioral smoke tests (`tests/behavior-scenarios.md#specification-driven-contract--convergence-scenarios`) evaluated against actual AI models in clean, isolated workspace fixtures.
 
@@ -331,77 +331,13 @@ To evaluate the impact of checkpoint boundaries honestly (e.g., comparing a base
 7. **Harness-Native Instruction Contract:** This protocol operates as a portable instruction contract. Manual protocol inspection is sufficient; no bundled background daemon or runtime supervisor is required.
 8. **Pre-Smoke Restraint:** No efficacy claims or evaluation statistics may be recorded in repository documentation or changelogs prior to executing real verification runs.
 
-### Observed Local Decision Probe (2026-11-04)
-
-A disposable signed-add/source-document fixture supplied ten predeclared cases to
-fresh scout sessions: two ordinary evidence-based prompts and two prompts loading
-the checkpoint. Four success claims were eligible and six ineligible per run. The
-oracle stayed outside worker-readable files; primary CLI observations were executed
-by the parent. These were decision probes, not autonomous implementation runs.
-
-- Baseline repeats matched 9/10 and 7/10 stage decisions, respectively: observed
-  false acceptances were 0/6 and 2/6; false rejections were 1/4 in each.
-- One complete checkpoint repeat matched 9/10 decisions, with 0/6 false acceptances
-  and 1/4 false rejections. The other invented three case IDs and omitted three
-  expected IDs, so its run was incomplete and no full-run error rates are reported.
-- A focused five-case follow-up matched 4/5 decisions. It still rejected a valid
-  current stage because a required later stage was pending, despite the explicit
-  stage-versus-workflow distinction. The failure is retained, not replaced by a pass.
-
-This does not demonstrate improved reliability. The control inherited host/global
-instructions, provider/model parameters were not pinned, arm dispatch order was not
-counterbalanced, the first baseline used a different output wrapper, and small
-contract clarifications landed during probing. Case order was shuffled per repeat,
-but the task family was tiny. Further prompt retries were stopped after recurrence;
-acceptance remains a parent-reviewed contract, not a certified autonomous judge.
-
-Raw local inputs, outputs, oracle disclosure after runs, and accounting were retained
-under `/tmp/daw-checkpoint-comparison-oriuomwm/`; temporary artifacts may be removed by
-the host. This observation is not a bundled or independently reproduced benchmark.
-
----
-
-## Observed Completed-Goal Benchmark (2026-11-04)
-
-Local multi-round paired benchmarks evaluated whether deterministic agentic workflow instructions reduce consumption or enforce structured transition records during autonomous task execution.
-
-Evaluations ran under a shared harness with fresh client configurations, clean task directories, and the identical model configuration across arms (`omniroute/codex/gpt-6.1-sol`). Subagent delegation tools were unavailable, so runs used honest direct execution fallback. Available tools were restricted to `read`, `write`, `edit`, and `bash`.
-
-Accounting for completed runs reflects all provider-reported gateway calls made by the client during each project run (`usage_provenance: reported`). The interrupted `queue/no-daw` run has incomplete accounting, as noted below. Fixture authoring, product changes, and independent evaluation overhead are excluded from both arms; no outside agent implemented or repaired benchmark outputs.
-
-### Observed Task Results
-
-| Round        | Stratum         | Task        | Arm        | Calls           | Reported Tokens        | Checks Passed | Exit  | Checkpoint / Workflow Compliance                                                                   |
-| :----------- | :-------------- | :---------- | :--------- | :-------------- | :--------------------- | :------------ | :---- | :------------------------------------------------------------------------------------------------- |
-| 1            | Small CLI Task  | expenses    | no-daw     | 10              | 54,063                 | 13/13         | 0     | Not instructed                                                                                     |
-| 1            | Small CLI Task  | expenses    | daw        | 12              | 123,167                | 13/13         | 0     | Failed (stage prose only; canonical handoffs and plan/review gates omitted)                        |
-| 1            | Small CLI Task  | inventory   | no-daw     | 11              | 59,109                 | 12/12         | 0     | Not instructed                                                                                     |
-| 1            | Small CLI Task  | inventory   | daw        | 11              | 117,899                | 12/12         | 0     | Failed (stage prose only; canonical handoffs and plan/review gates omitted)                        |
-| 1            | Small CLI Task  | bookmarks   | no-daw     | 8               | 37,696                 | 14/14         | 0     | Not instructed                                                                                     |
-| 1            | Small CLI Task  | bookmarks   | daw        | 16              | 173,593                | 14/14         | 0     | Failed (stage prose only; canonical handoffs and plan/review gates omitted)                        |
-| **R1 Total** |                 | **3 tasks** | **no-daw** | **29**          | **150,868**            | **39/39**     | **0** | **Baseline passed all functional checks**                                                          |
-| **R1 Total** |                 | **3 tasks** | **daw**    | **39**          | **414,659**            | **39/39**     | **0** | **Passed functional checks; +263,791 tokens (+175%); all 3 workflows failed required checkpoints** |
-| 2            | Multi-Step Goal | reconcile   | no-daw     | 9               | 51,641                 | 22/22         | 0     | Not instructed                                                                                     |
-| 2            | Multi-Step Goal | reconcile   | daw        | 15              | 137,420                | 22/22         | 0     | Failed (stage prose only; 0 canonical handoff envelopes observed)                                  |
-| 2            | Multi-Step Goal | queue       | no-daw     | 5 (4 ok, 1 err) | Unknown (16,142 known) | 21/21         | 1     | Not instructed; run halted on upstream 429 quota exhaustion                                        |
-| 2            | Multi-Step Goal | queue       | daw        | —               | Unexecuted             | —             | —     | Not launched                                                                                       |
-| 2            | Multi-Step Goal | lending     | both arms  | —               | Unexecuted             | —             | —     | Not launched                                                                                       |
-
-### Observations and Incomplete Round Status
-
-- **Efficiency & Cost:** In all completed pairs, the deterministic workflow arm consumed substantially more tokens than the unguided baseline (+175% across Round 1; +166% on the completed Round 2 `reconcile` goal). These runs do not demonstrate reduced token consumption or improved completion rates.
-- **Checkpoint & Gate Adherence:** In both Round 1 and Round 2, the workflow arm emitted conversational stage summaries but omitted machine-readable canonical handoff envelopes and explicit two-stage review records across all observed runs.
-- **Stratum Difference:** Round 2 introduced scaled multi-step goal fixtures (`reconcile`, `queue`, `lending`). Because prompt complexity, state spaces, and task demands changed, results cannot be compared causally across rounds. Comparisons are strictly valid only within matched pairs under the same stratum.
-- **Upstream Rate-Limit Failure & Missing Accounting:** During the Round 2 `queue/no-daw` run, 4 successful calls consumed 16,142 reported tokens, and all 21 acceptance checks passed. However, the client process exited with code 1 when the fifth call was rejected by the upstream gateway (`429 All credentials for model gpt-6.1-sol are cooling down (type=rate_limit_error param=model_cooldown)`). The underlying error record (`error_summary: [429]: The usage limit has been reached`, `error_type: quota_exhausted`) contained no usage provenance or token accounting. Because the unmetered call's actual usage is absent, the full token total for `queue/no-daw` cannot be known; substituting zero or estimating unmeasured consumption is prohibited.
-- **Benchmark Halt:** Per the frozen benchmarking protocol, complete accounting is an inviolable prerequisite. Dispatch was stopped immediately; neither `queue/daw` nor the `lending` pair was launched. Round 2 is blocked and incomplete (2 of at most 5 rounds started); the overall goal remains incomplete.
-
-Raw run records, logs, and accounting are retained at `/home/regio/.local/state/daw-benchmarks/20261104-round1-1vx9xxvs` for Round 1 and `/home/regio/.local/state/daw-benchmarks/20261104-round2-goals-b6af8cfd` for Round 2.
+For recorded empirical runs, probe observations, and benchmark results, see [Observed Local Decision Probe](observations.md#observed-local-decision-probe-2026-11-04) and [Observed Completed-Goal Benchmark](observations.md#observed-completed-goal-benchmark-2026-11-04).
 
 ---
 
 ## Progressive-Disclosure & Grilling Protocol Manual Evaluation Guidance
 
-The supporting protocol resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, and `skills/daw-design/references/builder-readiness.md`) are specification references rather than automated test harnesses. Verifying that an agent adheres to these protocols requires structured manual evaluation against scenarios SCN-10 through SCN-15 in [behavior scenarios](../tests/behavior-scenarios.md).
+The supporting protocol resources (`references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, and `skills/daw-design/references/builder-readiness.md`) are specification references rather than automated test harnesses. Verifying that an agent adheres to these protocols requires structured manual evaluation against scenarios SCN-10 through SCN-15 in [behavior scenarios](../../tests/behavior-scenarios.md).
 
 These evaluation procedures are manual behavioral inspection guidelines, **not** automated benchmark results or claimed execution scores. No automated compliance score or pass rate is claimed or fabricated here; an evaluator must observe and record actual session outputs.
 
@@ -445,7 +381,7 @@ These evaluation procedures are manual behavioral inspection guidelines, **not**
 
 Technical documentation generated during deterministic workflows serves two distinct audiences: human operators/maintainers and fresh coding agents (clean-context subagents or subsequent execution sessions lacking conversational memory).
 
-The canonical reference [Document Quality Standards & Review Rubric](document-quality.md) defines the 13 document rubrics and research foundations. This section defines the bounded evaluation protocol for measuring document efficacy across both audiences.
+The canonical reference [Document Quality Standards & Review Rubric](../../references/document-quality.md) defines the 13 document rubrics and research foundations. This section defines the bounded evaluation protocol for measuring document efficacy across both audiences.
 
 ### 1. Fresh-Agent Blind Comprehension Protocol
 
@@ -475,18 +411,13 @@ Automated checks and fresh-agent tests cannot measure qualitative human factors.
 
 ---
 
-## Observed Local Doc-Quality Workflow Smoke (2026-11-05)
-
-- **Harness & Invariants:** 216 unit tests pass prior to Windows fix; 5 transition edges eligible; `notacceptedready` rejected; stale hash invalidated. Installed CLI copy works from unrelated working directory with project inventory unchanged.
-- **Fresh-Agent Comprehension:** Fresh reader answered 13 canonical questions plus 1 labelled variant against docs; parent compared all 13 expected facts. Single synthetic doc set without human subjects; no blind controlled benefit claim. Fixture path: `/tmp/daw-doc-reader-evaluation-n0yiFtdu`.
-- **Negative Controls:** Two unlabelled negative controls evaluated by separate fresh agents were both rejected (conflicting replay exit 3 vs 0; default TTL missing) via fixture `/tmp/daw-doc-negative-5tixm6mh`. Oracle outside project excluded as non-portable local URI.
-- **Downstream Integration & Corrective Verification:** Initial integration failed: global `--ledger` before subcommand was ignored because base parser defaults overwrote values, landing at default path (parent relocated generated data to temp and cleared directory); five functional behavior checks passed only with flags after subcommand. A separate corrective worker resolved the subparser default override using `argparse.SUPPRESS`. On parent rerun in an isolated `HOME` environment (zero unexpected writes), all 5 held-out checks with documented global `--ledger`/`--json` placed before the subcommand passed (custom ledger used, exact replay preserved same ID, conflict exited with code 3 with bytes unchanged, release available count 1). Initial failure preserved; no causal comprehension or empirical benefit claimed.
+For recorded empirical runs from local doc-quality workflow smoke tests, see [Observed Local Doc-Quality Workflow Smoke](observations.md#observed-local-doc-quality-workflow-smoke-2026-11-05).
 
 ---
 
 ## Structural Coupling Analysis Behavioral Evaluation & Smoke Verification Protocol (daw-untangle)
 
-This evaluation protocol defines empirical verification standards for the read-only structural coupling analysis module (`daw-untangle`) under intent `untangle` and the coupling taxonomy defined in [`references/change-coupling.md`](change-coupling.md). It ensures that coupling assessments are evidence-backed, proportional, and non-destructive.
+This evaluation protocol defines empirical verification standards for the read-only structural coupling analysis module (`daw-untangle`) under intent `untangle` and the coupling taxonomy defined in [`references/change-coupling.md`](../../references/change-coupling.md). It ensures that coupling assessments are evidence-backed, proportional, and non-destructive.
 
 Like the rest of the DAW evaluation suite, this protocol avoids synthetic test runners, daemon processes, and simulated mock environments. Conformance is verified through reproducible manual behavioral scenarios (`tests/behavior-scenarios.md#structural-coupling-analysis-scenarios-daw-untangle`) evaluated on isolated workspace fixtures.
 
@@ -561,7 +492,7 @@ To verify agent compliance without automated runners:
 
 ## Parent Prefinal Coupling Checkpoint Behavioral Evaluation Protocol
 
-This protocol defines verification standards for evaluating the parent orchestrator's enforcement of the [Parent Prefinal Coupling Checkpoint](change-coupling.md#prefinal-coupling-checkpoint) prior to final workflow completion.
+This protocol defines verification standards for evaluating the parent orchestrator's enforcement of the [Parent Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint) prior to final workflow completion.
 
 Evaluation focuses on behavioral compliance across five primary scenarios without automated test harness scripts, daemon supervisors, or simulated execution:
 

@@ -3,7 +3,7 @@
 These tests exercise the runner and oracle plumbing using isolated fake agents
 and a self-contained temporary fixture scenario. They do not depend on external
 network access or LLM APIs. One oracle test runs the real reference oracle
-against the bundled scenarios under references/wizard-bench/ to check that
+against the bundled scenarios under tests/fixtures/wizard-bench/ to check that
 off-topic questions disclose no hidden requirement.
 """
 
@@ -18,12 +18,12 @@ import tempfile
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-RUNNER = REPO_ROOT / "scripts/wizard_bench.py"
-ORACLE = REPO_ROOT / "scripts/wizard_oracle.py"
+RUNNER = REPO_ROOT / "tools/evaluation/wizard_bench.py"
+ORACLE = REPO_ROOT / "tools/evaluation/wizard_oracle.py"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.wizard_bench import aggregate_summary, run_scenario
+from tools.evaluation.wizard_bench import aggregate_summary, run_scenario
 
 FAKE_AGENT_CODE = """import json
 import sys
@@ -62,7 +62,7 @@ if "Use daw-wizard" in prompt:
         if action == "secret_check":
             staged_suite = workspace / ".agents/skills/deterministic-agentic-workflow"
             leak_report = {
-                "wizard_bench_exists": (staged_suite / "references/wizard-bench").exists(),
+                "wizard_bench_exists": (staged_suite / "references/wizard-bench").exists() or (staged_suite / "tests/fixtures/wizard-bench").exists(),
                 "scenario_json_count": len(list(staged_suite.rglob("scenario.json"))),
                 "acceptance_py_count": len(list(staged_suite.rglob("acceptance.py"))),
                 "eval_test_exists": (staged_suite / "tests/test_wizard_bench.py").exists(),
@@ -637,7 +637,7 @@ class WizardBenchTests(unittest.TestCase):
         self.assertTrue(report["routing_md_exists"])
 
         # Source suite at REPO_ROOT remains completely intact
-        self.assertTrue((REPO_ROOT / "references/wizard-bench").is_dir())
+        self.assertTrue((REPO_ROOT / "tests/fixtures/wizard-bench").is_dir())
         self.assertTrue((REPO_ROOT / "tests/test_wizard_bench.py").is_file())
 
         # Fingerprint in result records the source suite identity
@@ -682,7 +682,7 @@ class WizardBenchTests(unittest.TestCase):
             ("log-analyzer", "What entrypoint filename is required?", "python3 logparser.py", ["--min-status", "--json", "Common Log Format"]),
         ]
         for scenario_id, on_topic, expected_entrypoint, leaked in cases:
-            scenario_file = REPO_ROOT / "references/wizard-bench" / scenario_id / "scenario.json"
+            scenario_file = REPO_ROOT / "tests/fixtures/wizard-bench" / scenario_id / "scenario.json"
             cmd = [sys.executable, str(ORACLE), "--scenario", str(scenario_file)]
 
             on_topic_reply = subprocess.run(cmd, input=on_topic, text=True, capture_output=True).stdout
@@ -692,6 +692,18 @@ class WizardBenchTests(unittest.TestCase):
             for leak in leaked:
                 self.assertNotIn(leak, off_topic_reply, f"{scenario_id}: off-topic reply leaked {leak!r}")
 
+
+    def test_wizard_bench_cli_help_works_from_arbitrary_cwd(self) -> None:
+        res = subprocess.run(
+            [sys.executable, str(RUNNER), "--help"],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("--agent-command", res.stdout)
+        self.assertIn("--scenarios-dir", res.stdout)
 
 if __name__ == "__main__":
     unittest.main()

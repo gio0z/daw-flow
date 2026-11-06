@@ -23,11 +23,12 @@
   - Runtime: Python 3.10+ standard library only (`argparse`, `hashlib`, `json`, `os`, `pathlib`, `re`, `sys`, `urllib.parse`).
   - Dependencies: Zero third-party runtime dependencies; strictly read-only filesystem access; no network, no Git CLI execution, no subshell spawning.
   - Subcommands: `package` (package integrity & link resolution) and `contract` (JSON task contract lifecycle validation).
-- **Installer:** [`scripts/install.py`](scripts/install.py) is a separate, explicitly mutating stdlib CLI for complete-bundle installation, ownership-checked updates, status, and removal. Its mutation behavior never extends to the validator or route engine.
-- **Behavioral Evaluations:** [`scripts/evaluate.py`](scripts/evaluate.py) and [`references/evaluation.md`](references/evaluation.md) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
-- **Test Suites:**
+- **Installer & Packaging:** [`scripts/install.py`](scripts/install.py) is a separate, explicitly mutating stdlib CLI for complete-bundle installation, ownership-checked updates, status, and removal. [`scripts/package_layout.py`](scripts/package_layout.py) defines the shared standard library operational bundle payload.
+- **Behavioral Evaluations & Benchmarks (Developer Tooling):** [`tools/evaluation/evaluate.py`](tools/evaluation/evaluate.py), [`tools/evaluation/wizard_bench.py`](tools/evaluation/wizard_bench.py), and evaluation guides in [`docs/evaluation/`](docs/evaluation/) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
+- **Test Suites & Fixtures:**
   - [`tests/test_validate.py`](tests/test_validate.py): Standard library `unittest` verifying package checks, contract schemas, boundary traversal prevention, duplicate-key rejection, and stage transitions.
   - [`tests/test_route.py`](tests/test_route.py): Standard library `unittest` verifying route calculations, schema constraints, path containment, high-risk flags, error envelopes, and `--check-suite`.
+  - [`tests/fixtures/wizard-bench`](tests/fixtures/wizard-bench): Evaluation benchmark scenario fixtures (bookmark manager, expense tracker, log analyzer).
   - Test Execution: `python3 -m unittest discover -s tests -p "test_*.py"` or isolated test runners (`pytest`).
 - **Operational & Schema References:**
   - [`references/suite-manifest.json`](references/suite-manifest.json): Authoritative suite manifest, module locations, route definitions, and schema definitions.
@@ -40,11 +41,14 @@
   - [`references/route-request.example.json`](references/route-request.example.json): Canonical JSON route request example envelope.
 - - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md).
 - **Standalone Repository Specifications:**
+  - [`CHANGELOG.md`](CHANGELOG.md): Chronological suite change history and architecture decisions log.
   - [`docs/BRD.md`](docs/BRD.md): Business Requirements Document.
   - [`docs/PRD.md`](docs/PRD.md): Product Requirements Document.
   - [`docs/TRD.md`](docs/TRD.md): Technical Requirements Document (architecture & engine).
   - [`docs/UIRD.md`](docs/UIRD.md): User Interface Requirements Document (CLI terminal & JSON streams).
   - [`docs/DESIGN.md`](docs/DESIGN.md): CLI architecture, data flow, and diagnostic design.
+  - [`docs/evaluation/guide.md`](docs/evaluation/guide.md): Evaluation harness usage, benchmark protocols, and research basis.
+  - [`docs/evaluation/observations.md`](docs/evaluation/observations.md): Empirical baseline findings and benchmark observation records.
 
 ## Operational Directives for Agents
 

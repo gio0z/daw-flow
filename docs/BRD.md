@@ -44,11 +44,12 @@ The business goal is not financial monetization or SaaS subscription revenue, bu
 ### 6. Scope Boundaries & Non-Goals
 
 - **In Scope:**
-  - Suite Router and Specialized Modular Skills package (`SKILL.md`, `skills/daw-*`, `references/`, `templates/`).
+  - **Operational Installed Package:** Suite Router and Specialized Modular Skills package (`SKILL.md`, `LICENSE`, `VERSION`, `skills/daw-*`, operational `references/`, `templates/`, and operational scripts `scripts/{install,route,validate,doc_quality,package_layout}.py`).
+  - **Developer & Repository Source:** Full repository checkout including developer test suites (`tests/test_validate.py`, `tests/test_route.py`), developer evaluation tooling (`tools/evaluation/`), repository documentation (`AGENTS.md`, `CHANGELOG.md`, `docs/`), and maintainer fixtures (`tests/fixtures/wizard-bench`).
   - Read-only standard library validation and routing engine (`scripts/validate.py`, `scripts/route.py`).
   - Declarative route policy manifest (`references/suite-manifest.json`).
   - Standard library test suites (`tests/test_validate.py`, `tests/test_route.py`).
-  - Complete standalone engineering documentation suite (`AGENTS.md`, `docs/BRD.md`, `docs/PRD.md`, `docs/TRD.md`, `docs/UIRD.md`, `docs/DESIGN.md`).
+  - Complete standalone engineering documentation suite (`AGENTS.md`, `CHANGELOG.md`, `docs/BRD.md`, `docs/PRD.md`, `docs/TRD.md`, `docs/UIRD.md`, `docs/DESIGN.md`, `docs/evaluation/`).
 - **Non-Goals (Explicit Exclusions):**
   - No monetization engine, SaaS billing, or payment integration.
   - No hosted web service or centralized database requirement.

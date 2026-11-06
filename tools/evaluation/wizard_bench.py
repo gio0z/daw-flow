@@ -26,18 +26,21 @@ import sys
 import time
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.evaluate import (
-    REQUIRED_PARTS,
+from tools.evaluation.evaluate import (
     run_process,
     snapshot,
     stage_suite,
     suite_identity,
     write_json,
 )
+try:
+    from scripts.package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
+except ImportError:
+    from package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
 
 CHECKLIST_KEYS = (
     "goal",
@@ -118,9 +121,10 @@ def sanitize_staged_suite(staged_root: Path, source_root: Path, scenarios_dir: P
         return
 
     # 1. Remove default wizard-bench scenario directory if present
-    default_wb = staged_root / "references/wizard-bench"
-    if default_wb.is_dir():
-        shutil.rmtree(default_wb)
+    for default_dir in ("tests/fixtures/wizard-bench", "references/wizard-bench"):
+        default_wb = staged_root / default_dir
+        if default_wb.is_dir():
+            shutil.rmtree(default_wb)
 
     # 2. Remove configured scenarios directory if located inside source
     try:
@@ -139,7 +143,7 @@ def sanitize_staged_suite(staged_root: Path, source_root: Path, scenarios_dir: P
             path.unlink()
 
     # 4. Remove evaluator test suites from staged tests directory
-    for test_name in ("test_wizard_bench.py", "test_bookmark_acceptance.py"):
+    for test_name in ("test_wizard_bench.py", "test_bookmark_acceptance.py", "test_expense_acceptance.py", "test_evaluate.py"):
         tpath = staged_root / "tests" / test_name
         if tpath.is_file():
             tpath.unlink()
@@ -613,9 +617,9 @@ def main() -> int:
     parser.add_argument("--scenario", default="all", help="Scenario ID or 'all' (default: all)")
     parser.add_argument(
         "--scenarios-dir",
-        default="references/wizard-bench",
+        default="tests/fixtures/wizard-bench",
         type=Path,
-        help="Path to scenarios directory (default: references/wizard-bench)",
+        help="Path to scenarios directory (default: tests/fixtures/wizard-bench)",
     )
     parser.add_argument("--arm", choices=["wizard", "brief", "both"], default="both", help="Evaluation arm")
     parser.add_argument("--runs", type=int, default=1, help="Repetitions per scenario arm (1..10)")
@@ -680,8 +684,10 @@ def main() -> int:
 
     if output == source or source in output.parents:
         parser.error("--output-dir must be outside the source suite")
-    if any(not (source / part).exists() for part in REQUIRED_PARTS):
-        parser.error("--root must contain the complete distributable suite")
+    required = [source / f for f in REQUIRED_FILES] + [source / d for d in REQUIRED_DIRS]
+    missing = [entry for entry in required if not entry.exists() and not entry.is_symlink()]
+    if missing:
+        parser.error(f"--root must contain the complete operational suite (missing: {', '.join(str(m.relative_to(source)) for m in missing)})")
 
     try:
         output.mkdir(parents=True, exist_ok=False)

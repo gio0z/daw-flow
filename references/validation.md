@@ -171,7 +171,6 @@ When running `validate.py package`, the following checks are enforced:
    - `references/installation.md`
    - `references/task-contract.example.json`
    - `scripts/validate.py`
-   - `tests/test_validate.py`
    - `templates/` containing exactly the 13 canonical document templates:
      `brd.md`, `prd.md`, `frd.md`, `techstack.md`, `blueprint.md`, `design.md`, `ui-ux.md`, `wireframe.md`, `roadmap.md`, `runbook.md`, `deployment.md`, `security.md`, `qa.md`. (Unrecognized extra Markdown files in `templates/` trigger validation errors). Escaping paths or symlinks yield `symlink_escapes_package` (for symlink escapes) or `path_escapes_package` (for non-symlink/traversal boundary escapes).
 2. **Frontmatter Validation:**

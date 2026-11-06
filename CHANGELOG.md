@@ -1,8 +1,19 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-06: Repository Structural Separation and Operational Packaging
+
+- **Operational Package Separation:** Formally separate the self-contained installed operational runtime package from developer tooling, tests, fixtures, and repository documentation.
+- **Canonical Package Layout Definition:** Introduce `scripts/package_layout.py` as the canonical source of truth defining the exact, minimal operational payload (`SKILL.md`, `LICENSE`, `VERSION`, `skills/`, `templates/`, operational `references/`, and operational `scripts/`), preserving relative paths without flattening nested directories and without copying dev tools or tests.
+- **Documentation Migration & Split:**
+  - Relocate suite change history and architectural decision logs from `references/changes.md` to repository root `CHANGELOG.md`.
+  - Split evaluation documentation from `references/evaluation.md` into `docs/evaluation/guide.md` (runner invocation, evaluation protocols, research basis, and criteria) and `docs/evaluation/observations.md` (dated empirical probe and benchmark observations, failure records, and execution limits).
+  - Retain all factual research citations, empirical failure findings, and token measurement caveats without fabrication or duplicate sections.
+- **Developer Tooling & Fixture Relocation:** Relocate development and evaluation tools (`evaluate.py`, `wizard_bench.py`, `wizard_oracle.py`, `autoresearch_bench.py`) from `scripts/` to `tools/evaluation/` and wizard evaluation fixtures from `references/wizard-bench/` to `tests/fixtures/wizard-bench/`.
+- **Operational Self-Containment:** Installed skills run, validate, route, status, update, and uninstall independently from installed paths without requiring source checkout, repository tests, documentation, or network access.
+
 ## 2026-11-06: Parent-Owned Proportional Pre-Delivery Coupling Checkpoint
 
-- **Parent-Owned Pre-Delivery Verification:** Formalize parent-owned structural coupling verification enforced before final delivery of any code-changing workflow ([`references/change-coupling.md#prefinal-coupling-checkpoint`](change-coupling.md#prefinal-coupling-checkpoint)), evaluating the changed diff and directly affected interfaces/dependencies.
+- **Parent-Owned Pre-Delivery Verification:** Formalize parent-owned structural coupling verification enforced before final delivery of any code-changing workflow ([`references/change-coupling.md#prefinal-coupling-checkpoint`](references/change-coupling.md#prefinal-coupling-checkpoint)), evaluating the changed diff and directly affected interfaces/dependencies.
 - **Proportional Route Governance:**
   - `feature` and `bugfix`: Reuses current accepted `daw-review` stage structural audit without redundant, duplicate review passes when scope and revision match.
   - `patch`: Retains the canonical minimal `daw-build -> daw-verify` pipeline with bounded parent diff check; introduces no mandatory extra reviewer stage or untangle pass for localized or one-line patches.
@@ -24,7 +35,7 @@
 
 - **Comprehensive Specification-Driven Mechanism Adoption:** Coherently adopt high-value specification-driven development mechanisms from GitHub Spec Kit (pinned upstream commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) across the existing 10 bundled modules (`skills/daw-*/`), 13 specification templates (`templates/`), and canonical procedural standards.
 - **Zero Architectural Bloat Invariant:** Implement complete adoption without adding new modules, route intents, workflow stages, execution daemons, background supervisors, hook registries, JSON envelope schema mutations, script changes, runtime dependencies, or package version bumps.
-- **Canonical Shared Procedural Contract:** Anchor execution semantics in [`document-quality.md#feature-delivery-contract`](document-quality.md#feature-delivery-contract), structured across nine disciplined subsections (A–I):
+- **Canonical Shared Procedural Contract:** Anchor execution semantics in [`document-quality.md#feature-delivery-contract`](references/document-quality.md#feature-delivery-contract), structured across nine disciplined subsections (A–I):
   - **A. Governance & Authoring Alignment:** Authoring modules (`daw-wizard`, `daw-design`) ingest real project principles and record source provenance, cleanly separating business what/why from technical how. Explicitly track proposed defaults versus decided rules; updating an architectural principle triggers automated synchronization of affected tasks, docs, and acceptance criteria without silent overrides or covert implementation.
   - **B. Clarification & Technical Uncertainty Resolution:** Agents inspect repository facts before querying users. Unresolved questions are ranked by `impact * uncertainty`. Dependent trade-offs are asked sequentially one at a time; independent choices are batched up to 5 per round. Read-only inquiry (`daw-ask`) proposes exact updates via parent orchestration without unauthorized file writes; technical uncertainties are researched before consulting users.
   - **C. Feature Slicing & Behavioral Contract Oracles:** Feature specifications (`prd.md`, `frd.md`) structure deliverables into prioritized user stories with stable IDs and Given/When/Then or equivalent exact input/output/error/state oracles. Inseparable safety or transaction invariants are kept intact; supporting infrastructure tasks require explicit prerequisite justification; business KPIs are not conflated with runtime code acceptance.

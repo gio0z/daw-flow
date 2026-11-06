@@ -541,7 +541,7 @@ tool-output evidence separately for each scenario.
 ### SCN-P-01: Same-ID correction and independent re-review
 
 Fixture: disposable signed-add CLI returning `abs(left) + abs(right)`; a harness with
-completed-worker continuation. Follow the [pilot protocol](../references/evaluation.md#persistent-worker-graph-pilot).
+completed-worker continuation. Follow the [pilot protocol](../docs/evaluation/guide.md#persistent-worker-graph-pilot).
 
 Expected: completed builder and independent reviewer retain their respective IDs across
 correction/re-review rounds. Record `r0` failure, actual `r1` hash, fresh reviewer source
@@ -598,7 +598,7 @@ These scenarios evaluate procedural gate adherence by the workflow parent or coo
 2. **Untrusted worker claims:** Self-reported worker status (`status: "pass"`), narrative explanations, and execution exit codes are treated as untrusted claims until validated against primary observations. A worker cannot author its own acceptance; the parent owns acceptance decisions.
 3. **Parent decision & primary observations:** The parent evaluates each criterion against primary evidence (stdout, stderr, exit codes, inspected diffs, or runtime behavior) and records an explicit acceptance decision (`accepted: true` or `accepted: false` / `not accepted`) with criterion-specific rationale across explicit [Checkpoint Boundaries](../references/operations.md#checkpoint-boundaries), optionally authoring a [Parent-Owned Acceptance Record](../references/operations.md#parent-owned-acceptance-record). Small or inline tasks record decisions inline in parent plans/handoffs without JSON ceremony.
 4. **No external infrastructure:** Scenarios use standard, disposable workspace fixtures and instructional contracts; no runtime daemons, scheduler interceptors, or execution frameworks are introduced.
-5. **Controlled comparisons & research limits:** In old-vs-new protocol testing, hold the harness, model, and task constant while toggling only the acceptance checkpoint instructions. Disclose any potential test-fixture contamination or repeat variance; do not claim causal efficacy or academic proof from a single pilot. See [Acceptance Decision Evaluation](../references/evaluation.md#acceptance-decision-evaluation) and [Research Basis & Limits](../references/evaluation.md#research-basis-and-limits). All scenarios in this document represent manual, unrun behavioral evaluation templates.
+5. **Controlled comparisons & research limits:** In old-vs-new protocol testing, hold the harness, model, and task constant while toggling only the acceptance checkpoint instructions. Disclose any potential test-fixture contamination or repeat variance; do not claim causal efficacy or academic proof from a single pilot. See [Acceptance Decision Evaluation](../docs/evaluation/guide.md#acceptance-decision-evaluation) and [Research Basis & Limits](../docs/evaluation/guide.md#research-basis-and-limits). All scenarios in this document represent manual, unrun behavioral evaluation templates.
 
 ---
 

@@ -39,7 +39,7 @@ python3 scripts/install.py install --agent codex --scope user --update
 python3 scripts/install.py uninstall --agent codex --scope user
 ```
 
-`--dry-run` previews an action without writing. Updates and removal refuse changed files, extra files, and unrelated skills. The installer copies the full suite, so removing the source checkout does not break it. It never modifies agent configuration or Git hooks, downloads packages, or installs agent CLIs.
+`--dry-run` previews an action without writing. Updates and removal refuse changed files, extra files, and unrelated skills. The installer installs the self-contained operational skill package (`SKILL.md`, `LICENSE`, `VERSION`, `skills/`, `templates/`, operational `references/`, and operational `scripts/`), so removing the source checkout does not break the installed agent skill. Developer tooling, tests, fixtures, and documentation remain in the source repository. It never modifies agent configuration or Git hooks, downloads packages, or installs agent CLIs.
 
 See [installation and compatibility](references/installation.md) for exact paths, platform limits, and custom directories. `status` checks files and module aliases; confirm client discovery in your agent's skill list after installation.
 
@@ -123,7 +123,7 @@ Worker retention is session-bounded and harness-dependent:
 
 - When the hosting agent harness supports continuing completed workers with preserved identity and conversation state, worker reuse is preferred for tasks requiring multi-round correction (retaining the builder and independent reviewer across rounds).
 - Worker retention is harness-dependent and not a universal or guaranteed behavior across all agents. It is not a persistent daemon, background scheduler, or crash recovery system.
-- If continuation is unavailable and retention is optional, use an explicit fresh-worker handoff; if delegation itself is unavailable, execute directly and report that limitation. Required retention fails closed as `blocked`. Never simulate continuity or hide worker replacement. See the [execution contract](references/operations.md#persistent-worker-graphs-harness-native) and [behavioral pilot protocol](references/evaluation.md#persistent-worker-graph-pilot).
+- If continuation is unavailable and retention is optional, use an explicit fresh-worker handoff; if delegation itself is unavailable, execute directly and report that limitation. Required retention fails closed as `blocked`. Never simulate continuity or hide worker replacement. See the [execution contract](references/operations.md#persistent-worker-graphs-harness-native) and [behavioral pilot protocol](docs/evaluation/guide.md#persistent-worker-graph-pilot).
 
 ### Internal Module Handoffs vs. User-Facing Reports
 
@@ -184,7 +184,7 @@ Routing requires classified input facts rather than arbitrary keyword matching:
 - **Preflight Coexistence:** Working tree is not required to be clean. The workflow respects existing uncommitted user edits and never executes destructive wipe commands (`git checkout .`, `git reset --hard`).
 - **Relevant Checks Only:** Cloud credentials and external rollback targets are evaluated only for high-risk deployment or infrastructure tasks, never for local file edits.
 - **Fail-Closed Approval:** High-risk mutating routes flag `interactive_approval_required: true` and `authorization_granted: false` (always false). A status of `ready` means the route is resolved, not that execution is authorized. Exact interactive operator confirmation is required at the point of risk; documents never grant authorization.
-- **Parent Acceptance:** A completed worker or proposed stage `pass` does not unlock downstream stages. The parent or independent evaluator independently inspects evidence and evaluates transitions (pre-dispatch eligibility, stage result acceptance, and final workflow completion) with optional structured recording in a [parent-owned acceptance record](references/operations.md#parent-owned-acceptance-record). Small or inline tasks record acceptance decisions inline in parent plans and handoffs without mandatory JSON files. Acceptance does not grant high-risk operational authorization. This is an instructional contract, not a runtime interceptor. See the [research basis and evaluation limits](references/evaluation.md#research-basis-and-limits) and [acceptance decision evaluation](references/evaluation.md#acceptance-decision-evaluation).
+- **Parent Acceptance:** A completed worker or proposed stage `pass` does not unlock downstream stages. The parent or independent evaluator independently inspects evidence and evaluates transitions (pre-dispatch eligibility, stage result acceptance, and final workflow completion) with optional structured recording in a [parent-owned acceptance record](references/operations.md#parent-owned-acceptance-record). Small or inline tasks record acceptance decisions inline in parent plans and handoffs without mandatory JSON files. Acceptance does not grant high-risk operational authorization. This is an instructional contract, not a runtime interceptor. See the [research basis and evaluation limits](docs/evaluation/guide.md#research-basis-and-limits) and [acceptance decision evaluation](docs/evaluation/guide.md#acceptance-decision-evaluation).
 
 ### Parent Prefinal Coupling Checkpoint & Proportional Delivery
 
@@ -291,7 +291,7 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 | **Automated External Git / Issue / Deploy Mutations** | Automatic branch push, PR creation, issue closing             | Strict fail-closed user authorization required for external side-effects                          | **Intentionally Excluded:** External environment changes, VCS mutations, and deployment actions strictly require explicit human approval.                                                                                                                                                                         |
 | **Upstream Tests-Optional Default**                   | `spec-driven.md`, `templates/commands/plan.md`                | Primary verification evidence required per Contract §D, §I                                        | **Intentionally Excluded:** Upstream Spec Kit treats testing as optional or deferred by default; DAW strictly rejects tests-optional defaults for behavioral acceptance. Tasks require observable runtime proof against Acceptance Criteria before completion.                                                    |
 | **Generic Checklist Override Default**                | `templates/commands/checklist.md`                             | Reviewer-owned quality checklist separation per Contract §E                                       | **Intentionally Excluded:** Upstream Spec Kit permits proceeding despite unchecked quality items or via generic user overrides; DAW strictly prohibits generic user 'proceed' prompts from bypassing blocking requirements gates or self-approving reviewer rubrics.                                              |
-| **Universal Efficacy Claims**                         | Claims of guaranteed bug-free generation via specifications   | Transparent honesty rules and negative control protocols in `references/evaluation.md`            | **Intentionally Excluded:** DAW explicitly rejects universal efficacy claims. Specifications and checklists provide cognitive structure and auditability; software correctness requires empirical execution and verification against domain oracles.                                                              |
+| **Unverified "Zero Hallucination" Claims**            | Marketing guarantees of 100% precision                        | Honest disclosure of prompt engineering limits, manual review necessity, and empirical costs      | **Intentionally Excluded:** LLM outputs are inherently probabilistic; contracts structure verification but cannot certify semantic correctness. Transparent honesty rules and negative control protocols in `docs/evaluation/guide.md`.                                                                           |
 
 ---
 
@@ -302,8 +302,9 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 - [Installation & Compatibility Guide (`references/installation.md`)](references/installation.md): Supported agent paths, symlink aliasing, and OS compatibility.
 - [Validation & Verification Policy (`references/validation.md`)](references/validation.md): Package validation rules, structural contracts, and validation diagnostics.
 - [Operations & Execution Manual (`references/operations.md`)](references/operations.md): Preflight gates, fail-closed approvals, rollback mechanics, and persistent worker graph contracts.
-- [Evaluation Harness & Benchmark Guide (`references/evaluation.md`)](references/evaluation.md): Reproducible task evaluations, oracle benchmarking, acceptance evaluation dimensions, and empirical baseline findings.
-- [Changelog & Architecture Decisions (`references/changes.md`)](references/changes.md): Suite design history, contract hardening, and historical notes.
+- [Evaluation Guide (`docs/evaluation/guide.md`)](docs/evaluation/guide.md): Reproducible task evaluations, oracle benchmarking, acceptance evaluation dimensions, research basis, and evaluation protocols.
+- [Evaluation Observations (`docs/evaluation/observations.md`)](docs/evaluation/observations.md): Observed empirical probe and benchmark records, failure findings, token measurements, and execution limits.
+- [Changelog & Architecture Decisions (`CHANGELOG.md`)](CHANGELOG.md): Suite design history, contract hardening, and historical notes.
 - [Document Quality Standards & Review Rubric (`references/document-quality.md`)](references/document-quality.md): Canonical 13-doc quality rubric, dual human and fresh-agent reader criteria, grounded evidence rules, and workflow transition gate.
 - [Canonical Feature Delivery Contract (`references/document-quality.md#feature-delivery-contract`)](references/document-quality.md#feature-delivery-contract): Canonical specification-driven procedural contract covering governance, clarification, story slicing, task traceability, prebuild readiness, convergence, and scoped pause/resume.
 - [Behavioral Verification Scenarios (`tests/behavior-scenarios.md`)](tests/behavior-scenarios.md): Test scenarios and regression verification cases.
@@ -325,9 +326,9 @@ CI configures these checks across Linux, macOS, and Windows with Python 3.10 and
 
 ### Empirical Evaluation & Realistic Limits
 
-The suite includes an opt-in evaluation harness (`scripts/evaluate.py`) that tests agent commands against isolated task fixtures without bypassing approvals or forcing paid calls.
+The repository includes an opt-in evaluation harness (`tools/evaluation/evaluate.py`) that tests agent commands against isolated task fixtures without bypassing approvals or forcing paid calls.
 
-Empirical evaluation records (detailed in [`references/evaluation.md`](references/evaluation.md)) establish that DAW does not automatically reduce token costs or guarantee canonical compliance:
+Empirical evaluation records (detailed in [`docs/evaluation/observations.md`](docs/evaluation/observations.md)) establish that DAW does not automatically reduce token costs or guarantee canonical compliance:
 
 - **Round 1 (3 Small CLI Tasks):** Both the baseline (no-DAW) and DAW passed all 39 functional acceptance checks (14/14, 11/11, 14/14). However, DAW used **175% more tokens** (414,659 vs. 150,868 baseline) and all 3 DAW runs failed required canonical checkpoints because the agent emitted stage narrative prose rather than structured handoffs and review gates.
 - **Round 2 (Multi-Step Goal Tasks):** Execution was blocked and remains incomplete after an unmetered upstream HTTP 429 rate limit halted dispatch under the frozen protocol.

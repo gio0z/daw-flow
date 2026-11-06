@@ -36,6 +36,7 @@ The Deterministic Agentic Workflow system is an offline, read-only, zero-depende
 2. **Agent Skill Package Validator (`scripts/validate.py package`):** Verifies the internal structural integrity of the workflow package itself, including YAML frontmatter scalar metadata, canonical template existence, routing table cross-references, URI schemes, and internal markdown link resolution.
 3. **Task Contract Lifecycle Validator (`scripts/validate.py contract`):** Enforces a deterministic, three-stage lifecycle contract (`plan` -> `execute` -> `complete`) on task definition files within a project repository.
 4. **Specialized Module Skills (`skills/daw-*`):** Self-contained, deeply specified skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`) containing concrete operational steps and returning clean orchestrator handoffs.
+5. **Packaging Layout Helper (`scripts/package_layout.py`):** Shared standard library definition of operational bundle files and directory roots for installation and staging.
 
 ### 2. Runtime Environment & Target Compatibility
 
@@ -177,7 +178,7 @@ A task contract (`task-contract.json`) progresses through three distinct lifecyc
 
 ### 7. Regression Strategy & Verification Suite
 
-The repository contains an automated unittest regression suite in `tests/test_validate.py` executed via standard Python `unittest`.
+The repository source checkout contains an automated unittest regression suite in `tests/test_validate.py` (with developer evaluation tooling in `tools/evaluation/`) executed via standard Python `unittest`.
 
 #### Test Coverage Categories
 

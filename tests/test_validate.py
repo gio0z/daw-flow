@@ -13,6 +13,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import shutil
 import tempfile
 import unittest
 
@@ -284,6 +285,29 @@ class TestValidateCLI(unittest.TestCase):
             errors = [f for f in payload["findings"] if f.get("severity") == "error"]
             self.assertTrue(any("operations.md" in f.get("path", "") or "operations.md" in f.get("message", "") for f in errors))
 
+    def test_package_without_tests_directory_validates_successfully(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+            shutil.rmtree(pkg_root / "tests", ignore_errors=True)
+
+            res = self.run_cli(["package", "--root", str(pkg_root), "--format", "json"])
+            self.assertEqual(res.returncode, 0, msg=f"Validation failed: {res.stderr}\n{res.stdout}")
+            payload = json.loads(res.stdout)
+            self.assertTrue(payload.get("valid"))
+            errors = [f for f in payload["findings"] if f.get("severity") == "error"]
+            self.assertEqual(errors, [])
+
+    def test_package_missing_validator_script(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+            (pkg_root / "scripts" / "validate.py").unlink()
+
+            res = self.run_cli(["package", "--root", str(pkg_root), "--format", "json"])
+            self.assertEqual(res.returncode, 1)
+            payload = json.loads(res.stdout)
+            self.assertFalse(payload.get("valid"))
+            errors = [f for f in payload["findings"] if f.get("severity") == "error"]
+            self.assertTrue(any("validate.py" in f.get("path", "") for f in errors))
     def test_package_unrelated_templates_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
