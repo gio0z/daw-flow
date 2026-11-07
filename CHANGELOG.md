@@ -1,5 +1,18 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-08: Optional Figma/FigCraft-First Visual Mockup Review
+
+- Align `templates/wireframe.md` mockup record with canonical `references/workflow-artifacts.md` §5: optional existing matching mockup, Figma/FigCraft frame, or renderable local HTML/SVG source when actually accessible; capture file/frame reference, revision/snapshot, visual preview, and actual capability exercised (`unexercised`/`unavailable` when not exercised, never a claimed vendor use).
+- No new workflow stage, mandatory vendor dependency, installation/account prompt, or canonical kind; domain/flow still precedes mockups and UI implementation follows visual review; actual rendered preview remains required with runtime verification distinct and UI-only blocking when no viable capability.
+- Truthful status: no runtime or test pass results are claimed by this entry.
+
+## 2026-11-08: Seven Workflow Corrections Integration (Documentation & Scenarios)
+
+- Integrate the seven authorized corrections into procedural prose and manual scenarios only (no code, schema, route, module, runtime, dependency, service, or 14th template): canonical semantic EARS guidance with observable oracle and normal/error separation (no keyword parser as truth, no invented policies/numbers, no forced five-pattern use; Given/When/Then remains valid); persisted authoritative spec before tactical decomposition with reuse of adequate specs and the existing design/clarification route for ambiguity (tiny settled patches and read-only inquiries keep the no-document path); saved plan binding stable requirement/AC IDs to task IDs, exact files, dependencies, parallel ownership, expected observations, evidence, and separate parent acceptance; REQUIRED parent-owned durable progress record from intake naming the actual active phase with explicit not-yet-created refs; rendered visual mockup (not prose/ASCII/wireframe-only) before UI work with reuse and scoped N/A; and ranked subagent-result triage with no automatic apply/deploy from worker pass.
+- README now links the canonical contracts ([Workflow Artifacts](references/workflow-artifacts.md), [EARS](references/document-quality.md#acceptance-criteria-ears), [Ranked Result Triage](references/operations.md#ranked-result-triage)) and states the required progress record distinctly from optional worker retention; the payload-only planner claim is replaced by the saved-plan requirement.
+- Scenarios: existing `SCN-R-*` resume and `SCN-H-02` tracker-absent assumptions are updated to the durable multi-step record model while tiny/read-only controls remain zero new files; new `SCN-WF-*` manual matrix covers semantic AC rejection, written spec → saved plan / current phase, fresh-session resume with scoped revisions, rendered mockup vs text/block/noUI reuse, and every-worker-output ranking with parent dedup / stale / unsupported / safety + urgency / dependency order / no automatic deploy. Empty-bootstrap owner-progress owner is clarified: it is not an existing product.
+- Truthful status: no runtime or test pass results are claimed by this entry; scenario outcomes remain unexecuted manual expectations until separately exercised.
+
 ## 2026-11-07: Agent Readiness Audit Corrections
 
 - Clarify explicit audit-and-fix requests as parent-composed read-only diagnosis followed by an authorized existing correction route; review-only requests and review modules retain zero mutation authority.

@@ -114,3 +114,19 @@ Final regression rerun: 241 tests in 32.942 seconds, no failures, one skipped; f
 A direct metadata inspection of the root plus eleven module `SKILL.md` files found matching canonical names, descriptions below 1,024 characters, and bodies below 500 lines. Final operational payload identity: VERSION `0.1.1`, 58 files, manifest SHA-256 `ac805422b89fa4811d310a1f2a39931c32c2c7bef640e56c597b23b8082384a6`, payload SHA-256 `83403fc44f6949cbc008819e8c59557d15c78ddf3f107de9aa97b9c338f56ce0`. Metadata inspection is not native client discovery proof.
 
 A final four-case fresh-agent decision probe selected the existing patch route after diagnosed audit findings, preserved review-only zero mutation, mapped missing required runtime proof to `blocked`, and mapped an executed contradiction to `fail`. It also marked the first two proposed review stages `not accepted` without criterion-specific evidence explaining that rejection. The parent therefore accepts only those routing/status observations, not the probe's blanket acceptance judgments. This residual ambiguity is retained; no universal handoff or parent-judgment reliability claim follows.
+
+---
+
+## Observed Bounded Seven-Correction Smoke (2026-11-08)
+
+Bounded smoke of the seven-correction suite authoring instructions through fresh agents, not a reliability benchmark or autonomous end-to-end certification. Fixture root: `/tmp/daw-seven-smoke-YJrhCG/`.
+
+- **Parent gates:** Package validation returned valid with no findings; suite check returned ready with no blockers; 241 unit tests ran with one skip and zero failures.
+- **Actual CLI routes unchanged:** Feature clear, bootstrap unclear, and review read-only routes behaved as expected.
+- **File-only tiny patch:** Only `greet.py` changed; parent observed Python output `Hello, World!` with exit 0 and no new documentation.
+- **Read-only inventory unchanged:** `contract.md` hash matched before and after.
+- **Visual previews:** Compact `390x844` and wide `1440x900` SVG source previews were actually rendered, with populated/empty/error text visible. Static fixture only; no runtime UI proof and no app UI changed.
+- **Written plan (corrected):** Saved `spec.md`, `plan.md`, and `progress.md` were produced, but the first smoke invented a pytest dependency despite the stdlib-only constraint, missed source revision binding, and truncated the planned route. The failed original is retained. A later corrective fixture run edited plan/progress: parent source inspection confirmed pytest→stdlib unittest was planned not run, brief/spec hashes bound, route canonical feature plan-build-review-verify plus readiness separate; current plan hash explicitly pending, readiness blocked pending parent runner review (not a full autonomous pass). No autonomous reliability or cost-improvement claim follows.
+- **Ranking triage:** R1–R7 covered merged duplicates, prerequisite before fix, stale held with no deploy; observations are supplied, not freshly executed.
+- **Blocked UI:** Initial transport failed. The replacement wrote a scoped missing-direction/text-only-capability record, with no fake mockup.
+- **Limits:** Final independent source review lenses persistence and mockup/EARS returned no actionable findings; triage lens initially overlooked a PRD07.5 closure contradiction, which the parent found, confirmed, and fixed in the current PRD, and the reviewer confirmed the history fix as sufficient and correct. One idle loop after a prior yield canceled the review transport; this is a bounded artifact, not a pristine review return. Parent final gates remained 241 tests, 1 skip, zero failures, with package valid and suite ready. No reliability/cost gain or universal enforcement claim.

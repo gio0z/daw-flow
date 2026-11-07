@@ -86,6 +86,12 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-DIAG-04` | Missing Required Runtime Proof Rejected With Directed Repair | Runtime behavior claimed without actual-surface execution | Runtime claim with no surface evidence               | Parent Acceptance                           | Missing runtime proof marked unexercised, parent not accepted; module blocked where missing prerequisite.                                                                                   |
 | `SCN-DIAG-05` | Tiny Settled Patch Without Ceremony Docs or Cleanup          | Settled localized fix with complete scoped evidence       | Localized single-line change                         | Parent Acceptance                           | Settled patch proceeds directly; 0 extra docs, broad cleanup, or giant audit.                                                                                                               |
 
+| `SCN-WF-01` | Semantic AC Rejects Vague Normal/Error, No Keyword Proof | AC with vague normal path + missing error oracle | Spec draft with AC claims | Spec Review / Parent Acceptance | Vague normal/error AC rejected; no keyword-count or five-pattern proof; invented numbers rejected. |
+| `SCN-WF-02` | Written Spec → Saved Plan / Current Phase | Clear requirements, no written spec, multi-step plan | Current adequate spec or none | Authoring → Plan | Parent records bounded what/why/non-goals/AC in chosen spec before planning; saved plan binds AC IDs; progress record names actual phase. |
+| `SCN-WF-03` | Fresh-Session Resume With Scoped Revisions | Resume request from saved progress record | Durable progress record + current revisions | Resume Checkpoint | Only pending stage resumes from current evidence; scoped revision invalidates affected scope only. |
+| `SCN-WF-04` | Rendered Mockup vs Text/Block/NoUI Reuse | UI-affecting work, settled domain/flow | Existing design source, no mockup yet | Visual / Authoring | Text/ASCII/wireframe-only rejected as mockup; material missing capability blocks UI scope only; noUI → scoped N/A. |
+| `SCN-WF-05` | Every Worker Output Ranked, Dedup/Stale/Unsupported Order | Multiple workers return findings + done worker | Results at mixed revisions with overlaps | Ranked Result Triage | Parent dedups, rejects stale/unsupported with record, ranks safety first then urgency/dependency; worker pass never auto-deploys. |
+
 ## Operational Rule Diagnostics Scenarios (Manual)
 
 These scenarios exercise the practical diagnostic lens in `references/operations.md#operational-rule-diagnostics`: trigger, observable tell/consequence, scoped corrective action, and sufficient proof. Each states an independent oracle expectation; none claims execution results beyond the described manual evaluation.
@@ -316,6 +322,7 @@ These scenarios exercise the practical diagnostic lens in `references/operations
 - **Content Invariants & Verification:**
   - Zero files are written to `/tmp/test-fixture-empty`.
   - The response contains a single clear inquiry asking the user what system, service, or application they intend to build.
+  - Empty-bootstrap owner progress is not an existing product: no saved plan or progress record is treated as a pre-existing project artifact, and the parent opens the REQUIRED durable progress record at intake once multi-step work is authorized — it never invents a product record for work that does not yet have a brief.
 
 ---
 
@@ -751,22 +758,22 @@ explicit fresh-worker handoff, not a blocker or a claim of same-ID reuse. Do not
 route stages merely to enable persistence. Collect actual selection evidence; this
 scenario is not a recorded pass.
 
-## Optional Workflow Resume Checkpoint Scenarios
+## Durable Workflow Resume Checkpoint Scenarios (Required Progress Record)
 
-Manual scenarios for the [Optional Workflow Resume Checkpoint](../references/operations.md#optional-workflow-resume-checkpoint).
+Manual scenarios for the REQUIRED parent-owned durable progress record owned canonically by [Workflow Artifacts](../references/workflow-artifacts.md) (§3–§4) and [Workflow Resume & Durable Progress Checkpoint](../references/operations.md#workflow-resume--durable-progress-checkpoint). For multi-step authorized work the progress record is required from intake regardless of optional worker retention; a chat payload or native todo alone is insufficient. Tiny settled patches and factual/read-only inquiries keep the zero-new-file path.
 These are expectations, not recorded passes; collect actual dispatch, revision and
 tool-output evidence separately for each scenario. They assert outcomes, not source wording.
 
 ### SCN-R-01: Unchanged revision resumes at pending stage, accepted unrelated stage not rerun
 
 - **Target Workspace Fixture:**
-  - Parent-owned Markdown resume summary at current artifact revision, with one
+  - REQUIRED parent-owned durable progress record (default `docs/workflows/<workflow-id>.md` or established project location) opened at intake, naming the actual active phase, with spec/plan refs at current scoped revisions, one
     stage `accepted`, one stage `pending` (planning state: not yet dispatched or not
     yet parent-accepted, not a worker outer status), and inspectable canonical
     handoff/evidence refs for the accepted stage.
 - **Prompt / Intake Invocation:**
   ```text
-  "Resume this paused workflow in a new session from the checkpoint."
+  "Resume this paused workflow in a new session from the saved progress record."
   ```
 - **Execution & Cognitive Behavior:**
   1. The parent resumes the pending stage only, reuses the accepted stage without
@@ -777,16 +784,18 @@ tool-output evidence separately for each scenario. They assert outcomes, not sou
   - Pending stage dispatched; accepted unrelated stage not rerun.
   - No parent `accepted` decision is recorded for the pending stage before fresh
     primary evidence is inspected.
+  - The durable progress record is the resume authority; no chat payload or
+    optional retained worker identity substitutes for it.
 
 ### SCN-R-02: Changed scope revision invalidates affected scope only
 
 - **Target Workspace Fixture:**
-  - Resume summary whose scope revision changed after the summary was written.
+  - Durable progress record whose scope revision changed after the record was written.
     The change affects one scope; other disjoint scopes remain at their prior accepted
     revisions.
 - **Prompt / Intake Invocation:**
   ```text
-  "Resume this paused workflow in a new session from the checkpoint."
+  "Resume this paused workflow in a new session from the saved progress record."
   ```
 - **Execution & Cognitive Behavior:**
   1. The parent treats review/verification evidence for the affected scope alone as
@@ -795,15 +804,16 @@ tool-output evidence separately for each scenario. They assert outcomes, not sou
 - **Content Invariants & Verification:**
   - Stale evidence rejected for affected scope only; downstream rechecked.
   - Unaffected accepted scopes retained without rerun.
+  - The parent updates the progress record on the revision change; no evidence is carried across the modified scope without reinspection.
 
 ### SCN-R-03: Fresh session does not inherit inaccessible evidence, worker IDs, or prior approvals
 
 - **Target Workspace Fixture:**
-  - Fresh session where prior evidence/worker IDs are inaccessible, prior
+  - Fresh session where the durable progress record exists but prior evidence/worker IDs are inaccessible, prior
     correction/hypothesis state exists, and a prior approval was granted in the earlier session.
 - **Prompt / Intake Invocation:**
   ```text
-  "Resume this paused workflow in a new session from the checkpoint."
+  "Resume this paused workflow in a new session from the saved progress record."
   ```
 - **Execution & Cognitive Behavior:**
   1. The parent creates a fresh worker, preserves retry/hypothesis state for the fresh
@@ -818,6 +828,7 @@ tool-output evidence separately for each scenario. They assert outcomes, not sou
   - Zero invented evidence records for inaccessible prior work.
   - Retry/hypothesis state preserved on the fresh worker; dependent dispatch gated
     on validated joins.
+  - The new session's parent owns the progress record anew; retained worker identity is never assumed across sessions.
 
 ## Parent Acceptance Checkpoint Scenarios
 
@@ -1790,15 +1801,16 @@ These scenarios cover actual capability discovery, tracking/scheduling, semantic
 
 ### SCN-H-02: Tracker Absent — Structured Fallback, No New File
 
-- **Target Workspace Fixture:** Same workflow as SCN-H-01, but no tracker capability is exposed.
+- **Target Workspace Fixture:** Multi-step workflow (not tiny/read-only), no tracker capability exposed; REQUIRED durable progress record exists or is opened at intake.
 - **Prompt / Intake Invocation:** Same as SCN-H-01.
 - **Execution & Cognitive Behavior:**
-  1. The agent states the tracker is unavailable, then uses the structured fallback state representation (existing canonical state/evidence records).
-  2. The agent creates no new tracker file, shadow database, or duplicate registry to simulate a tracker.
+  1. The agent states the tracker is unavailable, then uses the structured fallback state representation (existing canonical state/evidence records) plus the REQUIRED parent-owned durable progress record for multi-step work.
+  2. The agent creates no new tracker file, shadow database, or duplicate registry to simulate a tracker. (Zero-new-file still applies to tiny/read-only controls; for multi-step work the progress record is the required durable authority, not a tracker substitute.)
   3. Parent acceptance rules are identical to SCN-H-01: worker completion never implies acceptance.
 - **Content Invariants & Verification:**
   - 0 new tracker files or registries created.
   - Fallback absence is stated honestly; no invented tracker schema or calls.
+  - For multi-step work, execution state is readable from the durable progress record, not from chat alone.
 
 ### SCN-H-03: DAG Holds Downstream Until Parent Acceptance
 
@@ -1889,3 +1901,94 @@ These scenarios cover actual capability discovery, tracking/scheduling, semantic
 - **Content Invariants & Verification:**
   - 0 fabricated passes; no claim that UI behavior was exercised.
   - Evidence status is exactly `unexercised`/`blocked` for the required UI criterion.
+
+---
+
+## Workflow Artifact Scenarios (Manual)
+
+Manual scenarios for the seven corrections ([Workflow Artifacts](../references/workflow-artifacts.md), [EARS](../references/document-quality.md#acceptance-criteria-ears), [Ranked Result Triage](../references/operations.md#ranked-result-triage)). Bounded manual expectations only; no runtime/test pass claims, no source-text assertion tests. Existing scenario IDs and history are preserved.
+
+### SCN-WF-01: Semantic AC Rejects Vague Normal/Error, No Keyword Proof
+
+- **Target Workspace Fixture:** Spec draft with two acceptance criteria: a vague normal-path criterion (no observable response/oracle) and a missing error-path oracle; another criterion embeds an invented latency number without traceable source.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Review these acceptance criteria for semantic readiness."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The reviewer checks each criterion for trigger, observable response, and oracle (command output, readback, error code, or state read) without counting EARS keywords.
+  2. The vague normal-path criterion is rejected as not accepted/unexercised; no keyword-shaped prose can substitute for a missing oracle.
+  3. The missing error-path criterion is rejected: error criteria must name the observable error and, where one exists, the no-change side effect, without inventing side effects.
+  4. The invented latency number is rejected until traced to user direction, a repository constant, or a decided spec; it becomes an open question, not a silent number in a SHALL.
+  5. Given/When/Then phrasing expressing the same three elements is accepted equivalently.
+- **Content Invariants & Verification:**
+  - 0 fabricated oracles; keyword counts or five-pattern coverage are never treated as semantic proof.
+  - The review distinguishes normal-path and error-path rejections with scoped repair actions.
+
+### SCN-WF-02: Written Spec → Saved Plan / Current Phase
+
+- **Target Workspace Fixture:** Multi-step change with clear user requirements but no written spec source; established project convention provides `docs/specs/` and `docs/plans/`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Decompose this multi-step change into tasks and begin implementation."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The authorized parent records the faithful bounded what/why/non-goals/AC in the chosen spec before planning; the planner does not invent architecture or business choices.
+  2. `daw-plan` persists the saved plan mapping stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/checks, evidence slots, and separate parent acceptance — resolving to the established section or, absent one, `docs/plans/<workflow-id>.md`.
+  3. The parent opens the REQUIRED durable progress record at intake, naming the actual active phase (not merely the planned route) and explicit not-yet-created refs for artifacts that do not yet exist.
+  4. A chat payload or native todo alone is recorded as insufficient; the saved plan is the authority.
+  5. Ambiguity returns to the existing design/clarification route rather than inventing a new design insertion.
+- **Content Invariants & Verification:**
+  - Spec exists before decomposition; saved plan binds every AC ID to a task or an explicit finding.
+  - Parent acceptance stays distinct from worker pass throughout.
+  - Tiny settled patches and read-only inquiries retain 0 new files.
+
+### SCN-WF-03: Fresh-Session Resume With Scoped Revisions
+
+- **Target Workspace Fixture:** Durable progress record in a new session, with one accepted stage at an unchanged revision and another scope whose revision changed since the record was written; prior worker IDs are inaccessible.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Resume this workflow from the saved progress record."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The new-session parent reloads the progress record and revalidates current spec/plan revisions before dispatch.
+  2. Unchanged, accepted work resumes without rerun; only the pending stage advances from current, inspectable evidence.
+  3. The changed-scope revision invalidates affected evidence and approvals only; unaffected accepted scopes are retained.
+  4. Inaccessible evidence and worker IDs are treated as unavailable; no stale approval is inherited and no missing evidence is invented.
+  5. The parent updates the record on the revision change and names the actual next phase.
+- **Content Invariants & Verification:**
+  - 0 inherited approvals; 0 invented evidence records.
+  - Retry/hypothesis state is preserved on the fresh worker; dependent dispatch is gated on validated joins.
+
+### SCN-WF-04: Rendered Mockup vs Text/Block/NoUI Reuse
+
+- **Target Workspace Fixture:** UI-affecting change with settled domain/flow and existing design source, but no current rendered mockup; plus two contrast variants (prose-only mockup claim, and no-UI request).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Build this screen from the settled design source."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent rejects prose, ASCII, or wireframe-only descriptions as mockup proof; an actual inspectable rendered visual mockup with editable source or durable reference plus visual preview is required before UI implementation, using the available design/export/browser capability with no vendor mandate.
+  2. An existing matching rendered mockup for the same revision is reused rather than regenerated; review covers screens, behavior states, viewports, keyboard/focus, and requirement/AC/screen-ID links.
+  3. Where the capability is materially missing, only the UI scope is blocked; there is no silent text fallback and no external publish/account action without permission.
+  4. The no-UI variant records explicit scoped N/A; the small nonvisual fix variant reuses existing matching design without a redundant mockup.
+- **Content Invariants & Verification:**
+  - Mockup acceptance is never recorded as runtime implementation proof or automatic human approval.
+  - The persisted mockup links to settled domain/flow and existing design source at a pinned revision.
+
+### SCN-WF-05: Every Worker Output Ranked, Dedup/Stale/Unsupported Order, No Automatic Deploy
+
+- **Target Workspace Fixture:** Completed worker results at mixed revisions: two workers report the same defect (overlap), one returns a stale-revision pass, one reports an out-of-scope advisory without evidence, one surfaces a safety-relevant finding, and one worker proposes deploying the change.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Triage all returned worker results before acceptance or dispatch."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent inspects every completed result against the current revision and scope; duplicate/overlapping findings are deduped into one queue entry.
+  2. The stale-revision pass and the unsupported out-of-scope advisory are rejected with explicit not-accepted/advisory rationale — never silently dropped; a true clean result receives a concise accepted/no-action disposition without manufacturing a fix queue.
+  3. The parent independently re-ranks across all results; no child rank is trusted blindly. Safety/correctness/material acceptance blockers rank first, then urgency justification, then dependency-unblocking effect; relative rank is recorded without arbitrary numeric scores. Severity stays distinct from executable order, so an eligible prerequisite may dispatch before a higher-impact dependent fix while independent safe work continues.
+  4. The deploy proposal does not authorize deployment: external deploy still requires exact target/scope permission at the point of risk; worker pass never auto-applies or auto-deploys.
+  5. The ranked queue is written into the existing durable plan/progress record (finding/result ID, source worker, scope/revision + evidence, impact/urgency, dependency, rank, disposition/next action, integration target + verification ref) and each fix is integrated and verified against the current revision before parent acceptance closes it.
+- **Content Invariants & Verification:**
+  - Every returned result has one recorded disposition; 0 silently dropped findings.
+  - The queue records dedup, stale/unsupported rejections, and dependency-ordered dispatch; 0 automatic apply/deploy from worker pass.

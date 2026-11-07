@@ -47,9 +47,9 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 #### Category: Capability & Document Routing (`RTE`)
 
 - **REQ-RTE-01: 13-Document Matrix Routing**
-  - _Description:_ The workflow must provide unambiguous routing rules defining required documents and technical capabilities based on task impact tiers.
+  - _Description:_ The workflow must provide unambiguous routing rules defining required documents and technical capabilities based on task impact tiers, scaled proportionally to task scope.
   - _AC-RTE-01.1:_ Small scoped fixes (single-line or localized bug fixes, typos) operate in zero-doc patch mode with an explicit documented reason (e.g., localized bug fix, bounded scope) rather than forcing synthetic specification bundles.
-  - _AC-RTE-01.2:_ Full feature additions require all core architectural documents before code modification begins.
+  - _AC-RTE-01.2:_ Full feature additions require a proportional written specification appropriate to the feature scope before code modification begins; the 13-document suite is required only when explicitly requested under REQ-MOD-01.
   - _AC-RTE-01.3:_ Required capabilities may be fulfilled directly by the current agent or delegated to a qualified subagent without requiring external skill registry lookups or named external skill dependencies.
 
 #### Category: Lifecycle Invocation & Mode Precedence (`MOD`)
@@ -63,6 +63,49 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - _AC-MOD-02.1:_ The agent must clearly distinguish planned document actions from final completed actions.
   - _AC-MOD-02.2:_ During adoption of an existing codebase, the agent must inspect actual code, dependencies, and docs, authoring missing baseline specifications from observed facts while preserving existing code and user-authored documents.
   - _AC-MOD-02.3:_ When an explicit full 13-document suite is requested, the agent must honor all requested documents with substantive scoped content or document explicit blockers/applicability limits, never silently shrinking the suite.
+
+#### Category: Workflow Artifacts &amp; Acceptance Quality (`WF`)
+
+- **REQ-WF-01: Clear, observable acceptance criteria**
+  - _Description:_ Acceptance criteria use canonical semantic EARS guidance with five patterns and optional composition, state the observable response or oracle, separate normal and error behavior, and treat no keyword parser, invented policy or number, or forced five-pattern use as the truth source. Given/When/Then remains valid.
+  - _AC-WF-01.1:_ Every acceptance criterion states an observable response that can be checked without a keyword parser.
+  - _AC-WF-01.2:_ Normal and error behavior are stated separately for every acceptance criterion.
+  - _AC-WF-01.3:_ Acceptance criteria invent no policy, number, or dataset beyond the requirement source.
+  - _AC-WF-01.4:_ Given/When/Then is accepted as valid acceptance-criteria form.
+- **REQ-WF-02: Written specification before planning**
+  - _Description:_ For multi-step authorized work, the parent persists a proportional authoritative specification before tactical decomposition, reusing adequate current specs and recording faithful bounded what/why/non-goals/AC for clear user requirements without a written source. The planner does not invent architecture or business choices; material ambiguity returns to the existing design/clarification route rather than a new daw-design insertion. Bootstrap starts from blueprint/domain/flow before UI/data design. Tiny settled patches and factual/read-only inquiries retain no-document paths.
+  - _AC-WF-02.1:_ User requirements with no adequate written source have their faithful bounded what/why/non-goals/AC recorded in the chosen spec before daw-plan.
+  - _AC-WF-02.2:_ Material ambiguity is returned to the existing design/clarification route; clear routes gain no new daw-design insertion.
+  - _AC-WF-02.3:_ Tiny settled patches and factual/read-only inquiries remain on the no-document path.
+  - _AC-WF-02.4:_ Bootstrap records blueprint/domain/flow before UI/data design.
+- **REQ-WF-03: Specification-to-task verification mapping**
+  - _Description:_ Multi-step plans persist stable requirement/AC IDs mapped to task IDs, exact target files, dependencies, parallel ownership, expected observations/check actions, evidence, and separate parent acceptance, with bound spec source revisions. Planned commands/checkboxes are not evidence; supporting infra is justified; one-off execution includes bounded tools/commands, expected results, and rollback only when relevant.
+  - _AC-WF-03.1:_ Every planned task cites its requirement/AC IDs, exact target files, dependencies, and owner.
+  - _AC-WF-03.2:_ Every planned task states expected verification that is not yet exercised and keeps parent acceptance distinct from worker pass.
+  - _AC-WF-03.3:_ Planned commands and checkboxes are not presented as evidence.
+- **REQ-WF-04: Persistent multi-step execution plan**
+  - _Description:_ Multi-step plans are saved before build dispatch in an existing roadmap/issue-export/project document section when sufficient, otherwise in `docs/plans/<workflow-id>.md`. A chat payload or native todo is insufficient; task-tracker authority is not duplicated. The existing handoff details reference the plan artifact without changing the outer JSON schema. One document with separate spec, plan, and progress sections is allowed and preferred when lean.
+  - _AC-WF-04.1:_ A persisted plan artifact exists before build dispatch for multi-step work.
+  - _AC-WF-04.2:_ The plan reference appears in existing handoff details without changing the outer JSON schema.
+  - _AC-WF-04.3:_ No second task tracker is introduced as concurrent authority.
+- **REQ-WF-05: Durable project progress from intake**
+  - _Description:_ A parent-owned durable project progress document/section is required from intake, using the established project document location with default `docs/workflows/<workflow-id>.md`, referencing specification/plan (default new specification `docs/specs/<workflow-id>.md` if no convention). It starts early even while clarifying with explicit not-yet-created references; states active module/stage and subphase, active tasks, accepted stages, current scoped revisions, blockers/owner/question, next permitted action, primary evidence/handoff refs, and parent acceptance distinct from worker pass. It updates on real phase entry/acceptance, correction, block/resume, relevant revision change, stop/final. The parent is sole owner; workers return proposals; read-only roles never write. A route list is not active state; desired work is not actual progress. History stays compact without fake percentages/approvals; resume reloads/revalidates current references and preserves retries and scoped invalidation. This is not a daemon, crash recovery, or runtime enforcement; the validator remains stateless.
+  - _AC-WF-05.1:_ A parent-owned progress record exists from intake and names the actual active stage, subphase, and active task(s).
+  - _AC-WF-05.2:_ Accepted stages, scoped revisions, blockers, owner, next permitted action, and parent acceptance are recorded distinctly from worker results.
+  - _AC-WF-05.3:_ The record starts before active stage completion and uses explicit not-yet-created references for missing artifacts.
+- **REQ-WF-06: Visual mockup before UI implementation**
+  - _Description:_ UI-affecting work requires an actual inspectable rendered visual mockup, not prose, ASCII, or wireframe alone, derived from settled domain/flow and existing design source before UI implementation. An existing matching mockup may be reused. Relevant screens, behavior states, viewports, keyboard/focus, and requirement/AC/screen IDs are reviewed. The editable source or durable design reference and visual preview are saved using the actual available design/export/browser capability, with no vendor mandate and no external publish/account/asset actions without permission. Material missing capability/direction blocks only the UI scope, with no silent text fallback. Mockup acceptance is not runtime implementation proof or automatic human approval. No UI means explicit scoped N/A; small nonvisual fixes reuse existing material.
+  - _AC-WF-06.1:_ UI work links requirement/AC/screen IDs and has an inspectable rendered mockup available before UI implementation.
+  - _AC-WF-06.2:_ Missing material direction or capability blocks UI scope and does not silently fall back to text-only mockups.
+  - _AC-WF-06.3:_ No-UI work records explicit scoped N/A for the mockup requirement.
+  - _AC-WF-06.4:_ Mockup acceptance is not presented as runtime implementation proof or automatic human approval.
+- **REQ-WF-07: Subagent-result triage and prioritized fix ranking**
+  - _Description:_ Every completed subagent result is parent-triaged and ranked for prioritized fixing without noise, including rejected, stale, no-findings, and cancelled results — not only results that get integrated. Each worker returns findings or remaining fixes in its own proposed priority order plus evidence-backed remaining findings or an explicit no-actionable-finding statement; the parent independently validates and globally reranks across all returned results. Triage records result/finding ID, source worker, scope/current revision plus primary evidence, severity/impact, urgency justification, dependency/unblock relation, relative rank, disposition and next permitted action, and integration target plus observed verification/acceptance reference. Safety/correctness/material-acceptance blockers rank above nonblocking polish; severity stays distinct from executable order so a prerequisite may run before a higher-impact dependent fix. Deduplicate same-root-cause findings preserving source refs; unsupported/stale findings require bounded proof or rejection rather than auto-fix. No-findings results receive a concise no-corrective-action disposition after scoped sufficient source proof, not invented work. The parent owns acceptance; a child result or worker pass is never parent acceptance and a worker pass never authorizes external deployment. External deployment is not automatic: an ambiguous deploy instruction means integrate into the intended work target only, and real production deployment requires the exact user-specified target, scope, and point-of-risk permission.
+  - _AC-WF-07.1:_ Every completed worker result receives a parent triage record — including integrated, rejected, stale, no-findings, and cancelled results — with source worker, current revision plus primary evidence, rank reason, disposition, next permitted action, and verification/integration reference.
+  - _AC-WF-07.2:_ Workers propose priority order for their own findings; the parent globally reranks across all returned results by severity/impact, urgency, and dependency unblock effect, keeping severity distinct from dispatch order.
+  - _AC-WF-07.3:_ Parent acceptance is recorded separately from any child worker pass; a worker pass never authorizes external deploy.
+  - _AC-WF-07.4:_ External or production deployment is not performed automatically from an ambiguous deploy instruction; it requires the exact user-specified target, scope, and point-of-risk permission.
+  - _AC-WF-07.5:_ Accepted in-scope corrective findings close only via integration into the intended target plus parent-observed verification on the current revision; rejected, out-of-scope, or advisory findings and merged duplicates close only with an explicit reason and source/merged reference, never via forced unauthorized fix; clean no-findings results close with sufficient bounded evidence and a concise no-actionable-finding disposition.
 
 #### Category: Suite Routing & Module Execution (`RTE`)
 
@@ -112,3 +155,4 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - Runtime credential validation or cryptographic authorization tokens.
   - Standalone unbundled distribution of child modules without the suite root.
   - Git branch, commit, or push orchestration.
+- **Correction scope non-goals (WF):** Stateless validator engines bounded to current files; no new routes, modules, schemas, or templates beyond the existing 13; no runtime daemon, crash recovery, or enforcement daemon; read-only roles do not write. Subagent triage does not transfer parent acceptance and external deployment is not automatic. Source provenance for REQ-WF-01..07: user conversation explicitly authorizing the WT docs stage, mockup, and ranking corrections, plus user-supplied articles [Cara Bikin Requirement Lebih Jelas (EARS patterns)](https://ramadigital.id/blog/acceptance-criteria-ears-pattern-cara-bikin-requirement-lebih-jelas) and [Agentic Tapi Deterministic: Workflow AI Agent](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent); canonical DAW authorities are `references/workflow-artifacts.md`, `references/document-quality.md#acceptance-criteria-ears`, and `references/operations.md#ranked-result-triage`; inherited project guidance citations in `references/document-quality.md` (§2) remain existing guidance and are not claimed as user-supplied WF sources; no external provenance is claimed for runtime behavior.

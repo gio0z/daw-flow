@@ -29,6 +29,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 - **Nonrecursive Dispatch & Downstream Handoff:** `daw-design` performs structural analysis, interactive elicitation, specification drafting, and readiness inspection; it never executes code, performs recursive module dispatch, or invokes sub-skills directly (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent). Orchestration remains strictly with the parent router.
 - **Scope Guard (Governance & Architecture vs. Implementation):** Classify every user input as either architecture/governance content or a separate non-governance intent. If input includes feature implementation, code generation, refactoring, building, or deployment requests, `daw-design` MUST NOT execute them. Extract them as deferred intents under `details.next_actions`. Do not create or modify application source code, feature routes, components, or test files during design or governance authoring.
 - **Canonical Shared Procedural Contract:** Adhere to the shared delivery contract defined in [Canonical Document Quality & Workflow Transition Guide](../../references/document-quality.md#feature-delivery-contract) (specifically [Governance Alignment](../../references/document-quality.md#a-governance-and-authoring-alignment), [Clarification & Uncertainty Resolution](../../references/document-quality.md#b-clarification-and-technical-uncertainty-resolution), and [Feature Slicing & Behavioral Oracles](../../references/document-quality.md#c-feature-slicing-and-behavioral-contract-oracles)).
+- **Canonical Workflow Artifacts Contract:** Adhere to [Workflow Artifacts](../../references/workflow-artifacts.md) for specification/plan/progress/mockup persistence, ownership, and binding. For multi-step work, a proportional authoritative specification MUST be persisted before tactical planning per [§1–§2](../../references/workflow-artifacts.md#1-artifact-set--proportionality), reusing a current adequate spec and preserving its IDs. Parent — not workers — records actual active design subphase/progress; workers propose updates only and never self-approve. Bootstrap starts from blueprint/domain/flow before UI/database design. The feature-delivery contract [§A.6](../../references/document-quality.md#a-governance-and-authoring-alignment) applies the same rule; in case of divergence, [Workflow Artifacts](../../references/workflow-artifacts.md) governs persistence/ownership and [Document Quality §9](../../references/document-quality.md#feature-delivery-contract) governs acceptance-criteria semantics.
 
 ---
 
@@ -120,12 +121,15 @@ The design module governs structural analysis, architectural evaluation, domain 
    - **QA Review Limitation:** Human comprehension remains unexercised without live people; automated review evaluates structural and evidence compliance only.
 7. **Prioritized Feature Slicing & Measurable Oracles:** When authoring feature specifications (PRD, FRD, Blueprint):
    - Preserve existing stable story, requirement, and acceptance criteria IDs (`US-01`, `PRD-01`, `FRD-01`). If absent, generate scoped unique IDs and retain them.
-   - Structure features into prioritized, independently demonstrable/testable behavior stories (P1, P2...) with Given/When/Then or equivalent exact input/output/error/state oracles.
+   - Structure features into prioritized, independently demonstrable/testable behavior stories (P1, P2...) with acceptance criteria per the canonical [EARS Semantic Guidance](../../references/document-quality.md#acceptance-criteria-ears) (observable condition/response/oracle; Given/When/Then equivalent) — never restate competing persistence/format rules here.
    - Do not force deploy independence for inseparable safety or transaction invariants. Supporting infrastructure tasks can lack stories only with explicit prerequisite justification.
    - Distinguish business outcomes/KPIs from build/runtime acceptance criteria (a KPI cannot serve as runtime acceptance without an observable, testable measurement boundary).
+
 8. Author or update only the relevant specifications for the scope (avoiding forced 13-document churn).
 9. Accepted aliases (e.g., `api-contracts.md` for API specifications) are permitted where established, but do not invent uncoordinated template types.
-10. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
+10. **Persist Authoritative Spec Before Tactical Planning:** For multi-step work, persist the proportional authoritative specification (what/why/non-goals/acceptance criteria) before handing off to `daw-plan`, per [Workflow Artifacts §1–§2](../../references/workflow-artifacts.md#1-artifact-set--proportionality). Reuse a current adequate spec — do not duplicate it. If clear user requirements have no written source, the parent records their faithful bounded what/why/non-goals/AC in the chosen spec before planning; the planner cannot invent architecture or business choices. Ambiguity returns to the existing design/clarification route; no new design insertion is created for clear routes.
+11. **Blueprint/Domain/Flow Before UI/Database Design:** For bootstrap/greenfield work, settle blueprint, domain model, and data-flow/lifecycle before UI or database design. Do not let UI mockups or schema choices precede the domain/flow foundations unless the user supplies an explicit alternative direction.
+12. Persist settled specifications, domain definitions, and ADRs strictly within authorized document scope.
 
 ### Step 6: Builder-Readiness Assessment & Seam Inspection
 
@@ -134,6 +138,7 @@ The design module governs structural analysis, architectural evaluation, domain 
    - **Relevant Error Topologies:** Explicit failure conditions and error contracts where relevant (without mandating unneeded retries or fallbacks).
    - **State & Concurrency Invariants:** Atomic boundaries, consistency rules, and race condition mitigations where concurrency or shared state warrants it.
    - **Verifiable Acceptance Seams:** Deterministic, observable pass/fail criteria with verifiable evidence hooks.
+   - **Mockup Readiness Seam (UI-Affecting Work):** For new or changed visual UI, additionally verify per [Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na): an inspectable rendered mockup source or durable design reference plus a visual preview exists, derived from settled domain/flow and the existing design source/tokens; the mockup links relevant REQ/AC/screen IDs and covers relevant screens, behavior states, viewports, and focus/keyboard design (design review coverage, not runtime proof); the preview was produced with a real available tool (browser/design/export capability) — no vendor mandate, and prose/ASCII/wireframe-only is not a substitute. Missing direction or available capability blocks only the affected UI scope; other non-UI scopes proceed. Record `N/A` with scoped rationale when there is no UI or small nonvisual fixes reuse existing matching design without a redundant mockup. Design may plan mockup creation within authoring; readiness then specifically blocks UI implementation absent a reviewed current mockup, without creating a new route or forcing 13 documents. The mockup ref is recorded as a section inside an existing canonical kind or as the plan's design artifact — never a new mandatory 14th kind.
 2. Waive formal builder-readiness inspection for minimal, routine, or localized changes.
 3. Classify open items into **Blocking Unknowns** (halt handoff; resolve or escalate) versus **Safe Reversible Choices** (document sensible default with rationale; proceed autonomously).
 4. Report structural readiness, not runtime proof: design status `pass` validates specification completeness, never runtime execution or deployment.
@@ -158,7 +163,7 @@ Preserve these module-specific fields under `details`, using empty collections o
 - `architectural_summary`, `target_specifications`, `key_invariants`, and `explicit_non_goals`: grounded design, relevant artifact paths, boundaries, and exclusions.
 - `evaluated_alternatives`: material choices with `chosen`, `alternative`, and `rationale`; empty when alternatives are waived.
 - `domain_modeling`: `disambiguated_terms`, `adr_references`, and `convention_path`, respecting domain/ADR gates and repository conventions.
-- `builder_readiness`: `substantive_design`, `seams_checked`, `blocking_unknowns`, `safe_reversible_choices`, and `readiness_verdict`; disclose waived inspection for localized work.
+- `builder_readiness`: `substantive_design`, `seams_checked`, `blocking_unknowns`, `safe_reversible_choices`, `mockup_readiness`, and `readiness_verdict`; disclose waived inspection for localized work. `mockup_readiness` is `{required: bool, status: "reviewed"|"na"|"blocked", ref: "path or null", req_ac_screen_ids: [...], states_viewports_focus: "...", capability: "actual available tool or null", blocks_ui_only: bool}` — `required: false` with scoped rationale for no-UI/small nonvisual reuse; `blocked` only when the affected UI scope lacks direction/capability.
 - `interface_contracts`: material consumer inputs/outputs and failure contracts, with provenance for unsettled proposals.
 - `consequential_decisions`: `requires_user_approval` and `items`, kept separate from routine author decisions and operational authorization.
 - `sync_impact_report`: `version_change`, `modified_principles`, `added_sections`, `removed_sections`, and `downstream_artifacts_to_sync` when governance or foundations change.
@@ -197,6 +202,15 @@ Compact illustrative `details` (not a complete handoff):
     ],
     "blocking_unknowns": [],
     "safe_reversible_choices": [],
+    "mockup_readiness": {
+      "required": false,
+      "status": "na",
+      "ref": null,
+      "req_ac_screen_ids": [],
+      "states_viewports_focus": "no UI in scope",
+      "capability": null,
+      "blocks_ui_only": false
+    },
     "readiness_verdict": "ready_for_planning"
   },
   "interface_contracts": "POST /api/v1/auth/refresh -> {access_token: string, refresh_token: string}",
@@ -227,11 +241,11 @@ Before finalizing handoff from `daw-design`, verify:
 - [ ] Domain vocabulary grounded in observable codebase facts; newly proposed concepts explicitly marked with recommendation provenance.
 - [ ] Existing project specification and ADR path conventions respected (no forced generic paths).
 - [ ] Consequential user decisions segregated from routine engineering decisions.
-- [ ] For substantive designs, builder-readiness seams evaluated with zero unresolved blocking unknowns.
+- [ ] For substantive designs, builder-readiness seams evaluated with zero unresolved blocking unknowns; mockup readiness seam evaluated for UI-affecting work (`reviewed` ref + preview, or scoped `N/A`, or UI-only `blocked`).
 - [ ] Changed architectural decisions supersede rather than rewrite historical records.
 - [ ] Input classified per Scope Guard; non-governance/implementation requests extracted to `next_actions` without source code mutations.
 - [ ] Governance or principle changes include structured sync impact reporting with downstream artifacts flagged for synchronization.
-- [ ] Feature requirements structured as prioritized, independently testable user journeys (P1, P2...) with exact Given/When/Then oracles.
+- [ ] Feature requirements structured as prioritized, independently testable user journeys (P1, P2...) with EARS oracles per [EARS Semantic Guidance](../../references/document-quality.md#acceptance-criteria-ears); authoritative spec persisted before tactical planning per [Workflow Artifacts](../../references/workflow-artifacts.md).
 - [ ] Canonical shared delivery contract (`references/document-quality.md#feature-delivery-contract` sections A, B, and C) satisfied.
 - [ ] No recursive module dispatch attempted; independent review recommendations directed to parent router.
 

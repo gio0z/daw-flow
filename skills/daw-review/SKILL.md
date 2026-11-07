@@ -37,21 +37,24 @@ Invoke `daw-review` when:
 
 Before conducting a code review:
 
-1. **Target Diff / Scope:** The list of changed files, commits, or git diff relative to the base branch.
-2. **Authoritative Specification / Requirements Contract:** The user prompt, acceptance criteria, BRD/PRD, plan document, or task contract specifying what was requested.
-3. **Evidence Artifacts:** Test execution results, benchmark outputs, static analysis proofs, or diagnostic logs produced during build or verification.
+1. **Saved Spec + Plan + Current Task (multi-step premise):** For multi-step authorized work, the review premise is the saved proportional authoritative specification and saved plan, plus the parent's active task and current scoped revision (Workflow Artifacts §1–§4). Reuse the current adequate spec; do not duplicate. If clear user requirements have no written source, the parent records their faithful bounded what/why/non-goals/AC in the chosen spec before `daw-plan`. Tiny settled patches and factual/read-only inquiries retain the no-document path. For UI-affecting work, also confirm the actual inspectable rendered mockup is present and reviewed before UI code; a mockup gap is a BLOCKER for the UI scope, not a silent pass.
+2. **Target Diff / Scope:** The list of changed files, commits, or git diff relative to the base branch.
+3. **Authoritative Specification / Requirements Contract:** The user prompt, acceptance criteria, BRD/PRD, plan document, or task contract specifying what was requested.
+4. **Evidence Artifacts:** Test execution results, benchmark outputs, static analysis proofs, or diagnostic logs produced during build or verification.
    - **Ground Truth Evidence vs. Agent Self-Report:** Trust only actual command outputs, tool logs, observable test results, or verifiable static path proofs. Never accept an agent's self-reported "all tests pass" or "code is clean" without examining concrete verification evidence.
-4. **Relative Reference Base & Canonical Path Resolution:**
+5. **Relative Reference Base & Canonical Path Resolution:**
    - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-review`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.
    - The suite root is the canonical module directory's `../..`.
    - Resolve all relative links (`../../references/...`, `../../SKILL.md`) relative to the canonical physical module directory, NEVER relative to the logical alias path or `cwd`.
    - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-5. **Mandatory Governance Loading:**
+6. **Mandatory Governance Loading:**
    - Before executing any phase work, ensure root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6) are in context. If already loaded and active in the current session, reuse them directly without redundant re-reading.
    - `daw-review` is strictly read-only and never performs file mutations. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
    - The same independent read-only reviewer may be resumed for a corrected revision, but must inspect the current artifact; an earlier pass is invalid after affected edits. Existing retry and stop/replan rules still apply. Findings must be grounded in source proof or static verification of the current revision; independent review is strictly required only when the active route specifies it, and read-only review never forces unnecessary runtime execution when static proof is appropriate. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries). The parent authors acceptance decisions (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); reviewer findings serve as primary observations, not self-executing acceptance. Small tasks record reviews inline.
+   - **Read-only inspection bounds:** The reviewer inspects only the saved current artifacts — the specification/plan/progress revision in context, the current diff, and EARS semantics/mappings (requirement/AC IDs -> task IDs -> targets) for the actual active phase. It never writes progress records, the triage queue, mocks, or any file; it never invents evidence, and it never re-opens settled scope to manufacture findings.
+   - **Finding output contract:** Returns only prioritized, evidence-backed, actionable findings (each with impact/urgency rationale and dependency where relevant), or an explicit no-actionable-finding statement with its scoped N/A/proof. Implemented work is reported as an integration candidate plus the verification it still needs — never a fake `needs-fix` for work already done. The parent holds the [Ranked Result Triage queue](../../references/operations.md#ranked-result-triage) and decides corrective dispatch; a reviewer never self-approves or deploys.
 
-6. **Document Quality Reference & Review Invariants:**
+7. **Document Quality Reference & Review Invariants:**
    - Read [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md#feature-delivery-contract) (§E, §F, §G) and `references/document-quality-rubric.json` when reviewing formal specifications.
    - **Independent Evaluation vs. Author Self-Grading:** The reviewer/parent evaluates semantic clarity, task accessibility for fresh readers/agents, and empirical evidence validity. Authors cannot self-grade unlock or grant themselves a pass; review exits require an independent `reviewer` identifier and explicit per-check `decision`: `accepted` | `not_accepted`.
    - **Requirements-Quality Checklist vs. Execution Task Checkboxes & Runtime Acceptance (§E):**
@@ -73,7 +76,7 @@ Before conducting a code review:
    - **Mutation Invalidation:** Modifying any specification document changes its SHA-256 hash and immediately invalidates any prior `review-ready` eligibility.
    - **Proportionality & Python Fallback:** Trivial inline changes without formal specifications do not require document review transition records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
    - **QA Review Limitation:** Document quality review verifies structural evidence eligibility, coverage, and citation presence. Human comprehension remains unexercised without live people (`[UNEXERCISED: NO HUMAN PARTICIPANTS]`).
-7. **Structural Coupling Reference:** Consult [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) during Stage 2 technical audit when evaluating whether structural changes introduce hidden links, needless wrappers, or surplus taxonomy.
+8. **Structural Coupling Reference:** Consult [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) during Stage 2 technical audit when evaluating whether structural changes introduce hidden links, needless wrappers, or surplus taxonomy.
    7a. **Code Intelligence Capability Hierarchy:** Follow the canonical hierarchy in `../../skills/daw-untangle/SKILL.md` §2 for any code-intelligence lookups during review: real LSP for semantic definitions/references/callers/rename when available and language-supported; AST structural discovery when appropriate and authorized; graph only after coverage/freshness validation; scoped grep/glob fallback otherwise. Review is strictly read-only and never applies code actions, renames, or codemods (even when LSP/AST support them); cite the tier actually used and current revision in evidence; unavailable evidence is unexercised, never a pass. No global scans, fictitious tooling, mandatory external install, or static-as-runtime-proof claims.
 
 ---
@@ -85,13 +88,17 @@ Before conducting a code review:
 _Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity gate still produces a complete review report; evident security or data-loss risks must remain visible._
 
 1. **Scope & Goal Alignment:**
-   - Verify every item in the task contract or user request has a corresponding implementation.
+   - Verify every item in the saved specification/task contract (or user request on the no-document path) has a corresponding implementation.
    - Flag any missing acceptance criteria, omitted edge cases, or dropped requirements.
    - Check for unrequested scope creep: flag features, abstractions, or configuration knobs added without user authorization.
 2. **Behavioral Invariant Check:**
    - Verify that the core requested behavior actually exists and is exercised in the diff.
    - Ensure the implementation solves the real problem requested, not a simplified or familiar substitute.
-3. **Stage 1 Decision Gate:**
+3. **Saved Revision, EARS & Mapping Check (current artifacts only):**
+   - Conformity is evaluated against the saved specification/plan/progress revision in context for the actual active phase — never against an invented or stale revision.
+   - Confirm each AC's semantics against the canonical [EARS Semantic Guidance](../../references/document-quality.md#acceptance-criteria-ears): five patterns with composition allowed and Given/When/Then equivalent; observable response/oracle and normal/error separation present; no invented policies/numbers, no keyword parser as truth, no forced five-pattern use.
+   - Confirm mapping integrity: Requirement/AC IDs -> Task IDs -> exact target files; orphan tasks, unmapped criteria, and revision drift are BLOCKERs for the affected scope.
+4. **Stage 1 Decision Gate:**
    - If requirements conformity fails: Record `Stage 1: FAILED`, outer `status: "fail"`, and `details.review_verdict: "CHANGES_REQUESTED"`. Skip the full Stage 2 audit, but perform bounded static triage of evident confidentiality, authorization, or data-loss risks in the inspected paths. Record Stage 2 as `LIMITED_SECURITY_TRIAGE` when such triage is performed, or `SKIPPED` otherwise; neither status claims a full technical audit passed.
    - If requirements conformity passes: Proceed to Stage 2.
 
@@ -148,12 +155,14 @@ When requested by the parent orchestrator prior to build dispatch, `daw-review` 
 5. **Requirements-Quality Evaluation:**
    - Audit requirements prose against the reviewer-owned quality rubric for ambiguity, untestable adjectives ("fast", "intuitive", "robust"), missing negative/edge scenarios, and ungrounded KPI claims.
 6. **Structured Findings Format:**
-   - Report findings using compact Markdown with:
+   - Report findings using compact Markdown in the worker's proposed priority order, each with:
      - `Finding ID`: Stable identifier (e.g., `PRE-01`).
      - `Severity`: `BLOCKER` (fails readiness; prevents build dispatch for affected scope), `HIGH`, `MEDIUM`, `LOW`.
      - `Location`: `artifact_path:line`.
-     - `Consequence`: Concrete impact on build safety, requirements drift, or runtime ambiguity.
+     - `Consequence` (impact/urgency rationale): Concrete impact on build safety, requirements drift, or runtime ambiguity, plus why it is urgent now.
+     - `Dependency`: Prerequisite/unblock relation, if any (what it unblocks or what it waits on).
      - `Remediation`: Actionable repair instruction for the author or planner.
+   - The worker's order is a proposal only; the parent re-ranks in the [Ranked Result Triage queue](../../references/operations.md#ranked-result-triage). Implemented work already done is reported as an integration candidate plus the verification it still needs — never as a fake `needs-fix`. With no actionable finding, state it explicitly and cite the scoped N/A/proof inspected.
 7. **Metrics Coverage Denominator Accounting:**
    - When reporting requirement coverage (e.g., tasks per requirement or test oracle definitions), the denominator MUST include all declared requirements and acceptance criteria.
    - Exclude ONLY justified non-buildable or out-of-scope criteria (such as post-launch business KPIs or external SLAs lacking test oracle boundaries, each with explicit written justification).
@@ -197,6 +206,7 @@ Return a complete, observable JSON handoff before any transition using [routing 
 - **Separate Stage 1 & Stage 2 Requirements:** `details` MUST contain explicit and separate verdicts and evidence for Stage 1 (`stage_1_conformity`) and Stage 2 (`stage_2_technical_audit`). Conflating both stages into a single unseparated verdict is invalid.
 - **Review Mode Support:** `details.review_mode` explicitly distinguishes `"postbuild_code_review"` (default, evaluating implemented code diffs) from `"prebuild_readiness"` (evaluating proposed specifications, architecture, and task manifests for spec-dependent features). In `prebuild_readiness` mode, `review_verdict` evaluates cross-artifact readiness (`stage_1_conformity` reports requirements/story/task coverage and `stage_2_technical_audit` reports dependency/parallel safety). The orchestrator uses this checkpoint to gate build dispatch; postbuild code review (where required by the active route, e.g. feature and bugfix routes) and runtime verification remain strictly required after build completion.
 - **Verdict & Loop State:** Record `details.review_verdict` as `PASSED`, `CHANGES_REQUESTED`, `CONTRADICTION_HALT`, or `REPLAN_REQUIRED`, with `review_loop_state` tracking recurrence and remaining blockers and an actionable `recommendation_for_orchestrator`. Stage 1 failure requires outer `status: "fail"` and Stage 2 `SKIPPED` or `LIMITED_SECURITY_TRIAGE`, never a full technical pass.
+- **Finding output contract:** Returns only prioritized, evidence-backed, actionable findings (each with impact/urgency rationale and dependency where relevant), or an explicit no-actionable-finding statement with its scoped N/A/proof. Implemented work is reported as an integration candidate plus the verification it still needs — never a fake `needs-fix`. The parent re-ranks in the [Ranked Result Triage queue](../../references/operations.md#ranked-result-triage); the reviewer never self-approves or deploys.
 
 Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
 

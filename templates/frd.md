@@ -25,23 +25,29 @@
 
 _Describe interfaces, CLI arguments, or endpoints according to repo architecture. Provide exact input/output/error/state oracles. Do not force generic REST schemas if implementing internal modules or CLI tools._
 
-### FRD-01: [Interface / Operation Name] (Maps to US-01)
+### FRD-01: [Behavior Name] (Maps to US-01)
 
+_Write the contract in EARS or Given/When/Then per [EARS Semantic Guidance](../references/document-quality.md#acceptance-criteria-ears). One behavior per criterion; split independently verifiable responses._
+
+- **Criterion (EARS or GWT):** [WHEN/WHILE/WHERE/IF-THEN + THE SYSTEM SHALL + observable response, or Given/When/Then]
+- **Condition / trigger or state:** [Trigger event, while-state, or precondition]
+- **System response + observable oracle:** [Observable response and how a verifier proves it — return value, state readback, error code, file/DB read]
+- **Negative / no-change (if meaningful):** [Observable error AND no-change side effect where one exists, or N/A]
 - **Signature / Command Syntax:** `[Signature, CLI syntax, or Method]`
-- **Preconditions / Input State:** [Initial system state or caller context required]
 - **Inputs & Validation Rules:** [Type constraints, required vs optional, value limits, format validators]
 - **Outputs & Return Types:** [Structured response payload, return object, or stdout format]
-- **Success State Change (Oracle):** [Exact state change or database mutation upon successful execution]
-- **Error Handling & Failure Semantics:**
-  - **Edge / Invalid Input:** [Condition -> Specific error code / status payload]
-  - **Timeout / Degradation:** [Condition -> Fallback or retry semantics]
-  - **Forbidden State:** [Condition -> Immediate rollback / rejection]
+- **Provenance:** `[User Requirement]` / `[Observed Fact]` / `[Proposed Default]` / `[Open Question]` — no invented timeout/error policies; thresholds need a traceable source.
 
-### FRD-02: [Secondary Operation / Negative Path] (Maps to US-02)
+### FRD-02: [Negative / Error Behavior] (Maps to US-02)
 
+- **Criterion (EARS or GWT):** [IF + unwanted condition, THEN THE SYSTEM SHALL + error response]
+- **Condition / trigger or state:** [Invalid input or forbidden state]
+- **System response + observable oracle:** [Error code/status/message and how a verifier reads it]
+- **Negative / no-change (if meaningful):** [No rows persisted / no external call / input untouched, or N/A]
 - **Signature / Command Syntax:** `[Signature, CLI syntax, or Method]`
 - **Inputs & Constraints:** [Inputs and validation]
 - **Outputs / Failure Oracle:** [Explicit expected error, exit code, or response]
+- **Provenance:** `[User Requirement]` / `[Observed Fact]` / `[Proposed Default]` / `[Open Question]`
 
 ## 3. System Invariants & Inseparable Safety Boundaries
 

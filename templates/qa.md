@@ -40,7 +40,9 @@ _Routine bugfixes do NOT require a full new `qa.md`. Existing test suites or inl
 
 ## 2. Requirements-to-Test Traceability & Convergence Matrix
 
-_Map each requirement/acceptance criterion to its implementing story, task, target source paths, and deterministic verification command per [Feature Delivery Contract §D, §G](../references/document-quality.md#feature-delivery-contract). Source existence, passing old tests, or task checkboxes are never completion alone._
+_Map each requirement/acceptance criterion to its implementing story, task, target source paths, and deterministic verification command per [EARS Semantic Guidance](../references/document-quality.md#acceptance-criteria-ears) and [Feature Delivery Contract §D, §G](../references/document-quality.md#feature-delivery-contract). Source existence, passing old tests, or task checkboxes are never completion alone._
+
+_Coverage rule:_ normal-path criteria and IF/THEN error-path criteria are checked separately. For each mapped criterion, the verifier runs the check that proves the stated **system response + observable oracle**, and records evidence as `passed` only when the oracle matches; otherwise `failed`, `blocked`, `missing`, or `contradicted` — or `unexercised` until the verification command actually runs. Never infer a pass from the PRD/FRD text alone._
 
 ### 2.1 Coverage Denominator Accounting
 
@@ -53,12 +55,12 @@ _Map each requirement/acceptance criterion to its implementing story, task, targ
 
 ### 2.2 Traceability & Verification Status
 
-| AC / Req ID | User Story | Task ID(s) | Touchpoint Source Paths | Verification Command / Oracle       | Observed Status                          | Evidence Ref / Commit SHA          |
-| :---------- | :--------- | :--------- | :---------------------- | :---------------------------------- | :--------------------------------------- | :--------------------------------- |
-| `QA-01`     | `US-01`    | `TASK-01`  | `src/auth/session.py`   | `pytest tests/auth/test_session.py` | `Passed` (`implemented_verified`)        | `pytest exited 0 (commit abc1234)` |
-| `QA-02`     | `US-01`    | `TASK-02`  | `src/auth/token.py`     | `pytest tests/auth/test_token.py`   | `Unexercised` (`implemented_unverified`) | `[Awaiting fresh test run]`        |
+| AC / Req ID | Criterion (condition → response + oracle)                                                            | User Story | Task ID(s) | Touchpoint Source Paths | Verification Command / Expected Oracle                                       | Observed Status | Evidence Ref / Commit SHA          |
+| :---------- | :--------------------------------------------------------------------------------------------------- | :--------- | :--------- | :---------------------- | :--------------------------------------------------------------------------- | :-------------- | :--------------------------------- |
+| `QA-01`     | WHEN [normal trigger] THE SYSTEM SHALL [normal response]; oracle: [state readback / command output]  | `US-01`    | `TASK-01`  | `src/auth/session.py`   | `pytest tests/auth/test_session.py` → expect [normal oracle]                 | `Unexercised`   | `[awaiting fresh test run output]` |
+| `QA-02`     | IF [invalid input], THEN THE SYSTEM SHALL [error response]; oracle: [error code + no persisted rows] | `US-01`    | `TASK-02`  | `src/auth/token.py`     | `pytest tests/auth/test_token.py` → expect [error code + no-change readback] | `Unexercised`   | `[awaiting fresh test run]`        |
 
-_(Observed Status must be one of: `Passed` (implemented/verified), `Failing`, `Blocked`, `Unexercised` (implemented-unverified), `Missing`, or `Contradicted`)._
+_(Observed Status must be one of: `Passed` (implemented/verified), `Failing`, `Blocked`, `Unexercised` (implemented-unverified), `Missing`, or `Contradicted`). Evidence stays `unexercised` until the command runs._
 
 ## 3. Negative & Boundary Testing
 

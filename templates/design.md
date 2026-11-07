@@ -1,6 +1,6 @@
 # Visual Design System & Tokens: [Feature / Surface]
 
-> **Fill-in Guidance:** Fill this template using existing repository design tokens and component libraries. Equivalent existing design files or token definitions may be linked directly. New design tokens are permitted when explicitly requested or required by new feature requirements; document them with technical rationale rather than claiming a fabricated upstream design source. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, headless services), mark web WCAG styling conformance as N/A and document platform-appropriate proposed visual/formatting conventions (e.g. ANSI colors, terminal formatting); never claim empirical screen-reader or platform compatibility absent observed tests. Mark N/A with rationale if the change has no visual styling impact. Unresolved visual questions block only impacted visual/frontend implementation. Never include secret values or credentials.
+> **Fill-in Guidance:** Fill this template using existing repository design tokens and component libraries. Equivalent existing design files or token definitions may be linked directly. New design tokens are permitted when explicitly requested or required by new feature requirements; document them with technical rationale rather than claiming a fabricated upstream design source. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, headless services), mark web WCAG styling conformance as N/A and document platform-appropriate proposed visual/formatting conventions (e.g. ANSI colors, terminal formatting); never claim empirical screen-reader or platform compatibility absent observed tests. Mark N/A with rationale if the change has no visual styling impact. Unresolved visual questions block only impacted visual/frontend implementation. Never include secret values or credentials. For UI-affecting work, record the actual rendered mockup (editable source or durable design ref + visual preview) and its review per [workflow-artifacts §5](../references/workflow-artifacts.md) — see §5 below; prose alone is insufficient.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
@@ -55,7 +55,17 @@ _Verify compliance against the target accessibility baseline (WCAG 2.2 AA defaul
 - **Large Text / UI Control Contrast:** [Proof that headers and interactive borders maintain required contrast ($\ge 3:1$ for AA, $\ge 4.5:1$ for AAA) against adjacent surfaces, or N/A with rationale for non-UI/CLI surfaces]
 - **Color Independence:** [Visual indicators (icons, text labels, borders) ensuring meaning is not conveyed by color alone, or N/A with rationale for non-UI/CLI surfaces]
 
-## 5. Document Quality & Review Checks
+## 5. Rendered Mockup Artifact & Review Record
+
+_Canonical timing/proof/N/A rule: [references/workflow-artifacts.md](../references/workflow-artifacts.md) §5 — apply it here, do not duplicate it. Domain/flow are settled before this mockup is authored; UI implementation follows a reviewed current mockup. Reuse an existing matching mockup where applicable (record its ref, do not force a new one). No invented assets or fabricated token sources._
+
+- **Mockup artifact:** [Editable source or durable design ref + visual preview link(s), or `N/A` with scoped rationale (no UI / nonvisual patch reusing existing matching design)]
+- **Coverage mapping:** [Requirement/AC/screen IDs → mockup screens, behavior states, viewports covered]
+- **Token/component provenance:** [Existing tokens and primitives actually used in the mockup; any new token with stated rationale]
+- **Review record & limits:** [Reviewer, date, observed result; static mockup labels are not runtime/click/keyboard proof — actual runtime is verified later]
+- **Blocking condition:** [Material unavailable capability/direction blocks only this UI scope; no text-only fake pass]
+
+## 6. Document Quality & Review Checks
 
 _Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
 

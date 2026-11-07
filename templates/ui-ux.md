@@ -1,6 +1,6 @@
 # UI/UX & Interaction Design Specification: [Feature / Surface]
 
-> **Fill-in Guidance:** Fill this template for interactive behaviors, state transitions, and accessibility compliance. Equivalent existing interaction specs or Storybook stories may be referenced directly. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, embedded libraries), mark web WCAG conformance as N/A and document platform-specific proposed usability/ergonomics criteria (e.g. terminal contrast, keyboard shortcuts); never claim empirical screen-reader or platform compatibility absent observed tests. Unresolved interaction questions block only impacted UI component work. Never include secret values or credentials.
+> **Fill-in Guidance:** Fill this template for interactive behaviors, state transitions, and accessibility compliance. Equivalent existing interaction specs or Storybook stories may be referenced directly. Honor the repository or project's required accessibility standard for web applications (do NOT downgrade AAA if specified; default to WCAG 2.2 AA if unspecified for applicable web surfaces). For non-web environments (CLI, backend, embedded libraries), mark web WCAG conformance as N/A and document platform-specific proposed usability/ergonomics criteria (e.g. terminal contrast, keyboard shortcuts); never claim empirical screen-reader or platform compatibility absent observed tests. Unresolved interaction questions block only impacted UI component work. Never include secret values or credentials. For UI-affecting work, record the actual rendered mockup (editable source or durable design ref + visual preview) and its review per [workflow-artifacts §5](../references/workflow-artifacts.md) — see §5 below; prose behavior specs alone are insufficient.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
@@ -50,7 +50,17 @@ _Define behavior for all operational interface states:_
 - **Focus Management:** [Focus trapping in modal dialogues, focus restoration to trigger upon dismiss; verify focus indicator visibility (WCAG 2.4.7) and ensure focus is not obscured by sticky containers or overlays (WCAG 2.4.11)]
 - **Form Validation Timing:** [Validation on blur or submit; error messages programmatically linked to fields via `aria-describedby`]
 
-## 5. Document Quality & Review Checks
+## 5. Rendered Mockup Artifact & Review Record
+
+_Canonical timing/proof/N/A rule: [references/workflow-artifacts.md](../references/workflow-artifacts.md) §5 — apply it here, do not duplicate it. Domain/flow are settled before this mockup is authored; UI implementation follows a reviewed current mockup. Reuse an existing matching mockup where applicable (record its ref, do not force a new one). No invented assets or fabricated token sources._
+
+- **Mockup artifact:** [Editable source or durable design ref + visual preview link(s), or `N/A` with scoped rationale (no UI / nonvisual patch reusing existing matching design)]
+- **Coverage mapping:** [Requirement/AC/screen IDs → mockup screens, behavior states, viewports covered]
+- **Token/component provenance:** [Existing tokens and primitives actually used in the mockup]
+- **Review record & limits:** [Reviewer, date, observed result; static mockup labels are not runtime/click/keyboard proof — actual runtime is verified later]
+- **Blocking condition:** [Material unavailable capability/direction blocks only this UI scope; no text-only fake pass]
+
+## 6. Document Quality & Review Checks
 
 _Verify against canonical [Document Quality Rubric](../references/document-quality.md) before workflow transitions. Mark N/A with rationale where proportional to scope._
 

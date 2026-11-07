@@ -3,6 +3,7 @@
 This document defines the CLI contract, JSON envelope, exit codes, and strict schema for the Deterministic Agentic Workflow validator (`scripts/validate.py`).
 
 The validator is a read-only, stdlib Python (3.10+) utility. It performs structural and boundary checks on the skill package and project task contracts.
+The validator remains **stateless**: it never persists workflow state, decides parent acceptance, ranks worker findings, or writes spec/plan/progress/mockup artifacts. Artifact selection and persistence for multi-step authorized work follow the canonical [Workflow Artifacts](workflow-artifacts.md) contract; parent triage/acceptance follows [Ranked Result Triage](operations.md#ranked-result-triage). No Python or schema change is made by those references.
 
 ---
 
@@ -117,6 +118,7 @@ The validator is deliberately bounded and **fail-closed**:
 14. **Opacity of Reviewer (`docs`):** Review exit transitions (`review-ready` and `review-rework`) validate `reviewer` as a non-empty string reference. The validator never authenticates human signatures, verifies external identity providers, or certifies reviewer independence.
 15. **Non-Applicable (N/A) Evidence Attestation (`docs`):** Criteria marked `not_applicable` require non-empty rationale and grounded source evidence objects demonstrating why the criterion does not apply. N/A is an explicit reviewer/author attestation backed by inspectable evidence, not an automated bypass.
 16. **Artifact Mutation Invalidates Verdict (`docs`):** Review verdicts (`review-ready`) are cryptographically pinned to document and source SHA-256 byte hashes. Any file modification invalidates prior eligibility, requiring re-entry via `rework`, `rework-review`, and fresh `review-ready` validation. Decision `"accepted"` with status `"blocked"` is invalid across all edges. On `review-rework`, at least one check must have `decision: "not_accepted"`.
+17. **No Workflow-Artifact or Triage Semantics:** The validator does not create or rank spec/plan/progress/mockup artifacts, does not persist parent workflow state or the ranked result queue, and does not decide parent acceptance. Those procedural duties live in [Workflow Artifacts](workflow-artifacts.md) and [Ranked Result Triage](operations.md#ranked-result-triage); the validator only checks the structural transition/record it is explicitly invoked on.
 
 ---
 

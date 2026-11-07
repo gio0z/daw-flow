@@ -244,33 +244,52 @@ The parent orchestrator evaluates all module outputs through this canonical veri
 4. **Primary Observable Evidence & Expected-vs-Actual Evaluation:**
    - Every applicable criterion must be mapped to an inspectable primary observation comparing expected versus actual results, along with the execution or transport outcome.
    - **Failures and Missing Evidence Cannot Become Pass:** If evidence is missing, unexercised, ambiguous, or contradicted by primary observations, the parent MUST reject the reported pass as a success and mark the stage `not accepted` with a criterion-specific reason, retaining failure outputs as diagnostic evidence.
-   - Criteria are identified stably by existing criterion text or ID.
-   - Optional criterion-to-evidence mappings belong inside existing envelope `details` or plan/handoff artifacts—NEVER requiring new mandatory outer envelope fields.
-   - Expected negative tool exit codes or expected error messages from tools (e.g., a test asserting that invalid CLI flags exit with code 2) are valid verification checks, distinct from worker execution or transport failures.
-   - Existing evidence can be inspected and reused when current, relevant, and sufficient; do not mandate universal rerun of identical checks when the underlying revision is unchanged. Record explicit evidence invalidation whenever the underlying artifact revision, criteria, scope, or relevant environment context changes.
-   - Parent stage acceptance verifies that execution criteria were satisfied; it NEVER constitutes operational authorization for high-risk actions (production deployment, destructive migrations, or external mutations).
+
+   - **No-fabrication pending for missing evidence:** Missing, stale, or unverifiable primary evidence is recorded as `pending / unexercised` with the exact missing ref named; it is never recorded as accepted, and never backfilled from narrative, checkbox, or desired-work text. The disposition stays `not accepted` until fresh inspected proof exists.
+
+- Expected negative tool exit codes or expected error messages from tools (e.g., a test asserting that invalid CLI flags exit with code 2) are valid verification checks, distinct from worker execution or transport failures.
+- Existing evidence can be inspected and reused when current, relevant, and sufficient; do not mandate universal rerun of identical checks when the underlying revision is unchanged. Record explicit evidence invalidation whenever the underlying artifact revision, criteria, scope, or relevant environment context changes.
+- Parent stage acceptance verifies that execution criteria were satisfied; it NEVER constitutes operational authorization for high-risk actions (production deployment, destructive migrations, or external mutations).
 
 5. **Source vs. Runtime Evidence Distinction:**
    - **Source/Static Proof:** Inspectable diffs, AST/type checks, structural grep, and file content reviews constitute sufficient proof for documentation updates, specification alignment, architectural design, and read-only code review when they directly establish the relevant claim (a bare pattern match alone without verifying context is never sufficient).
    - **Runtime Proof:** Functional behavior, side effects, API responses, CLI commands, and database state mutations require inspectable runtime execution evidence (test runner output, command exit code + stdout, rendered UI state).
    - NEVER force runtime command execution or test runs during read-only reviews or static document edits where source inspection is the appropriate proof.
 
+<a id="mandatory-pre-dispatch-dependency-joins"></a>
+
 6. **Mandatory Pre-Dispatch Dependency Joins:**
-   - Before dispatching any dependent downstream task, the parent orchestrator MUST join and verify that all mandatory inputs from predecessor tasks are accepted for their current expected input revisions (disjoint artifacts maintain their own revision hashes; there is no global single-hash requirement).
-   - An earlier successful sibling or prior run cannot mask a failed, missing, outdated, or still-running dependency.
-   - Success-dependent stages require accepted successful predecessors. A corrective
-     dispatch instead consumes current, validated failure findings under explicit
-     correction scope; accepting findings as diagnostic input does not mark the failed
-     stage successful or unlock release. Missing or failed-transport output cannot
-     supply findings it never produced.
+
+- Before dispatching any dependent downstream task, the parent orchestrator MUST join and verify that all mandatory inputs from predecessor tasks are accepted for their current expected input revisions (disjoint artifacts maintain their own revision hashes; there is no global single-hash requirement).
+- An earlier successful sibling or prior run cannot mask a failed, missing, outdated, or still-running dependency.
+- Success-dependent stages require accepted successful predecessors. A corrective
+  dispatch instead consumes current, validated failure findings under explicit
+  correction scope; accepting findings as diagnostic input does not mark the failed
+  stage successful or unlock release. Missing or failed-transport output cannot
+  supply findings it never produced.
 
 7. **Parent Acceptance Record (`accepted` / `not accepted`):**
    - The parent records an explicit decision: `accepted` or `not accepted`, accompanied by a criterion-specific rationale for any rejection.
    - This decision is distinct from worker outer execution statuses (`pass`, `fail`, `blocked`). The outer status vocabulary remains strictly `"pass"`, `"fail"`, `"blocked"`; `not accepted` is solely the parent's evaluation decision label, never a new outer JSON envelope status.
    - No unexercised required criterion may be accepted. Missing observations must be explicitly marked absent or unexercised, never invented.
 
-### Checkpoint Boundaries
+<a id="ranked-result-triage"></a>
 
+### Ranked Result Triage
+
+Every completed worker result goes through parent triage before acceptance or fix dispatch. Triage is per-result and dependency-local: the parent MUST consume each returned result before accepting the stage it belongs to or dispatching a dependent, but MUST NOT insert a global barrier that waits for unrelated pending siblings before dispositioning a ready result. A completed result whose mandatory predecessor join is already accepted can be dispositioned and, when eligible, dispatched while an independent sibling is still pending. Only the dependent consumer waits on its own missing predecessor; unrelated pending work never blocks it.
+
+**Worker output contract (compact, existing details/findings — no mandatory giant schema per child):** each completed worker returns only actionable, evidence-backed findings or remaining fixes in its own proposed priority order, each with source scope, impact/urgency rationale, and dependency where relevant; or an explicit statement of no actionable finding (see step 2 for the scoped-evidence requirement). Implemented work is reported as an integration candidate plus the verification it still needs — never a fake `needs fix` for work already done. A child priority proposal never constitutes self-acceptance or deployment permission.
+
+1. **Inspect:** Verify primary evidence against the current revision and scope (identity, round, revision, criterion IDs copied from the dispatch contract). Deduplicate and merge overlapping findings from multiple workers.
+2. **Reject with record / no-findings gate:** Unsupported, out-of-scope, or advisory findings are rejected with an explicit not-accepted/advisory rationale — never silently dropped. A statement of no actionable finding receives a concise `accepted / no corrective action` disposition ONLY after the parent has inspected sufficient scoped evidence for the claim (source/runtime proof proportionate to the scope, or an explicitly recorded scoped N/A). A bare "no findings" claim with no inspected evidence is recorded `not accepted` pending that scoped proof; never manufacture a fix queue from clean results, and never grant free acceptance either.
+3. **Parent re-rank:** The parent validates and re-ranks across all returned results into a single queue — never blindly trusts child rank. Assign relative ordered rank from severity/impact, urgency, and dependency-unblock effect — not arbitrary numeric scores or blanket P0. Keep severity distinct from dispatch order: eligible prerequisites dispatch before dependents, while independent safe work continues.
+4. **Record queue:** For multi-step work, in the existing durable plan/progress record ([Workflow Artifacts](workflow-artifacts.md)), write a compact queue entry per finding/result: finding/result ID, source worker, evidence/revision, impact/urgency justification, rank, dependencies, disposition/next action, and integration verification ref. Preserve retry/dependency joins and retry history; a later correction round appends, it does not erase the prior queue entries.
+5. **Dispatch & verify:** Dispatch fixes per the ranked eligible queue, integrate into the intended target, verify against the current revision, and close only via parent acceptance. Existing pre-dispatch joins and correction recurrence limits apply; read-only roles gain no write authority. External deploy still requires exact target/scope permission at the point of risk — triage never authorizes it automatically.
+
+No new Python schema, outer JSON field, or global scheduler is introduced; the queue lives in existing plan/progress artifacts.
+
+<a id="checkpoint-boundaries"></a>
 The execution pipeline requires the parent orchestrator to apply three discrete verification checkpoints. Each boundary enforces explicit entry prerequisites, evidence evaluation rules, and parent decision options:
 
 | Boundary                                                                         | Inputs                                                                                                                                                                                                                          | Parent Decision                                                                                                                                                                                   | Advance Condition                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -281,6 +300,7 @@ The execution pipeline requires the parent orchestrator to apply three discrete 
 | **Final Completion Checkpoint** (at workflow conclusion)                         | Audit across all pipeline stages, user acceptance criteria, and evidence freshness across all artifact revisions.                                                                                                               | `completed` vs `incomplete` (or `blocked`).                                                                                                                                                       | All required route and user criteria accepted; zero required downstream, review, or verification tasks remain pending or blocked.                                                                                                                                                                                                                                                                                                                                                      |
 
 - **Stage Acceptance vs. Final Completion Rule:** At result acceptance, accept a stage whose own required criteria and mandatory predecessors pass even when a required LATER or independent sibling stage remains pending; only final completion is withheld. A pending mandatory predecessor instead blocks dependent stage dispatch.
+  <a id="evidence-reuse--invalidation-rule"></a>
 - **Evidence Reuse & Invalidation Rule:** Existing evidence may be reused when current, relevant, and sufficient without arbitrary full-suite mandates. Record explicit evidence invalidation whenever the underlying artifact revision, criteria, scope, or relevant environment context changes. Do not carry forward prior passed source or runtime proof across modified artifacts without reinspection.
 - **Proportional Prefinal Coupling Check Rule:** Before final completion of code-changing work, the parent orchestrator checks the changed diff and directly affected interfaces/dependencies for structural coupling ([references/change-coupling.md#prefinal-coupling-checkpoint](change-coupling.md#prefinal-coupling-checkpoint)). For feature/bugfix routes, the parent reuses the current accepted `daw-review` result for matching revision/scope without duplicate review overhead; for patch routes, the parent performs a bounded proportional diff check (documenting single-perspective fallback limits if operating without an independent reviewer) without injecting a new reviewer stage or untangle pass; for docs-only tasks, an explicit inline N/A rationale is recorded. Escalation to `daw-untangle` is strictly exceptional and reserved for demonstrated boundary obscurity over a bounded scope.
 - **Separate Authorization Rule:** Parent stage acceptance verifies that execution criteria were satisfied; it NEVER constitutes operational authorization for high-risk actions (production deployment, destructive migrations, or external mutations).
@@ -496,62 +516,13 @@ never be presented as independent review.
    Late output cannot restart the graph. End-to-end completion requires the active
    route's final criteria and actual current-revision verification, not a worker exit.
 
-### Optional Workflow Resume Checkpoint
+### Workflow Resume & Durable Progress Checkpoint
 
-A workflow that may need cross-session resume MAY keep one parent-owned Markdown summary,
-`Optional Workflow Resume Checkpoint`, listing current stage, accepted criteria,
-revision refs, inspectable handoff/evidence refs, and pending work. It is a summary,
-never a JSON replacement, authentication, approval token, canonical handoff
-replacement, second authority, or evidence truth; primary evidence remains the
-referenced canonical handoff and observation records. Prefer reusing an existing
-harness record or handoff artifact; one checkpoint per workflow only when needed.
-No automatic disk creation; persist only when cross-session resume is needed and
-an explicit task/repo/workflow authorization designates its path. Read-only modules
-never gain write authority from it. Harness-native records are preferred when
-durable, inspectable, and accessible next session.
+The REQUIRED parent-owned durable progress record and its resume/revalidation rules are owned canonically by [Workflow Artifacts](workflow-artifacts.md) (§3–§4). Do not maintain a second optional resume summary. The parent opens the progress record at intake, updates it only on real phase entry/acceptance, correction, block/resume, relevant revision change, stop, or final, and on resume revalidates current references, reconstructs mandatory predecessor joins, and preserves retry state before any dispatch. Read-only modules never write it and never gain write authority from it.
 
-Objective/scope: resume the same workflow ID, active route, and scope. Non-goals: no
-new route, stage, mandatory file/path, SQLite store, logger, runtime, autonomous crash
-recovery, event log, retry/approval restoration, or new machinery. When retention is
-unavailable, the parent validates the checkpoint refs and supplies the available
-canonical handoffs and findings to a fresh worker — never the summary alone.
-Success-dependent dispatch requires complete, accepted predecessor inputs. A scoped
-corrective dispatch may instead consume validated failure findings under the existing
-correction rules; unavailable findings MUST NOT be invented. The parent reconstructs
-the applicable joins and pre-dispatch checks before dispatch.
+Scoped revalidation: reload the progress record and spec/plan revisions, verify the blocking condition cleared and approvals still bind to the current action/target/revision/scope, inspect referenced handoffs and primary evidence, and treat missing or stale evidence as unverified (not an accepted prerequisite). Invalidate only the affected scope on revision change; never carry prior pass proofs across modified artifacts without reinspection.
 
-Content per stage: workflow ID; task/criterion IDs or existing stable criterion text
-(label the identifier as an ID or quote the actual criterion text); worker outcome
-using existing semantics only (`pass`/`fail`/`blocked` are worker claims, not new
-enums); parent acceptance (`accepted`/`not accepted`, or explicitly pending); artifact
-revisions per scope (e.g., `snapshot:docs/design.md#rev-…` or commit/hash);
-inspectable canonical handoff and primary evidence refs; unresolved
-findings/decisions with owner and affected scope; `next_permitted_action` (e.g.,
-`advance_to_next_stage`, `dispatch_correction`, or `blocked`); current round/allowed
-correction state and hypothesis/retry state when relevant; next pending stage when
-parent acceptance is not yet recorded. Illustrative excerpt only:
-
-```markdown
-## Optional Workflow Resume Checkpoint (illustrative, not an execution)
-
-- Workflow ID: wf-signed-sum-402; objective/scope: signed-sum CLI fix; route: daw-build→daw-verify
-- Stage task-402 (worker outcome `pass` claim / parent acceptance pending); artifact
-  `src/cli/signed_sum.py` @ `snapshot:src/cli/signed_sum.py#rev-b2`;
-  criterion `AC-1-signed-addition` (ID) inspected via primary evidence ref `obs-…-r2`;
-  handoff ref: canonical handoff for task-402 round 2; unresolved: none;
-  round 2; next pending stage: parent acceptance of task-402 not yet recorded;
-  next permitted action: parent_acceptance_review
-```
-
-Update rules: the parent updates this summary after an actual accepted transition,
-correction, or pause — not after every tool call and not from a worker claim alone.
-Resume algorithm: the parent reads current constraints, validates checkpoint refs
-against artifacts, compares artifact revisions per scope, and inspects referenced
-handoffs/primary evidence. Missing, unavailable, or stale evidence is treated as
-unverified, not as an accepted prerequisite; invalidate only the affected scope.
-Resume never resets retry state, restores an approval, or assumes prior worker IDs
-remain valid. The parent reconstructs mandatory predecessor joins and pre-dispatch
-checks before dispatching any work.
+Optional worker retention (continued completed-worker identity in the owning session) is distinct from this durable-artifact requirement and remains optional per [Persistent Worker Graphs](#persistent-worker-graphs-harness-native) above.
 
 ### Optional OMP Mapping
 
@@ -560,6 +531,7 @@ idle/parked worker, and results arrive automatically; use `wait` only when block
 Observe successful continuation before relying on it. A drained `workpool` is not a
 retained worker graph. Other harnesses may expose different tools or no continuation;
 apply the capability/fallback rules above rather than requiring OMP commands.
+<a id="native-workflow-tracking-and-scheduling"></a>
 
 ## Native Workflow Tracking & Scheduling
 
@@ -574,7 +546,7 @@ At intake, “discover the actual native task/todo tracker” means inspecting e
 
 ### Structured fallback (no tracker)
 
-When no native tracker exists, use structured records in the existing plan/handoff (task ID, owner, depends_on, acceptance_criteria, verification_command, evidence, status) as the record. Fallback is usable without any mandatory file. Evidence unavailable means `unexercised`, never a fake pass.
+When no native tracker exists, use structured records in the existing plan/handoff (task ID, owner, depends_on, acceptance_criteria, verification_command, evidence, status) as the record. The native fallback complements the mandatory durable multi-step artifacts owned by [Workflow Artifacts](workflow-artifacts.md): a chat payload or native todo alone cannot substitute for the saved plan or parent-owned progress record, and the parent-only durable record remains the authority for multi-step work. Parent-only updates write the progress record; workers return proposals that the parent records after inspection. Evidence unavailable means `unexercised`, never a fake pass.
 
 ### Native DAG/batch scheduling
 

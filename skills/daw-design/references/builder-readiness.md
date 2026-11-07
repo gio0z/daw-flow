@@ -9,6 +9,8 @@ _Reference Links:_
 - [Parent Design Specification](../SKILL.md)
 - [Shared Routing Reference](../../../references/routing.md)
 - [Root Governance Specification](../../../SKILL.md)
+- [Workflow Artifacts (Persistence, Ownership & Mockup Contract)](../../../references/workflow-artifacts.md)
+- [Acceptance Criteria / EARS Semantic Source](../../../references/document-quality.md#acceptance-criteria-ears)
 
 ---
 
@@ -51,6 +53,19 @@ For substantive designs, inspect consumer boundaries material to downstream impl
 ### 4. Verifiable Acceptance Seams
 
 - **Check:** Are acceptance criteria defined as observable pass/fail checks linked to concrete outputs, paths, or response codes?
+- **EARS Anchor:** Author acceptance criteria per the canonical [EARS Semantic Guidance](../../../references/document-quality.md#acceptance-criteria-ears) (observable condition/response/oracle; Given/When/Then equivalent). Do not invent competing local persistence/format rules.
+
+### 5. Mockup Readiness Seam (UI-Affecting Work Only)
+
+For new or changed visual UI, additionally verify per [Workflow Artifacts §5](../../../references/workflow-artifacts.md#5-mockup-timing-proof--na):
+
+- **Check:** Does an inspectable rendered mockup source or durable design reference plus a visual preview exist, derived from settled blueprint/domain/flow and the existing design source/tokens? Does it link relevant REQ/AC/screen IDs and cover relevant screens, behavior states, viewports, and focus/keyboard design? Was the preview produced with a real available tool (browser/design/export capability) — no vendor mandate?
+- **Not Runtime Proof:** Mockup review covers design intent across states/viewports/focus/keyboard; it is not runtime implementation proof and not automatic human approval.
+- **No Text Substitute:** Prose, ASCII, or wireframe-only descriptions do not satisfy the mockup requirement.
+- **Scoped Blocking:** Missing direction or unavailable capability blocks only the affected UI scope; non-UI scopes proceed. Do not halt the whole workflow for a UI-only gap.
+- **Explicit N/A:** Record `N/A` with scoped rationale when there is no UI or small nonvisual fixes reuse existing matching design without a redundant mockup.
+- **Planning vs. Readiness:** Design may plan mockup creation within authoring; readiness then specifically blocks UI implementation absent a reviewed current mockup. This adds no new route and forces no 13-document bundle.
+- **Kind Placement:** The mockup lives as a section/reference inside an existing canonical kind or as the plan's design artifact — never a new mandatory 14th kind.
 
 ---
 
@@ -72,13 +87,13 @@ When builder-readiness is evaluated, record an optional summary under `details.b
 ```json
 "builder_readiness": {
   "substantive_design": true,
-  "seams_checked": ["interfaces", "error_handling", "concurrency", "acceptance_criteria"],
+  "seams_checked": ["interfaces", "error_handling", "concurrency", "acceptance_criteria", "mockup"],
   "blocking_unknowns": [],
   "safe_reversible_choices": [
     "Default HTTP client timeout set to 15 seconds"
   ],
+  "mockup_readiness": {"required": false, "status": "na", "ref": null, "req_ac_screen_ids": [], "states_viewports_focus": "no UI in scope", "capability": null, "blocks_ui_only": false},
   "readiness_verdict": "ready_for_planning"
-}
 ```
 
-If material blockers exist, set `readiness_verdict: "blocked"` and `status: "blocked"`, documenting the specific blocking items in `details`.
+If material blockers exist, set `readiness_verdict: "blocked"` and `status: "blocked"`, documenting the specific blocking items in `details`. When only the UI-affecting scope is blocked (missing mockup direction/capability), set `mockup_readiness.status: "blocked"` with `blocks_ui_only: true` and keep non-UI readiness separate; do not halt the entire workflow for a UI-only gap.

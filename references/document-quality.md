@@ -268,6 +268,7 @@ Existing project file naming, issue tracking, and directory structures are respe
 3. **Record Source Provenance & Status:** Trace every principle or constraint to its authoritative repository source or human input. Explicitly distinguish _proposed/default_ options from _decided_ architectural choices.
 4. **Impact Analysis on Principle Changes:** When a foundational principle, architectural constraint, or design decision is modified, the authoring agent MUST enumerate all affected documents, tasks, and acceptance evidence. Authorized artifacts must be synchronized. Silent overriding of established principles or sneaking feature implementation into governance-only edits is strictly prohibited.
 5. **Preserve Existing Scope Guard:** Speculative additions, unrequested refactorings, or unauthorized scope creep remain strictly blocked by existing scope guards.
+6. **Persist Authoritative Specification Before Tactical Decomposition (multi-step work):** For multi-step authorized work, a proportional authoritative specification (what/why/non-goals/acceptance criteria) MUST be persisted before tactical decomposition, per [Workflow Artifacts](workflow-artifacts.md) §1–§2. Reuse an existing adequate spec; do not duplicate it. If clear user requirements have no written source, the authorized parent records their faithful bounded what/why/non-goals/AC in the chosen spec before planning — the planner cannot invent architecture or business choices. Ambiguity returns to the existing design/clarification route; no new design insertion is created for a clear route. Tiny settled patches and factual/read-only inquiries retain the no-document path. A chat payload or native todo alone cannot substitute for the saved specification.
 
 <a id="b-clarify"></a><a id="b-clarification-and-technical-uncertainty-resolution"></a>
 
@@ -286,10 +287,38 @@ The clarification **transport** — capability discovery of the harness's actual
 ### C. Feature Slicing & Behavioral Contract Oracles
 
 1. **Stable Identifier Preservation:** Preserve existing stable identifiers for requirements, user stories, and acceptance criteria (`REQ-xxx`, `US-xxx`, `AC-xxx`). If identifiers are absent in legacy documents, generate unique, scoped identifiers and retain them consistently across all downstream artifacts.
-2. **Prioritized Demonstrable Behavior Stories:** Decompose features into prioritized, independently demonstrable and testable behavior slices. Each story must define verifiable contract oracles using Given/When/Then or explicit input, output, error state, and postcondition assertions.
+2. **Prioritized Demonstrable Behavior Stories:** Decompose features into prioritized, independently demonstrable and testable behavior slices. Each story must define verifiable contract oracles — express acceptance criteria per the canonical [EARS Semantic Guidance](#acceptance-criteria-ears) (five forms with composition allowed; Given/When/Then equivalent) or as explicit input, output, error state, and postcondition assertions carrying the same observable condition, response, and oracle.
 3. **Transactional & Safety Invariants:** Do not force artificial deployment independence for inseparable transactional, data-integrity, or security invariants that must land together atomically.
 4. **Explicit Out-of-Scope & Measurable Non-Functional Criteria:** Define explicit out-of-scope boundaries to prevent scope expansion. Non-functional, performance, security, and negative/edge-case criteria must be empirically measurable with verified or proposed target provenance.
 5. **Infrastructure Task Justification & KPI Boundaries:** Supporting infrastructure or refactoring tasks may exist without an end-user story ONLY when backed by an explicit, justified prerequisite dependency. Business outcome goals and high-level KPIs do not serve as build/runtime acceptance criteria unless bounded by a concrete, observable system measurement boundary.
+
+<a id="acceptance-criteria-ears"></a>
+
+#### Acceptance Criteria: EARS Semantic Guidance (Canonical)
+
+This is the single canonical source for how acceptance criteria are expressed. Templates (`prd`, `frd`, `qa`) link here and add only compact fields/checks; they MUST NOT restate competing persistence or format rules.
+
+Each criterion MUST state an **observable condition, observable response, and oracle**: the trigger/state that is checked, what the system observably does, and how a verifier proves it (command output, state readback, error code, file/DB read, or other durable evidence). Semantic clarity is the acceptance bar — not keyword counts, not five-pattern coverage, not format ritual.
+
+**The five EARS forms (choose the form that fits the behavior; composition is allowed):**
+
+1. **Ubiquitous:** `THE SYSTEM SHALL <observable response>` — always true (e.g., audit log written for every export).
+2. **Event-driven:** `WHEN <trigger event> THE SYSTEM SHALL <observable response>` — most criteria use this form.
+3. **State-driven:** `WHILE <state/condition> THE SYSTEM SHALL <observable response>` — the system behaves that way as long as the condition holds.
+4. **Optional feature:** `WHERE <feature/config is available> THE SYSTEM SHALL <observable response>` — applies only when the feature exists.
+5. **Unwanted behavior:** `IF <unwanted condition or invalid input>, THEN THE SYSTEM SHALL <observable response>` — names the error/rejection response for the bad case (e.g., invalid input returns a specific error and leaves stored state unchanged).
+
+Composition is allowed and common (e.g., `WHEN <event> WHILE <condition> THE SYSTEM SHALL <response>`) when one form alone would misstate the trigger; composition supplements the five forms but never replaces the unwanted-behavior form. Do NOT force every criterion through all five patterns.
+
+Illustrative example (proposed, not a binding existing fact): `WHEN an export is requested with an unreadable source, THE SYSTEM SHALL return error E_SOURCE_UNREADABLE and leave exports unchanged.` The error identifier is illustrative only; use the repository's actual error identifier for the behavior.
+
+**Authoring rules:**
+
+- **One behavior per criterion where practical.** If a criterion carries two independently verifiable responses, split it. Combined criteria obscure the oracle and hide partial failure.
+- **Meaningful error / no-change distinction.** Error-path criteria MUST name the observable error (code, status, message, or exit class) AND the no-change side effect where one exists (no rows persisted, no external call made, input artifact untouched). Do not invent side effects the behavior does not have.
+- **No invented numeric or business policy.** Numeric thresholds (latency, counts, retries, timeouts) and business limits (fees, quotas, cutoffs) appear only with a traceable source (user direction, repository constant, or decided spec). Anything else is an open question or proposed default, never a silent number in a SHALL.
+- **Given/When/Then equivalence.** Given/When/Then is a valid expression of the same observable contract (Given = precondition/state, When = trigger/event, Then = observable response/oracle). Use either EARS or Given/When/Then per criterion; do not require a keyword parser as truth.
+- **No forced five patterns or keyword validation.** Validation checks whether an independent reader can state the trigger, response, and oracle — never whether the prose contains `WHEN`, `WHILE`, `WHERE`, or `IF/THEN`. Synonyms and concise prose that carry the same three elements are acceptable.
 
 <a id="d-traceability-task"></a><a id="d-traceability-dependency-graph-and-parallel-safety"></a>
 
@@ -300,6 +329,7 @@ The clarification **transport** — capability discovery of the harness's actual
 3. **Empty Evidence Before Execution:** Evidence references and status records MUST remain empty or explicitly unexercised until the verification command actually runs. A checked task checkbox (`[x]`) or the existence of a command string does NOT constitute proof of completion.
 4. **Many-to-Many Task Coverage:** A single task may satisfy multiple acceptance criteria; artificial 1-to-1 task proliferation is discouraged.
 5. **Strict Dependency Order & Safe Parallelism:** Foundational setup and infrastructure dependencies must strictly precede dependent user story tasks. Tasks marked for parallel execution (`[P]`) are permitted ONLY when they involve disjoint target file writes AND share no concurrent data mutation or runtime execution dependencies. The orchestrator must reject dependency cycles, missing prerequisites, and shared ownership conflicts before dispatching parallel subagents; independent authorized tasks may proceed concurrently.
+6. **Persisted Plan Before Build Dispatch:** For multi-step work, the plan mapping stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/check actions, evidence slots, and separate parent acceptance MUST be saved before build dispatch, per [Workflow Artifacts](workflow-artifacts.md) §1–§2. Reuse an existing roadmap/issue-export/project doc section when sufficient; otherwise use the default `docs/plans/<workflow-id>.md`. A chat payload or native todo is insufficient. Include the artifact reference in existing handoff `details` without changing the outer JSON schema; there is one artifact authority only — no duplicate task-tracker authority.
 
 <a id="e-requirements-quality-checklist"></a><a id="e-requirements-quality-checklist-and-review-separation"></a>
 
@@ -335,18 +365,21 @@ The clarification **transport** — capability discovery of the harness's actual
    - The parent orchestrator owns final acceptance of readiness findings.
    - Route-required postbuild review remains distinct; a prebuild checkpoint cannot satisfy it. For routes that explicitly mandate postbuild review (`feature`, `bugfix`), passing this prebuild readiness checkpoint NEVER replaces or waives postbuild `daw-review`, which audits the actual modified codebase and runtime evidence after implementation. Do NOT insert `daw-review` into routes that do not require it (e.g., `patch` pipeline is `daw-build` -> `daw-verify`). Verification is always performed per the active route.
 5. **Direct Fallback with Evidence Limits:** If an independent subagent reviewer cannot be spawned, the orchestrator performs an honest, direct cross-artifact check in the current session, explicitly documenting the limitation in the handoff evidence.
+6. **Ranked Result Triage After Worker Results:** Every completed worker result is parent-ranked into a prioritized fix queue before acceptance or fix dispatch, per [Ranked Result Triage](operations.md#ranked-result-triage): verify evidence against the current revision, dedup/noise-filter overlapping findings, order by severity, urgency, and dependency unblock effect, and close only via parent acceptance with integration proof. Triage never authorizes external deployment automatically. The queue mechanics live in operations; this section does not duplicate the gate.
 
 <a id="g-convergence-change-impact"></a><a id="g-convergence-drift-analysis-and-scoped-invalidation"></a>
 
 ### G. Convergence, Drift Analysis & Scoped Invalidation
 
 1. **Three-Way Drift Inspection:** Adoption (`daw-setup`) and verification (`daw-verify`) modules MUST inspect three data sources: (1) actual working tree code, (2) authoritative specification/contract documents, and (3) current observable runtime evidence.
-2. **Four-State Convergence Classification:** Features and requirements must be classified into one of four deterministic states:
+2. **Four-State Convergence Classification:** Features and requirements must be classified into one of four deterministic states based on **consequence**, not on the drift category alone:
    - `implemented_verified`: Code exists and fresh runtime verification evidence satisfies the acceptance oracle.
    - `implemented_unverified`: Code exists, but verification has not run, evidence is stale, or tests are missing.
    - `missing`: Required code, configuration, or tests do not exist in the working tree.
    - `contradicted`: Existing code or tests directly violate authoritative specification constraints.
    - (_Blocked items_ lacking dependencies or authorization are tracked as `blocked`).
+     _Severity by consequence:_ a classification describes what kind of drift it is; the **consequence** of that drift drives the severity/urgency in [Ranked Result Triage](operations.md#ranked-result-triage). `missing`, `contradicted`, and `implemented_unverified` do not map to a fixed severity automatically: the same label can be `BLOCKER`, `HIGH`, `MEDIUM`, or `LOW` depending on whether it breaks a safety invariant, blocks a dependent path, or is a non-blocking polish gap. Use the labels to name the drift type and the consequence to set the rank.
+
 3. **Evidence Over Artifact Existence:** The existence of source files, green tests from prior commits, or checked markdown checkboxes does NOT prove convergence. Only fresh, observable runtime execution against the current code revision constitutes proof.
 4. **Parent-Authorized Plan Updates Without Duplication:** When drift is detected, the parent orchestrator authorizes targeted task updates. The planning agent MUST preserve existing task IDs and history, append only genuine uncovered work within accepted scope, and avoid duplicating already pending tasks or repeating identical missing work across iterations. Review and verification modules MUST NOT perform automatic code edits or unprompted scope expansions.
 5. **Scoped Invalidation Mechanics:**
@@ -355,12 +388,13 @@ The clarification **transport** — capability discovery of the harness's actual
    - **Code-Only Changes Do Not Invalidate Docs:** Modifying implementation code does not invalidate accepted specification documents or force specifications back through the document quality transition gate unless the specification itself is altered.
    - **Targeted Approval Invalidation:** Prior operator approvals are invalidated ONLY when their specific action, target environment, code revision, or operational scope changes—never by blanket, unrelated workspace updates.
 6. **Bounded Repair Cycles:** Repair and review iterations are bounded by existing workflow retry limits (see the [Fix-and-Rereview Loop Protocol](../skills/daw-review/SKILL.md#4-fix-and-rereview-loop-protocol)); unbounded or infinite convergence loops are strictly prohibited.
+7. **Ranked Result Triage for Drift Findings:** Parent-ranked triage of drift and worker findings follows [Ranked Result Triage](operations.md#ranked-result-triage) — current-revision evidence, dedup/noise filter, severity plus urgency plus dependency order, parent acceptance and integration proof. Drift classifications from item 2 name the drift type; consequence sets severity and rank (see item 2 note).
 
 <a id="h-pause-resume"></a><a id="h-scoped-pauseresume-and-canonical-block-state"></a>
 
 ### H. Scoped Pause/Resume & Canonical Block State
 
-1. **Use Existing Canonical Statuses:** Pausing and resuming operations utilize existing canonical handoff and acceptance statuses (`blocked`, `in_progress`, `ready`, `completed`, `failed`). Do not create synthetic or ad-hoc status strings.
+1. **Use Existing Canonical Statuses:** Pausing and resuming operations utilize existing canonical handoff outer statuses (`pass`, `fail`, `blocked`) and parent acceptance decisions (`accepted` / `not accepted`) per [Parent Acceptance Checkpoint](operations.md#parent-acceptance-checkpoint) (item 7). Do not create synthetic or ad-hoc status strings. Internal document-transition labels (`authoring`, `review`, `rework`, `ready`) and convergence labels (`implemented_verified`, `implemented_unverified`, `missing`, `contradicted`, `blocked`) may be used where those contracts apply, but they are not outer handoff statuses.
 2. **Canonical Block on Missing Information:** When execution cannot proceed due to missing material decisions, unanswered human clarifications, failed preflight checks, or ungranted high-risk approvals, the affected node MUST halt with canonical status `blocked`.
 3. **Structured Pause Record in Handoff & Acceptance:** The pausing agent or parent orchestrator MUST record the halt in the existing authorized record (parent acceptance record or module handoff details):
    - `blocked_reason`: Specific cause of the block.
@@ -376,8 +410,8 @@ The clarification **transport** — capability discovery of the harness's actual
    - Re-check that target revisions, scope boundaries, and preflight prerequisites remain valid.
    - Verify that required human approvals have been explicitly granted at the point of risk.
 6. **No Phantom Daemon Guarantees:** Agents must not promise persistent background monitoring, automated process wake-ups, or daemon supervisors unless the host harness natively provides and demonstrates them.
-
-<a id="i-integration"></a><a id="i-local-toolchain-integration-and-reusable-verification"></a>
+7. **Progress Record Ownership on Block/Resume:** The parent-owned durable progress record ([Workflow Artifacts](workflow-artifacts.md) §3) is the authority for block/resume state; the parent is sole owner and workers return proposals only, read-only roles never write. On resume, revalidate current spec/plan revisions and preserve retry state per [Workflow Artifacts](workflow-artifacts.md) §4. Internal lifecycle terms (`authoring`, `review`, `rework`, `ready`) describe the document transition gate (§4), not parent workflow progress — do not conflate the two.
+   <a id="i-integration"></a><a id="i-local-toolchain-integration-and-reusable-verification"></a>
 
 ### I. Local Toolchain Integration & Reusable Verification
 
