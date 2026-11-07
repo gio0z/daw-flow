@@ -30,7 +30,7 @@ The wizard module conducts a structured, interactive specification interview for
 - **Question Ranking by Impact × Uncertainty:** Rank candidate questions by multiplying observable impact on system boundaries, user journeys, contract definitions, security posture, or test design by factual uncertainty. Prioritize behavior-changing and contract-defining questions in early rounds regardless of phase.
 - **Dependent Trade-Offs vs. Independent Batching:** When choices have causal dependencies, sequence dependent questions **one at a time** along the active decision frontier (upstream scope and architecture before downstream parameters). Independent orthogonal choices may be batched together up to the 5-question limit per round.
 - **No Redundant Questions & Fact-First Discovery:** Before each round, inspect workspace evidence and drop every candidate question already answered by the brief, an earlier answer, or a recorded default. Re-asking settled facts is the largest measured precision loss in clarification studies (CONTRA, arXiv 2610.01769).
-- **Native Clarify Transport:** For unresolved material user decisions, use the shared grilling native clarify transport via parent capability-based routing (native clarify, or the equivalent ask/question tool actually exposed — never invent a tool call). Discoverable facts stay automatic. Ask material unresolved decisions only, at most 5 per round along the active decision frontier, emitting decision context before blocking. Use tool-supplied recommendation/custom/free-text/multiselect semantics; do not hardcode a schema or synthesize `Other`. Do not emit a duplicate text questionnaire alongside the tool. Cancel/unanswered stays unresolved (Open Question), never default consent; ordinary clarification never substitutes for provider/security point-risk authorization. See `../../references/grilling.md`.
+- **Native Clarify Transport:** Follow [Native Interactive Clarification Transport (Canonical Rule)](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule) for unresolved material user decisions only. Cancel/unanswered remains an Open Question, never default consent; clarification does not replace required provider/security point-of-risk approval.
 - **Distinguish Business What/Why from Technical How:** Separate business problems, user journeys, and functional outcomes from technical implementation how. Never invent policies, owners, approvals, or unobservable vanity metrics.
 - **Safe Answer Reinjection:** Reinject operator answers directly into drafted specifications, reconcile conflicting requirements, update affected acceptance criteria, and mark remaining unknowns to block only dependent feature scope.
 - **Prioritized Feature Slices & Measurable Oracles:** Preserve stable IDs (`US-01`, `PRD-01`, `FRD-01`). Feature requirements must specify prioritized independently demonstrable/testable user stories (P1, P2...) with Given/When/Then or equivalent exact input/output/error/state oracles. Do not force deploy independence for inseparable safety or transaction invariants.
@@ -109,57 +109,41 @@ _(Note: User-facing UI specifications in Phase 4 are omitted for headless CLI or
 
 ## 4. Output Contract
 
-Every completion of `daw-wizard` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized spec artifacts, or an explicit inline fallback). Direct-user responses default to concise natural language summarizing interview status and generated specifications:
+Use [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract) for the complete outer JSON schema and transport. Deliver the actual, inspectable envelope to the parent before the next bootstrap stage; concise direct-human interview reports do not replace that handoff. Do not dump envelopes into normal user replies or create unrequested transport files.
+
+### Wizard Details Contract
+
+Preserve under `details`:
+
+- `project_name`, `scale_classification`, and `generated_specifications`: interview identity, proportional depth, and actual created artifact paths.
+- `open_questions_count` and `open_questions`: remaining decisions, affected scope, impact, owner, and resolution trigger, consistent with document appendices. Cancelled/skipped/unanswered material decisions remain unresolved and block only dependent scope.
+- `agent_ready_checklist`: coverage of all 8 items in Step 4, with artifact references and any gaps; never replace evidence with a blanket readiness claim.
+- `recommended_next_step`: recommend `daw-setup` to record conventions; this is distinct from the bootstrap handoff to `daw-design` and does not dispatch either module.
+
+Compact illustrative `details` (not a complete handoff; checklist entries describe a hypothetical document set):
 
 ```json
 {
-  "objective": "Complete greenfield project specification interview and generate baseline architectural specifications.",
-  "input_paths": [],
-  "output_paths": [
+  "project_name": "sample-service",
+  "scale_classification": "small API utility",
+  "generated_specifications": [
     "docs/specs/blueprint.md",
-    "docs/specs/prd.md",
-    "docs/specs/techstack.md",
-    "docs/specs/security.md",
-    "docs/specs/roadmap.md"
+    "docs/specs/techstack.md"
   ],
-  "acceptance_criteria": [
-    {
-      "criterion": "Conducted 6-phase elicitation interview with proportional depth and at most 5 questions per round",
-      "status": "pass"
-    },
-    {
-      "criterion": "Generated baseline specifications adhering to canonical suite templates",
-      "status": "pass"
-    },
-    {
-      "criterion": "Recorded unresolved decisions in Open Questions appendix with owners and triggers",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "docs/specs/blueprint.md",
-      "summary": "Authored foundational system architecture and component boundaries"
-    },
-    {
-      "reference": "docs/specs/techstack.md",
-      "summary": "Documented chosen stack, dependencies, and architectural invariants"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-design",
-  "details": {
-    "project_name": "sample-service",
-    "scale_classification": "medium application",
-    "generated_specifications": [
-      "docs/specs/blueprint.md",
-      "docs/specs/prd.md",
-      "docs/specs/techstack.md",
-      "docs/specs/security.md",
-      "docs/specs/roadmap.md"
-    ],
-    "open_questions_count": 2,
-    "recommended_next_step": "Run daw-setup to record discovered build commands and project conventions in AGENTS.md"
-  }
+  "open_questions_count": 0,
+  "open_questions": [],
+  "agent_ready_checklist": {
+    "goal": "blueprint.md#goal",
+    "scope": "blueprint.md#scope",
+    "typed_inputs_outputs": "blueprint.md#contracts",
+    "data_persistence": "blueprint.md#data",
+    "edge_cases_errors": "blueprint.md#error-behavior",
+    "executable_acceptance": "blueprint.md#acceptance-criteria",
+    "constraints": "techstack.md#constraints",
+    "no_change_list": "blueprint.md#non-goals"
+  },
+  "recommended_next_step": "Recommend daw-setup to record spec directory and stack commands after bootstrap design."
 }
 ```
+
+Set advisory `handoff_to: "daw-design"` only when the applicable interview, confirmed document set, agent-ready checklist, and document review/ready gates are satisfied; otherwise report the actual blocking conditions to the parent. A proposed `status: "pass"` certifies this specification interview stage only, not parent acceptance, application implementation, runtime verification, or operational authorization.

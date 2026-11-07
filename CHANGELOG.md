@@ -1,5 +1,39 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-07: Agent Readiness Audit Corrections
+
+- Clarify explicit audit-and-fix requests as parent-composed read-only diagnosis followed by an authorized existing correction route; review-only requests and review modules retain zero mutation authority.
+- Separate optional execution-lifecycle labels from canonical outer handoff `pass`/`fail`/`blocked` and parent `accepted`/`not accepted` decisions.
+- Correct requirements-clarity reference prose to match the existing resolver: unknown requirements block bootstrap, feature, and patch; unclear requirements block patch, while feature enters design and bootstrap enters its interview.
+- Preserve deterministic engine behavior, approval boundaries, module count, and schemas. Verification observations distinguish structural/package checks, bounded supervised agent smoke, transport failures, and the initial parent-confounded patch probe; no cross-client or autonomous reliability certification is claimed.
+
+## 2026-11-07: SCN-C-04 Conditional Diagnosis Decision
+
+- In `tests/behavior-scenarios.md`, replace SCN-C-04's unconditional `daw-build` remediation with one mutually exclusive branch from fresh diagnosis in existing scope/revision/evidence/disposition fields: sufficient legitimate coupling accepted structurally only; missing/conflicting/stale ownership-or-invariant evidence held as not accepted/unexercised on only the affected criterion with no build dispatch; proven concrete defect not accepted/failed with bounded correction, affected-evidence invalidation, and re-verification. Add three given-observation manual controls C04-A/B/C; diagnostic pass is not runtime/production proof or mutation authorization. Limits: docs/scenarios only; no code, schema, route, or new files; zero writes by untangle preserved.
+
+## 2026-11-07: Prefinal Coupling Checkpoint Three-Answer Record
+
+- Refine the canonical coupling checkpoint in `references/change-coupling.md` and its root/operations pointers: require three concise, evidence-backed answers, retain factual N/A for confirmed nonstructural scope, and escalate only demonstrated unresolved cross-module impact. Trigger patterns prompt inspection rather than automatic defect claims; existing accepted reviews are reused without new artifacts or verdict values.
+- Extend `SCN-C-01` (legitimate transaction co-change accepted), `SCN-C-02` (clear local patch one-line N/A), and `SCN-C-04` (unresolved hidden-order/shared-state escalation bounded) to require the three short answers in existing scope/revision/evidence/disposition records; add `SCN-C-08` requiring a concrete three-answer record over bare PASS and retaining wrappers with actual security/protocol purpose. Docs/scenarios only; no new runtime code, schema, route, or hook.
+
+## 2026-11-07: Operational Rule Diagnostics Adoption and Manual Scenarios
+
+- Adopt a practical diagnostic lens in `references/operations.md#operational-rule-diagnostics` (no new schema, stage, checklist, or mandatory artifact): each applicable rule connects trigger, observable tell/consequence, scoped corrective action, and sufficient proof, reusing the existing `passed`/`failed`/`blocked`/`unexercised` and parent `accepted`/`not accepted` vocabulary.
+- Adopted from pinned upstream inspiration (no external dependency): the trigger/tell/fix/proof framing and observable-tell discipline; scoped tiers distinguish non-negotiable hard obligations (safety gates, accepted contracts, point-of-risk approvals), contextual choices judged against actual requirement and purpose (subjective style defects are not gate violations), and consistency checks proportional to changed scope.
+- Evidence scope is tiered: static proof suffices for documentation and read-only review where it directly establishes the claim; runtime claims require execution on the actual surface by a non-read-only actor; missing required evidence blocks only the affected completion, with scoped repair under the existing retry protocol and no forced giant audit. Limits: instruction structure only; no runtime promise, dependency, schema, route, or gate stage; no universal quality claim and no behavior beyond the described manual scenarios.
+- Add five manual scenarios (`SCN-DIAG-01` to `SCN-DIAG-05`): valid static documentation proof accepted without forced tests; expected negative CLI exit accepted as valid proof; stated-purpose style choice not a defect while the real invariant's evidence is inspected; missing required runtime proof rejected with a specific scoped corrective action; tiny settled patch proceeding without extra documents or broad cleanup. No probe results are claimed; existing scenario IDs are preserved.
+
+## 2026-11-07: Instruction Density and Consistency
+
+- Make the prebuild review gate conditional on changed scope and route triggers rather than applying it uniformly.
+- Load advisory context progressively, limited to the current question and relevant headings.
+- Treat clarification transport and the outer handoff envelope as canonical throughout, retaining domain details in their owning modules.
+- Consolidate worktree setup into one procedure.
+
+## 2026-11-07: Animation Performance Reference Adoption
+
+- Add optional shared `references/animation-performance.md`, linked from `daw-review` Stage 2 Performance and `daw-verify` Web UI surface. Covers stack-neutral conditional trigger, bounded inventory, static cost checklist, reproducible baseline/after frame traces with refresh-rate-aware budgets, runtime reduced-motion and cleanup checks, evidence statuses, metric limits, and exact WCAG 2.2.2/2.3.3 applicability with flashing separate. No new module, route, generator, or runtime dependency; reviewer/verifier roles remain read-only.
+
 ## 2026-11-06: Capability-First Harness Integration
 
 - Bind plan task IDs to available native tracker references and use native scheduling without treating worker completion as parent acceptance or bypassing dependency joins. Preserve structured fallback without new mandatory files.

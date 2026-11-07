@@ -25,7 +25,7 @@ Routing in DAW is deterministic and requires classified input facts. The workflo
 
 ### Precedence Rules & Invariants
 
-- When user intent is evaluation, code audit, or PR review, `review` takes precedence.
+- When user intent is evaluation, code audit, or PR review, `review` takes precedence. This is an evaluation-only dispatch: the `review` route itself remains read-only and runs `daw-review` only. An explicit parent request that combines evaluation with authorized correction is sequenced by the parent: finish the read-only review first, then route the authorized correction as its own existing intent based on findings (`bugfix`, `patch`, or `feature`). No new intent, enum, or stage is introduced.
 - When user intent is explicit structural analysis, coupling investigation, modular boundary assessment, or change-coupling inspection, `untangle` takes precedence. Strictly read-only; ignores unknown risk or workspace preferences; no `daw-workspace`, approval execution, or mutation. Dispatches to `daw-untangle`. (Note: refactoring implementation requests themselves are NOT silently routed to untangle; mutating refactoring uses standard feature/patch routes after scope is accepted. Untangle is an explicit bounded investigation, never an extra mandatory stage on all requests or an unsolicited whole-codebase cleanup mandate). Governed by [references/change-coupling.md](change-coupling.md).
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
 - Read-only user intent always wins: `review`, `untangle`, and `ask` ignore risk and workspace preferences and never mutate code or specifications.
@@ -69,11 +69,11 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 
 `patch` is pre-diagnosed by definition: its constraints are already well-defined, so requirements clarification is never part of the pipeline.
 
-- `requirements: "unknown"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNKNOWN` (exit code 1).
-- `requirements: "unclear"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNCLEAR` (exit code 1).
-- `requirements: "clear"` → unchanged `daw-build` -> `daw-verify`.
+- `requirements: "unknown"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNKNOWN` (exit code 1) for `bootstrap`, `feature`, and `patch`.
+- `requirements: "unclear"` → `needs-input`, no stages, blocker `REQUIREMENTS_UNCLEAR` (exit code 1) for `patch`; `feature` with `unclear` requirements uses `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`.
+- `requirements: "clear"` → unchanged canonical stages for the selected intent.
 
-`bugfix` keeps its investigation entry point (`daw-debug`) for `unknown`/`unclear` requirements; no other intent is gated on requirements clarity.
+`bugfix` keeps its investigation entry point (`daw-debug`) for `unknown`/`unclear` requirements. `bootstrap`, `feature`, and `patch` block on `unknown` requirements; `patch` alone blocks on `unclear` requirements, while `feature` with `unclear` requirements enters the design route above.
 
 ### Invocation Commands:
 
@@ -476,6 +476,8 @@ This section defines the canonical output envelope produced by all 11 internal e
 
 > **Contract Scope Note:** This schema defines the **runtime module handoff contract** returned across module completion stages. It is distinct from the top-level route decision payload emitted by `scripts/route.py` and the task verification envelope checked by `scripts/validate.py`.
 
+**Cold factual advisory exception:** A directly invoked `daw-ask` may answer a factual question without loading this section's schema/transport detail when no material decision, parent handoff, or downstream transition occurs. Root `SKILL.md` §4/§6 safety rules, read-only intake, factual evidence, and route selection still apply. Load this section before any actual handoff (including a worker return to a parent) or transition; load the [canonical clarification transport](grilling.md#native-interactive-clarification-transport-canonical-rule) and relevant grilling protocol before a material decision. This is a context-loading exception, not execution or file-write permission.
+
 ### Canonical Handoff Schema
 
 > **Observable Transition Checkpoint Invariant:** Canonical output handoffs MUST be delivered and observable as complete JSON envelopes BEFORE advancing to the next stage, not deferred to final retrospective prose or remembered only in thoughts. Full actual JSON MUST be delivered and inspectable by the parent orchestrator via the preferred transport mechanism (or an explicit inline fallback checkpoint if no structured transport exists; see [User-Facing Reports & Handoff Transport](#user-facing-reports--handoff-transport)). The agent MUST NOT unconditionally dump full raw JSON into normal user-facing chat output unless explicitly requested. If subagent tools or external delegators are unavailable, execute directly via honest direct fallback in the current session.
@@ -608,9 +610,9 @@ Whenever any execution module (`skills/daw-*/SKILL.md`) is invoked directly, it 
    - Resolve the module's physical symlink target to locate the true canonical module directory.
    - Determine the suite root (`../..` relative to canonical module directory).
 2. **Intake & Governance Loading:**
-   - Read root `SKILL.md` §4 (Preflight Checks, Coexistence & High-Risk Gating) and §6 (Canonical Module Handoff Contract).
-   - Read `references/routing.md` §5 (Canonical Module Handoff Contract).
-   - Safe read-only intake, query processing, and contextual assessment proceed without requiring operational approvals or clean workspaces.
+   - Read root `SKILL.md` §4 (Preflight Checks, Coexistence & High-Risk Gating) and §6 (Canonical Module Handoff Contract); reuse unchanged rules already loaded in the session.
+   - Read this reference's §5 (Canonical Module Handoff Contract), or reuse it if unchanged. Only the cold factual advisory exception in §5 permits deferring schema/transport detail until needed; all actual parent handoffs and downstream transitions still require the complete contract.
+   - Safe read-only intake, query processing, and contextual assessment proceed without requiring operational approvals or clean workspaces. A factual `daw-ask` answer stays read-only and grants no execution approval.
 3. **Pre-Mutation Operational Evaluation:**
    - BEFORE executing any state mutation, command with side-effects, or disk modification, load relevant preflight and risk rules from `references/operations.md`.
    - Determine change risk level from observable facts:

@@ -23,7 +23,7 @@ Structural analysis does not exist to satisfy aesthetic symmetry or subjective d
 Structural analysis must remain strictly proportional to authorized scope:
 
 - **Authorized Boundary:** Analysis investigates **only** the authorized named area, subsystem, or explicitly requested full repository. It NEVER expands into an unsolicited whole-codebase cleanup campaign or cosmetic refactoring wave.
-- **Proportional Depth:** Routine localized feature additions, isolated bug fixes, or single-file edits DO NOT require change-coupling analysis or untangle passes.
+- **Proportional Depth:** Routine localized feature additions, isolated bug fixes, or small local edits DO NOT require deep change-coupling analysis or `daw-untangle` passes absent demonstrated structural risk; the §8 lightweight prefinal checkpoint still applies. File count alone never exempts a demonstrated cross-module risk.
 - **Primacy of Working Code:** Working, well-tested code that does not actively incur change friction should remain untouched. "Boring" and proven code is preferable to novel abstractions.
 
 ---
@@ -216,7 +216,7 @@ This is an **instructional procedural skill rule governing agent reasoning**, NO
 Structural verification depth must match the risk and route of the delivered change:
 
 - **Feature & Bugfix Routes:** Existing route-required `daw-review` already executes Stage 2 structural boundary and architectural audits. The parent orchestrator **reuses the existing accepted `daw-review` result** for the current matching artifact revision and scope. It MUST NOT execute a redundant or duplicate review pass if an accepted review already covers the current diff.
-- **Patch Route:** The patch route remains strictly streamlined (`daw-build` -> `daw-verify`). The parent orchestrator performs a bounded, proportional inspection of the changed diff and directly affected interfaces. It MUST NOT mandate a new intermediate reviewer stage or invoke `daw-untangle` for localized, low-risk, or single-file fixes. If operating without an independent review stage, the parent explicitly notes the single-perspective verification fallback limitation in its acceptance record rather than claiming simulated independent acceptance.
+- **Patch Route:** The patch route remains strictly streamlined (`daw-build` -> `daw-verify`). The parent orchestrator performs a bounded, proportional inspection of the changed diff and directly affected interfaces. It MUST NOT mandate a new intermediate reviewer stage or routine `daw-untangle` escalation. A structurally-free local patch MAY record one-line N/A only after that bounded diff confirms no affected interface, shared state, order, or cross-module dependency; file count alone never exempts demonstrated risk. If operating without an independent review stage, the parent explicitly notes the single-perspective verification fallback limitation in its acceptance record rather than claiming simulated independent acceptance.
 - **Documentation & Non-Code Routes:** Tasks with zero structural code changes (docs-only, configuration descriptions, comments) record an explicit inline N/A rationale (e.g., `coupling_check: "N/A - documentation-only, no structural code changes"`) without structural analysis overhead.
 - **Implementation Rail:** During construction, `daw-build` applies lightweight change-coupling self-checks (minimal diff, avoiding accidental co-change, preserving public contracts) and notes observations inline in its handoff details.
 
@@ -228,7 +228,26 @@ Escalation to `daw-untangle` is strictly an exception, not a routine pipeline st
 - **Strictly Bounded Scope:** Any escalation MUST target solely the specific affected boundary, component, or subsystem. An untangle escalation NEVER authorizes a whole-codebase scan, unsolicited architectural audit, or broad repository cleanup.
 - **Read-Only Analysis Contract:** `daw-untangle` returns bounded, evidence-backed read-only analysis to the parent orchestrator. It receives NO mutation authority. An untangle output status of `pass` indicates completion of structural diagnosis, NEVER proof of runtime behavioral correctness or operational fix.
 
-### 3. Finding Disposition, Invalidation & Authorized Corrections
+### 3. Compact Three-Answer Delivery Check
+
+Before final delivery, the parent answers three questions inside the existing `scope` / `revision` / `evidence` / `disposition` fields of its plan or handoff record — no new mandatory fields, files, or schemas:
+
+1. **Affected interfaces/dependencies:** Which interfaces, callers, or dependencies does the diff touch?
+2. **Essential vs. accidental:** Is any co-change an essential invariant co-change or accidental coupling, with concrete evidence (call site, import, shared state, sequence)?
+3. **Sufficient or escalate:** Is current evidence sufficient for `accepted`, or is there a specific unresolved boundary with a stated disposition / escalation reason?
+
+A structurally-free local patch (docs/comments/local-only change with no affected interface or shared state — confirmed by bounded diff inspection, not by file count) may satisfy answers 1–3 with a single factual N/A line stating that concrete reason. Local or single-file scope is not an automatic exemption when evidence shows actual cross-boundary risk. A bare `PASS` is never sufficient evidence: reuse an accepted `daw-review` only by citing its current-revision answers, never by re-running a duplicate review.
+
+| Trigger                         | Tell — inspect first                                                                    | Action — read-only unless a scoped repair is authorized                                                                                                                                                               |
+| :------------------------------ | :-------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unexplained multi-module change | Diff spans modules with no stated invariant link                                        | Name affected interfaces; inspect local call sites. A clear defect is fixed via bounded `daw-plan`/`daw-build`; `daw-untangle` only if cross-module impact remains unresolved.                                        |
+| Hidden order / shared state     | Behavior depends on sequence, global, env, or mutable shared state outside the contract | Record essential vs. accidental with evidence. Accidental → bounded scoped correction; unresolved impact → `daw-untangle`, read-only.                                                                                 |
+| New cycle                       | Import or call cycle appears in the diff                                                | Trace locally. Clear defect → bounded plan/build fix; `daw-untangle` only when local inspection cannot resolve it.                                                                                                    |
+| Added wrapper / mapping         | New pass-through, adapter, or translation layer appears                                 | Inspect purpose against §4 preserved patterns. Shallow structure alone is not a defect; cite a concrete consequence before proposing a bounded, authorized plan/build repair. The reviewer never removes it directly. |
+
+Trigger examples are inspection prompts, not automatic defects. A `daw-untangle` escalation requires demonstrated, unresolved cross-module impact after local inspection; record `not accepted` with the scoped escalation reason, not a new enum value. Clear material defects and missing required evidence can also prevent acceptance without requiring untangle; inspection itself grants no mutation authority.
+
+### 4. Finding Disposition, Invalidation & Authorized Corrections
 
 When structural issues are identified:
 
@@ -239,7 +258,7 @@ When structural issues are identified:
 - **Evidence Invalidation on Revision:** Any code modification made during correction **invalidates all affected review and runtime verification evidence** for prior revisions. The parent orchestrator must re-verify behavioral correctness and recheck the revised diff before final acceptance.
 - **Applicable Route Retry & Stop Rules:** Corrective iterations follow existing applicable route retry and stop rules without inventing new fixed caps. Executed criteria that fail retain status `fail`; unexercised prerequisites or missing approvals become `blocked`.
 
-### 4. Observability & Parent Acceptance Record
+### 5. Observability & Parent Acceptance Record
 
 Coupling verification is recorded directly within the existing plan, handoff, or parent checkpoint records. It requires NO mandatory new files, custom schemas, or hidden storage.
 

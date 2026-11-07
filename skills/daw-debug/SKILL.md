@@ -102,70 +102,59 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 
 ## 4. Output Contract
 
-Every completion of `daw-debug` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, authorized artifact, or an explicit inline checkpoint fallback). Direct-user responses default to concise natural language. Rich diagnostic findings, hypothesis ledger, and root-cause analysis are preserved under `details`:
+Use [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract) for the complete outer JSON schema and transport. Deliver the actual, inspectable envelope to the parent before downstream transition; concise direct-human diagnostic reports do not replace that handoff. Do not dump envelopes into normal user replies or create unrequested transport files.
+
+### Diagnostic Details Contract
+
+Preserve under `details`:
+
+- `problem_summary`, `reproduction_command`, and `failing_signature` (`error_type`, `message`, `source_location`): the exact failure boundary. Distinguish user-provided failure evidence from new hypothesis-isolation experiments; an unrun command is a proposal, not execution evidence.
+- `hypothesis_ledger`: distinct candidates with `id`, `cause`, `test`, `status`, and `evidence`; retain falsified hypotheses and exact observations, not only the winning theory.
+- `root_cause`: confirmed `mechanism` and `symptom_vs_root_distinction`; if unconfirmed, state that explicitly without presenting a hypothesis as fact.
+- `remediation_contract`: the `invariant` to restore, `target_files`, and `recommended_regression_test`, not an implemented fix claim.
+- `open_questions`: remaining boundary questions or missing prerequisites, including observed contradictions and anti-thrashing reasons when stopping/replanning.
+
+Compact hypothetical `details` (not a complete handoff):
 
 ```json
 {
-  "objective": "Diagnose root cause of session KeyError on token refresh.",
-  "input_paths": ["src/auth/session.py", "src/auth/serializer.py"],
-  "output_paths": [],
-  "acceptance_criteria": [
+  "problem_summary": "Refreshed sessions lose token_version during serialization.",
+  "reproduction_command": "pytest tests/auth/test_session_serializer.py -k roundtrip",
+  "failing_signature": {
+    "error_type": "KeyError",
+    "message": "'token_version'",
+    "source_location": "src/auth/session.py:84"
+  },
+  "hypothesis_ledger": [
     {
-      "criterion": "Causal mechanism distinguished from surface symptom with falsification evidence",
-      "status": "pass"
+      "id": "H1",
+      "cause": "Serializer omits token_version",
+      "test": "Round-trip a session with token_version set",
+      "status": "Confirmed",
+      "evidence": "Isolated round-trip output lacks token_version"
     },
     {
-      "criterion": "Targeted regression test case specified for remediation",
-      "status": "pass"
+      "id": "H2",
+      "cause": "Migration omitted the default",
+      "test": "Inspect schema and affected row",
+      "status": "Falsified",
+      "evidence": "Inspected column and affected row both contain token_version=1"
     }
   ],
-  "evidence": [
-    {
-      "reference": "tests/auth/test_token_refresh.py",
-      "summary": "Isolated test execution confirmed KeyError at session.py:84 caused by missing token_version"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-plan",
-  "details": {
-    "problem_summary": "Authentication token validation fails silently on valid refreshed tokens",
-    "reproduction_command": "pytest tests/auth/test_token_refresh.py -k test_refresh_token_rotation",
-    "failing_signature": {
-      "error_type": "KeyError",
-      "message": "'token_version' missing from session dict",
-      "source_location": "src/auth/session.py:84"
-    },
-    "hypothesis_ledger": [
-      {
-        "id": "H1",
-        "cause": "Session serializer dropped token_version during serialization",
-        "test": "Unit test session serializer round-trip",
-        "status": "CONFIRMED",
-        "evidence": "SessionSerializer.to_dict() omitted token_version field in commit 3b1a2f"
-      },
-      {
-        "id": "H2",
-        "cause": "Database migration failed to backfill column default",
-        "test": "Query database schema directly",
-        "status": "FALSIFIED",
-        "evidence": "Database column has default value 1 and all rows populated"
-      }
-    ],
-    "root_cause": {
-      "mechanism": "Commit 3b1a2f refactored SessionSerializer to use explicit field mapping but omitted token_version from the export list, causing deserialization on subsequent requests to throw KeyError.",
-      "symptom_vs_root_distinction": "Catching KeyError in session.py:84 would have defaulted to guest mode, silently masking broken sessions. The root fix requires restoring token_version in SessionSerializer."
-    },
-    "remediation_contract": {
-      "invariant": "SessionSerializer must round-trip all required session tokens without loss.",
-      "target_files": ["src/auth/serializer.py"],
-      "recommended_regression_test": "tests/auth/test_session_serializer.py::test_session_serialization_token_version_roundtrip"
-    },
-    "open_questions": []
-  }
+  "root_cause": {
+    "mechanism": "Explicit serializer field mapping omits token_version, causing later deserialization to raise KeyError.",
+    "symptom_vs_root_distinction": "Catching KeyError would mask lost session data; restore the serializer field instead."
+  },
+  "remediation_contract": {
+    "invariant": "Session serialization round-trips every required field.",
+    "target_files": ["src/auth/serializer.py"],
+    "recommended_regression_test": "tests/auth/test_session_serializer.py::test_token_version_roundtrip"
+  },
+  "open_questions": []
 }
 ```
 
-_(Note: `status: "pass"` indicates that the diagnostic phase criteria have been satisfied; it does not indicate bug fix implementation or resolution)._
+`status: "pass"` proposes satisfaction of diagnostic-stage criteria only, not bug-fix implementation, resolution, parent acceptance, or runtime correctness. Select advisory `handoff_to` from the active route under §7 — on the canonical `bugfix` route, `daw-plan` (never skip directly to `daw-build`); on `status: "fail"` or `"blocked"`, return `handoff_to: null` and the active ledger and boundary questions to the parent. The handoff is advisory metadata for the parent orchestrator, and `daw-debug` never invokes another module directly.
 
 ## 6. Stop / Replan Protocols
 
@@ -179,10 +168,10 @@ Immediately halt debugging and return control to the parent orchestrator if:
 
 ## 7. Handoff
 
-Upon exit:
+Upon exit, return the Diagnostic Handoff to the parent orchestrator with advisory `handoff_to` selected from the active route only per §4; the parent exclusively decides dispatch and `daw-debug` never invokes another module directly.
 
-- If causal root is confirmed: Hand off the Diagnostic Report to the orchestrator for dispatch to `daw-build` (for test-driven remediation) or `daw-plan` (if the fix requires an architectural contract change).
-- If blocked or replanning: Hand off the active Hypothesis Ledger, observed falsifications, and specific boundary questions to the parent orchestrator.
+- If causal root is confirmed (`status: "pass"`): recommend `handoff_to: "daw-plan"` — the next stage on the canonical `bugfix` route (`daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`); never skip directly to `daw-build`.
+- If blocked or replanning (`status: "blocked"` / `"fail"`): return `handoff_to: null` and hand off the active Hypothesis Ledger, observed falsifications, and specific boundary questions to the parent orchestrator; a halted debug stage never advances the pipeline.
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`

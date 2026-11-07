@@ -65,8 +65,7 @@ Inspect observable repository facts without executing mutating commands:
 
 ### Step 2: Formulate Findings & Batched Confirmation
 
-Present discovered facts to the operator in one single batched round, pre-filling defaults:
-**Native Clarify Transport:** For unresolved config preferences (e.g. `workspace`, `issue_tracker`), use the shared grilling native clarify transport via parent capability-based routing (native clarify, or the equivalent ask/question tool actually exposed — never invent a tool call), with decision context before blocking and tool-supplied recommendation/custom/free-text/multiselect semantics (no hardcoded schema, no synthesized `Other`, no duplicate text questionnaire). Discovered facts (`spec_dir`, commands, `default_branch`, `high_risk_paths`) are presented as pre-filled defaults in one batched round, not re-asked as fact questions. Cancel/unanswered stays unresolved, never default consent; still show the proposed diff and await explicit confirmation before writing. Ordinary clarification never substitutes for provider/security point-risk authorization. See `../../references/grilling.md`.
+Present discovered facts as pre-filled defaults, not questions the repository already answers. Ask only unresolved material config preferences using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): exposed tools only, frontier decisions in rounds of at most 5, cancellation remains unresolved, and clarification never grants mutation or point-of-risk approval. Batch compatible preferences without forcing dependent questions into the same round; the proposed diff still requires explicit confirmation before writing.
 
 1. **spec_dir:** Default `docs/specs/` (or discovered existing path).
 2. **test_command:** Discovered test command or `none`.
@@ -112,48 +111,23 @@ Exact block format:
 
 ## 4. Output Contract
 
-Every completion of `daw-setup` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before concluding the stage per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, or an explicit inline fallback). Direct-user responses default to concise natural language. `setup` is a single-stage terminal route: on `status: "pass"` it returns `handoff_to: null`.
+Use the complete outer envelope and transport in [routing §5](../../references/routing.md#5-canonical-module-handoff-contract), delivering inspectable JSON before concluding the stage. Direct-user reports remain concise natural language unless an explicit format request or the canonical inline fallback applies. `setup` is a single-stage terminal route: a proposed `status: "pass"` returns `handoff_to: null` and covers only discovered configuration, explicit operator approval, and the authorized single-block write, not parent acceptance or application readiness. Missing confirmation blocks the write; `fail` and `blocked` retain routing §5 semantics.
+
+Required `details`: `target_file` and `configuration`, retaining all configuration fields below. This illustrative payload accompanies actual input/output paths, approval evidence, and observed write evidence in the outer envelope:
 
 ```json
 {
-  "objective": "Initialize repository DAW configuration in AGENTS.md.",
-  "input_paths": ["package.json", "AGENTS.md"],
-  "output_paths": ["AGENTS.md"],
-  "acceptance_criteria": [
-    {
-      "criterion": "Discovered repository test/lint/build commands and spec directory conventions",
-      "status": "pass"
-    },
-    {
-      "criterion": "Operator explicitly approved DAW configuration settings",
-      "status": "pass"
-    },
-    {
-      "criterion": "Wrote single fenced DAW configuration block in AGENTS.md between markers",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "AGENTS.md",
-      "summary": "Fenced daw-config block written with verified test runner and spec directory"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": null,
-  "details": {
-    "target_file": "AGENTS.md",
-    "configuration": {
-      "schema": 1,
-      "spec_dir": "docs/specs",
-      "test_command": "npm test",
-      "lint_command": "npm run lint",
-      "build_command": "none",
-      "workspace": "in-place",
-      "high_risk_paths": ["migrations/", "deploy/"],
-      "issue_tracker": "github",
-      "default_branch": "main"
-    }
+  "target_file": "AGENTS.md",
+  "configuration": {
+    "schema": 1,
+    "spec_dir": "docs/specs",
+    "test_command": "npm test",
+    "lint_command": "npm run lint",
+    "build_command": "none",
+    "workspace": "in-place",
+    "high_risk_paths": ["migrations/", "deploy/"],
+    "issue_tracker": "github",
+    "default_branch": "main"
   }
 }
 ```

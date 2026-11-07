@@ -185,79 +185,19 @@ The untangle module performs deterministic, read-only structural analysis and ch
 
 ## 4. Output Contract
 
-Every completion of `daw-untangle` delivers a structured handoff payload adhering to the canonical suite envelope for module-to-orchestrator handoffs. The full canonical JSON envelope is required on actual module-to-parent returns (or an inline JSON fallback checkpoint only when real pre-transition observability across stages is needed). When directly answering the user with no downstream stage transition, provide a concise, grounded human report only per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport); do not append raw JSON envelopes, schema examples, or extra status lines to direct user replies.
+Use [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract) for the complete outer JSON schema and transport. Deliver the actual, inspectable envelope on module-to-parent returns and before downstream transitions. With no downstream transition, answer a direct user in concise grounded natural language only; use an inline checkpoint only for real pre-transition observability, never unrequested transport files.
 
 ### Canonical Envelope Schema
 
-```json
-{
-  "objective": "String describing the structural analysis objective",
-  "input_paths": ["List of inspected source files and directories"],
-  "output_paths": [],
-  "acceptance_criteria": [
-    {
-      "criterion": "String describing specific analysis evaluation criterion",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "Tool call or static reference proof (e.g. ast_grep, grep, lsp)",
-      "summary": "Concrete finding observation or coverage proof"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": null,
-  "details": {
-    "inspected_scope": {
-      "authorized_target": "src/auth",
-      "coverage": "Inspected all 14 Python modules, 82 symbol references, and dynamic route decorators",
-      "tools_used": ["grep", "read", "ast_grep"]
-    },
-    "findings": [
-      {
-        "id": "COUP-001",
-        "title": "Concise finding title",
-        "category": "hidden_link",
-        "locations": [
-          "src/auth/session.py:45-80",
-          "src/user/service.py:112-135"
-        ],
-        "observed_relationship": "Concrete description of the observed coupling mechanism",
-        "consequence": "Observed friction or risk",
-        "proposed_boundary": "Deep module proposal with narrow interface",
-        "tradeoffs": "Gains vs. costs analysis",
-        "behavior_invariants": ["Specific invariant that must be preserved"],
-        "verification_proposal": "Suggested test command or verification assertion",
-        "confidence": "high"
-      }
-    ],
-    "decision_log": [
-      {
-        "topic": "Structural boundary choice",
-        "rationale": "Why this boundary was chosen",
-        "alternatives_considered": "Alternatives evaluated and rejected"
-      }
-    ],
-    "dependencies": [
-      "Identified external libraries or cross-subsystem dependencies"
-    ],
-    "invariants": [
-      "System invariants that must be retained during refactoring"
-    ],
-    "proposed_change": {
-      "summary": "High-level summary of proposed restructuring",
-      "boundary": "Target deep module interface definition",
-      "impact": "Affected files and consumers"
-    },
-    "verification_plan": {
-      "suggested_checks": ["Existing or proposed verification commands"]
-    },
-    "non_goals": ["Explicit non-goals excluded from scope"],
-    "unknowns": []
-  }
-}
-```
+The outer schema is defined only in routing §5. Preserve the following module-specific contract under `details`; empty findings are valid when supported by disclosed coverage:
+
+- `inspected_scope`: `authorized_target`, `coverage`, and actual `tools_used`, including inspected boundaries and dynamic/public entrypoint limits.
+- `findings`: each includes `id`, `title`, `category` (`hidden_link`, `needless_link`, or `surplus_taxonomy`), `locations`, `observed_relationship`, `consequence`, `proposed_boundary`, `tradeoffs`, `behavior_invariants`, `verification_proposal`, and `confidence`.
+- `decision_log`: `topic`, `rationale`, and `alternatives_considered`, including legitimate resilience patterns checked and preserved as non-findings.
+- `dependencies`, `invariants`, and `non_goals`: scoped external/cross-subsystem links, required behavior, and exclusions.
+- `proposed_change`: `summary`, `boundary`, and affected files/consumers in `impact`; proposals grant no execution authority.
+- `verification_plan.suggested_checks`: checks for downstream execution, never represented as exercised by untangle.
+- `unknowns`: unresolved facts, downstream design choices, and qualified negative evidence; distinguish analysis-blocking gaps from ordinary proposal uncertainty.
 
 ### Important Status & Boundary Rules
 
@@ -268,111 +208,57 @@ Every completion of `daw-untangle` delivers a structured handoff payload adherin
 
 ### Concrete Production Example
 
+Compact hypothetical `details` only (not a complete handoff or evidence of an actual inspection):
+
 ```json
 {
-  "objective": "Diagnose structural coupling and boundary friction in session token management and user authentication services.",
-  "input_paths": [
-    "src/auth/session.py",
-    "src/auth/tokens.py",
-    "src/auth/middleware.py",
-    "src/user/service.py",
-    "src/config/settings.py"
-  ],
-  "output_paths": [],
-  "acceptance_criteria": [
+  "inspected_scope": {
+    "authorized_target": "src/auth and src/user",
+    "coverage": "Inspected session.py, tokens.py, middleware.py, user/service.py, and their references. Checked configured middleware bindings; third-party consumers remain outside coverage.",
+    "tools_used": ["grep", "read"]
+  },
+  "findings": [
     {
-      "criterion": "Identify hidden, needless, or surplus coupling across auth and user subsystems",
-      "status": "pass"
-    },
-    {
-      "criterion": "Preserve legitimate token signing, security guards, and protocol retry invariants",
-      "status": "pass"
-    },
-    {
-      "criterion": "Disclose inspected search scope and protect dynamic middleware entrypoints",
-      "status": "pass"
+      "id": "COUP-001",
+      "title": "Shared mutable session dictionary bypasses lifecycle validation",
+      "category": "hidden_link",
+      "locations": ["src/auth/session.py:12-25", "src/user/service.py:88-102"],
+      "observed_relationship": "UserService directly mutates GLOBAL_SESSION_STORE owned by session.py.",
+      "consequence": "Session lifecycle validation is bypassed during user deactivation.",
+      "proposed_boundary": "Expose revoke_user_sessions(user_id) through SessionManager; keep its dictionary private.",
+      "tradeoffs": "Adds one domain method and migrates callers; removes direct state sharing.",
+      "behavior_invariants": [
+        "Immediately revoke active refresh tokens",
+        "Preserve transaction and concurrency boundaries"
+      ],
+      "verification_proposal": "pytest tests/auth/test_session_lifecycle.py tests/user/test_user_service.py",
+      "confidence": "high"
     }
   ],
-  "evidence": [
+  "decision_log": [
     {
-      "reference": "grep -rn 'GLOBAL_SESSION_STORE' src/",
-      "summary": "Direct references found in src/auth/session.py:12 and src/user/service.py:88 bypassing SessionManager"
-    },
-    {
-      "reference": "grep -rn 'request.scope' src/auth/middleware.py",
-      "summary": "Middleware mutates untyped dictionary key 'raw_token_cache' read by service layer"
+      "topic": "Retain AuthMiddleware error translation",
+      "rationale": "Observed PyJWTError-to-401 translation is a legitimate seam boundary, not surplus taxonomy.",
+      "alternatives_considered": "Removing it would leak library exceptions to clients."
     }
   ],
-  "status": "pass",
-  "handoff_to": null,
-  "details": {
-    "inspected_scope": {
-      "authorized_target": "src/auth and src/user subsystems",
-      "coverage": "Inspected 5 files (1,240 lines), 34 symbol cross-references, and FastAPI middleware bindings",
-      "tools_used": ["grep", "read"]
-    },
-    "findings": [
-      {
-        "id": "COUP-001",
-        "title": "Shared Mutable Session Cache via Global Dictionary",
-        "category": "hidden_link",
-        "locations": [
-          "src/auth/session.py:12-25",
-          "src/user/service.py:88-102"
-        ],
-        "observed_relationship": "UserService directly reads and mutates GLOBAL_SESSION_STORE dict owned by session.py, bypassing session lifecycle validation.",
-        "consequence": "Action-at-a-distance bugs during concurrent logout; impossible to test UserService in isolation without resetting global dict.",
-        "proposed_boundary": "Encapsulate session lookup behind SessionManager.revoke_user_sessions(user_id) with synchronized lock; UserService passes user_id only.",
-        "tradeoffs": "Adds one method to SessionManager interface; eliminates temporal race condition during user deactivation.",
-        "behavior_invariants": [
-          "Session invalidation must immediately revoke active JWT refresh tokens",
-          "Thread-safety of session dictionary must be preserved"
-        ],
-        "verification_proposal": "pytest tests/auth/test_session_lifecycle.py tests/user/test_user_service.py",
-        "confidence": "high"
-      },
-      {
-        "id": "COUP-002",
-        "title": "Shallow TokenFormatter Pass-Through Layer",
-        "category": "surplus_taxonomy",
-        "locations": ["src/auth/tokens.py:45-62"],
-        "observed_relationship": "TokenFormatter class has 3 methods that solely invoke jwt.encode/decode with no added validation or domain logic.",
-        "consequence": "Gratuitous indirection layer that obscures standard PyJWT library parameters.",
-        "proposed_boundary": "Inline PyJWT calls directly into SessionTokenService; eliminate TokenFormatter class.",
-        "tradeoffs": "Reduces file count and call stack depth; requires callers to import SessionTokenService.",
-        "behavior_invariants": [
-          "HS256 signing algorithm and 15-minute expiration window must remain identical"
-        ],
-        "verification_proposal": "pytest tests/auth/test_tokens.py",
-        "confidence": "high"
-      }
-    ],
-    "decision_log": [
-      {
-        "topic": "Retention of AuthMiddleware error translation",
-        "rationale": "AuthMiddleware catches PyJWTError and translates to 401 Unauthorized. This is a legitimate seam error translation and was preserved.",
-        "alternatives_considered": "Removing middleware try/except was rejected because it would leak library exceptions to client responses."
-      }
-    ],
-    "dependencies": ["PyJWT", "FastAPI Request/Response protocols"],
-    "invariants": [
-      "Authentication middleware must continue to reject expired tokens with HTTP 401",
-      "No breaking changes to public /api/v1/auth/login response schema"
-    ],
-    "proposed_change": {
-      "summary": "Decouple UserService from session internals via SessionManager API; remove redundant TokenFormatter class.",
-      "boundary": "SessionManager exposes get_session(token) and revoke_user_sessions(user_id); internal dict is private.",
-      "impact": "Modifies src/auth/session.py, src/auth/tokens.py, and src/user/service.py."
-    },
-    "verification_plan": {
-      "suggested_checks": ["pytest tests/auth/ -v", "pytest tests/user/ -v"]
-    },
-    "non_goals": [
-      "Migrating from in-memory session cache to Redis (separate infrastructure task)",
-      "Refactoring user database models"
-    ],
-    "unknowns": []
-  }
+  "dependencies": ["PyJWT", "FastAPI middleware bindings"],
+  "invariants": [
+    "Expired tokens still produce HTTP 401",
+    "Public login schema remains unchanged"
+  ],
+  "proposed_change": {
+    "summary": "Decouple UserService from session storage internals.",
+    "boundary": "SessionManager owns session mutation behind a user_id-based API.",
+    "impact": "src/auth/session.py and src/user/service.py and their consumers"
+  },
+  "verification_plan": {
+    "suggested_checks": ["pytest tests/auth/ tests/user/"]
+  },
+  "non_goals": ["Redis migration", "User database model refactoring"],
+  "unknowns": [
+    "No direct external callers observed within inspected repository scope; third-party usage is not disproven."
+  ]
 }
 ```
 

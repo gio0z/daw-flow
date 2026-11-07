@@ -88,7 +88,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 2. **Technical Research Before User Inquiries:** Before querying the operator about technical uncertainties, non-destructively research workspace code, dependencies, schemas, and official documentation. Record architectural decisions, technical rationale, alternatives considered, and authoritative citations directly in the appropriate existing specification section (e.g. `techstack.md`, ADR section in architecture doc, or `blueprint.md`) — no mandatory separate `research.md`.
 3. Ground all fact-discoverable items through codebase inspection before asking the user.
 4. Elicit in bounded rounds (maximum 5 prioritized questions per round) ordered by `impact × uncertainty`. Sequence dependent trade-offs **one at a time** along the active decision frontier; batch only independent choices up to 5 per round.
-5. **Native Clarify Transport:** When grilling asks unresolved material user decisions, use the shared grilling native clarify transport via parent capability-based routing (native clarify, or the equivalent ask/question tool actually exposed — never invent a tool call). Discoverable facts stay automatic. At most 5 frontier questions per round, with decision context before blocking; use tool-supplied recommendation/custom/free-text/multiselect semantics, no hardcoded schema or synthesized `Other`, and no duplicate text questionnaire alongside the tool. Cancel/unanswered stays unresolved, never default consent; ordinary clarification never substitutes for provider/security point-risk authorization. See `../../references/grilling.md`.
+5. **Native Clarify Transport:** Follow [Native Interactive Clarification Transport (Canonical Rule)](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule) for unresolved material user decisions only. Cancel/unanswered remains unresolved, never default consent; clarification does not replace required provider/security point-of-risk approval.
 6. Frame questions with concrete agent recommendations and technical rationales when evaluating trade-offs; prompt for open user preferences when new business direction is required without forcing arbitrary assumptions. Avoid false dichotomies, answered questions, or internal naming queries.
 7. Waive formal grilling for direct questions, routine engineering details, or small settled changes.
 8. **Safe Answer Reinjection:** `daw-design` is the authorized specification write module. When receiving user answers from interactive grilling or read-only inquiry handoffs (from `daw-ask` or parent handoff via `details.elicitation_updates`), `daw-design` safely reinjects answers into the authoritative specifications, reconciles conflicting text, updates affected acceptance criteria, and marks remaining unknowns to block only dependent scope.
@@ -149,86 +149,73 @@ The design module governs structural analysis, architectural evaluation, domain 
 
 ## 4. Output Contract
 
-Every completion of `daw-design` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, authorized artifact, or an explicit inline checkpoint fallback). Direct-user responses default to concise natural language. Rich architectural analysis, domain modeling, and builder-readiness facts are preserved under `details`:
+Use [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract) for the complete outer JSON schema and transport. Deliver the actual, inspectable envelope to the parent before any downstream transition; a concise direct-human report does not replace that handoff. Do not dump the envelope into normal user replies or create unrequested transport files.
+
+### Design Details Contract
+
+Preserve these module-specific fields under `details`, using empty collections or explicit not-applicable explanations for waived work rather than inventing findings:
+
+- `architectural_summary`, `target_specifications`, `key_invariants`, and `explicit_non_goals`: grounded design, relevant artifact paths, boundaries, and exclusions.
+- `evaluated_alternatives`: material choices with `chosen`, `alternative`, and `rationale`; empty when alternatives are waived.
+- `domain_modeling`: `disambiguated_terms`, `adr_references`, and `convention_path`, respecting domain/ADR gates and repository conventions.
+- `builder_readiness`: `substantive_design`, `seams_checked`, `blocking_unknowns`, `safe_reversible_choices`, and `readiness_verdict`; disclose waived inspection for localized work.
+- `interface_contracts`: material consumer inputs/outputs and failure contracts, with provenance for unsettled proposals.
+- `consequential_decisions`: `requires_user_approval` and `items`, kept separate from routine author decisions and operational authorization.
+- `sync_impact_report`: `version_change`, `modified_principles`, `added_sections`, `removed_sections`, and `downstream_artifacts_to_sync` when governance or foundations change.
+- `next_actions`: deferred implementation/non-governance intents; include `elicitation_updates` and decision state/open questions when answer reinjection or grilling applies.
+
+Compact illustrative `details` (not a complete handoff):
 
 ```json
 {
-  "objective": "Draft system architecture and API contract specification for auth token refresh.",
-  "input_paths": ["docs/specs/prd.md", "src/auth/session.py"],
-  "output_paths": ["docs/specs/blueprint.md"],
-  "acceptance_criteria": [
+  "architectural_summary": "Rotate single-use refresh tokens in the existing session ledger.",
+  "target_specifications": ["docs/specs/blueprint.md"],
+  "key_invariants": [
+    "Single-use refresh tokens",
+    "No plaintext token persistence"
+  ],
+  "explicit_non_goals": ["Third-party OAuth providers"],
+  "evaluated_alternatives": [
     {
-      "criterion": "Blueprint defines session token refresh invariants and API schemas",
-      "status": "pass"
-    },
-    {
-      "criterion": "Builder-readiness seam inspection confirms zero blocking unknowns",
-      "status": "pass"
+      "chosen": "Session ledger",
+      "alternative": "Stateless claims",
+      "rationale": "Immediate revocation requires retained session state"
     }
   ],
-  "evidence": [
-    {
-      "reference": "docs/specs/blueprint.md",
-      "summary": "Authored architecture specification covering token refresh flow and data model"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-plan",
-  "details": {
-    "architectural_summary": "Token refresh service using dedicated session store with cryptographic rotation.",
-    "target_specifications": ["docs/specs/blueprint.md"],
-    "key_invariants": [
-      "Refresh tokens are single-use with cryptographic rotation",
-      "Zero plaintext token persistence"
+  "domain_modeling": {
+    "disambiguated_terms": ["RefreshToken", "SessionStore"],
+    "adr_references": [],
+    "convention_path": "docs/specs/"
+  },
+  "builder_readiness": {
+    "substantive_design": true,
+    "seams_checked": [
+      "interfaces",
+      "error_handling",
+      "concurrency",
+      "acceptance_criteria"
     ],
-    "explicit_non_goals": ["Third-party OAuth identity providers"],
-    "evaluated_alternatives": [
-      {
-        "chosen": "Dedicated session ledger table",
-        "alternative": "Stateless HMAC-signed token claims",
-        "rationale": "Immediate revocation requirement precludes stateless token claims"
-      }
-    ],
-    "domain_modeling": {
-      "disambiguated_terms": ["RefreshToken", "SessionStore"],
-      "adr_references": ["docs/specs/blueprint.md#adr-token-storage"],
-      "convention_path": "docs/specs/"
-    },
-    "builder_readiness": {
-      "substantive_design": true,
-      "seams_checked": [
-        "interfaces",
-        "error_handling",
-        "concurrency",
-        "acceptance_criteria"
-      ],
-      "blocking_unknowns": [],
-      "safe_reversible_choices": [
-        "Default HTTP client timeout set to 15 seconds"
-      ],
-      "readiness_verdict": "ready_for_planning"
-    },
-    "interface_contracts": "POST /api/v1/auth/refresh -> {access_token: string, refresh_token: string}",
-    "consequential_decisions": {
-      "requires_user_approval": false,
-      "items": []
-    },
-    "sync_impact_report": {
-      "version_change": "1.0.0 -> 1.1.0",
-      "modified_principles": [],
-      "added_sections": ["Session Token Refresh Invariants"],
-      "removed_sections": [],
-      "downstream_artifacts_to_sync": [
-        "docs/specs/roadmap.md",
-        "docs/specs/qa.md"
-      ]
-    },
-    "next_actions": []
-  }
+    "blocking_unknowns": [],
+    "safe_reversible_choices": [],
+    "readiness_verdict": "ready_for_planning"
+  },
+  "interface_contracts": "POST /api/v1/auth/refresh -> {access_token: string, refresh_token: string}",
+  "consequential_decisions": { "requires_user_approval": false, "items": [] },
+  "sync_impact_report": {
+    "version_change": "1.0.0 -> 1.1.0",
+    "modified_principles": [],
+    "added_sections": ["Token refresh invariants"],
+    "removed_sections": [],
+    "downstream_artifacts_to_sync": [
+      "docs/specs/roadmap.md",
+      "docs/specs/qa.md"
+    ]
+  },
+  "next_actions": []
 }
 ```
 
-_(Note: `status: "pass"` indicates that the design phase criteria have been satisfied; it does not represent end-to-end implementation, deployment, or runtime verification)._
+`status: "pass"` proposes satisfaction of design-stage criteria only: specification completeness and applicable seam inspection, not parent acceptance, implementation, deployment, or runtime proof. Follow §7 for advisory routing; never self-dispatch.
 
 ---
 

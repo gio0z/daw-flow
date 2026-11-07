@@ -4,6 +4,8 @@ This reference defines the canonical shared grilling protocol for Deterministic 
 
 This reference is the **canonical native interactive clarification transport** for all DAW decision workflows. Whenever any DAW module must ask the operator a material question — interview, design decision, setup confirmation, unclear-route intake, or any other decision frontier — it MUST use this transport. It applies beyond the three interview modules named below; do not duplicate a separate questionnaire alongside the same tool call.
 
+**Progressive loading for factual advice:** A direct factual `daw-ask` answer with no material decision or actual handoff/transition need not load the full protocol. Answer from evidence under root `SKILL.md` §4/§6 and the module's read-only/intake rules. Before a material question, load the canonical transport below and the relevant decision-frontier steps; before any actual handoff, load [routing §5](routing.md#5-canonical-module-handoff-contract). No clarification, approval, or mutation authority is implied by this loading exception.
+
 ### Native Interactive Clarification Transport (Canonical Rule)
 
 1. **Capability discovery, never assumption:** At the start of a session (or when the harness/toolset changes), the parent MUST discover which interactive question tool the harness actually exposes. Use the tool's real name and real schema as exposed — e.g. a native `clarify` tool when present, or the harness's equivalent `ask` / `question` / `AskUserQuestion` tool under its actual name and fields. NEVER invent, hardcode, or hallucinate a tool name, parameter, or schema; NEVER presume a tool exists because another harness has it. If no interactive question tool is exposed, that is the "native absent" case below.

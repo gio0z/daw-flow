@@ -150,6 +150,77 @@ Verification establishes truthful, observable evidence that the system satisfies
    - **Strict Secret & Data Redaction:** Commands, logs, error outputs, and audit records MUST redact all secrets, API tokens, passwords, private keys, authorization headers, and sensitive customer personal data. Record configuration key names or reference identifiers only (e.g., `AUTH_TOKEN=[REDACTED]`), never credential values.
    - **Distinguish Outcomes Truthfully:** Explicitly record whether checks are `passed`, `failed`, `blocked`, or `unexercised`. Never claim verification passed for tests that were skipped, mocked, or not run.
 
+### Operational Rule Diagnostics
+
+This subsection is a practical lens on the existing gates in this
+reference, not a new schema, stage, checklist, or mandatory
+artifact. Use it when authoring or applying an operational rule.
+Record only relevant entries in existing finding, plan, or
+handoff fields; do not demand a full per-rule record for every
+task, and do not create a parallel diagnostics file.
+
+**Compact model.** For each applicable rule, connect four elements:
+
+1. **Trigger:** the condition that invokes the rule (for example,
+   a completion claim, a high-risk mutation, or a changed invariant).
+2. **Tell:** the observable sign of a violation or misapplication,
+   plus its consequence, stated as inspectable evidence rather
+   than a subjective impression. For a preventative safety
+   requirement the tell is the observable prerequisite gap
+   itself (for example, a missing approval), not observed harm;
+   safety does not wait for harm to become observable.
+3. **Fix:** the scoped corrective action bounded by the rule's
+   authority. Direction and requirements supply intent; the fix
+   must not invent product requirements, scope, or proof beyond
+   the cited direction.
+4. **Proof:** the sufficient evidence that the fix held, recorded
+   with the existing verdict vocabulary: `passed`, `failed`,
+   `blocked`, `unexercised`, and parent `accepted` or `not accepted`.
+   No new verdict, status, or field is introduced.
+
+**Classify before acting:**
+
+- **Hard obligations** (safety gates, accepted contracts,
+  point-of-risk approvals where required): non-negotiable.
+  Rationalizing them away, or treating a document or plan as
+  authorization, is itself a tell. Stop the affected action
+  and resolve the relevant prerequisite or repair the defect
+  under existing authority; obtain point-of-risk approval only
+  where that authority requires it.
+- **Contextual choices** (direction, requirements, purpose):
+  judge against the actual requirement and purpose. A cosmetic
+  preference, naming taste, or subjective style defect is not
+  a gate violation on its own.
+- **Consistency checks:** keep them proportional to the changed
+  scope. Cite the existing authority (§1–§5 and the Parent
+  Acceptance Checkpoint) instead of restating it at length.
+
+| Diagnostic case                              | Tell / consequence                                                                                 | Scoped fix                                                                                                                                                                                                                                                                       | Sufficient proof                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Unsupported completion claim                 | Worker `pass` with missing primary evidence, or executed output contradicting the expected outcome | Missing evidence marks the relevant check `unexercised` and the parent records `not accepted`; contradicted executed evidence marks the check `failed`; the module maps these to its existing `fail` / `blocked` outer status. Repair only the missing or contradicted evidence. | Fresh primary observation vs. expected outcome on the affected revision; parent `accepted` / `not accepted` |
+| Missing material direction vs. settled patch | A material unknown treated as settled, or a pre-diagnosed fix blocked on ceremony                  | Halt `blocked` naming the question and next permitted action for true unknowns; proceed directly for settled patches                                                                                                                                                             | Recorded question plus blocking impact, or settled contract plus targeted proof                             |
+| Cosmetic preference vs. actual invariant     | Nit framed as gate failure while the real invariant goes untested                                  | Downgrade the nit to an advisory note; verify the invariant through existing proof, asking the authorized verifier to re-execute only if that proof is insufficient                                                                                                              | Proof of the invariant (schema, boundary, behavior), not agreement with taste                               |
+| Out-of-scope cleanup                         | Unrelated rewrite, migration, or cleanup smuggled into the change                                  | Remove it from scope or split it as a separate scoped task; never bundle it to "improve while here"                                                                                                                                                                              | Diff limited to the declared scope; separate work only if separately authorized                             |
+| Stale proof / negative expected exit         | Pass reused after an affected revision change, or expected tool failure read as worker failure     | Invalidate the affected evidence on relevant revision, scope, or context change and reinspect; treat expected negative exits as valid checks                                                                                                                                     | Fresh observation on the affected revision; expected exit matched, distinct from transport failure          |
+
+Static proof (diff inspection, AST or type checks, structural
+grep in context) suffices for documentation and read-only
+review where it directly establishes the claim; runtime claims
+require execution on the actual surface, and a read-only
+reviewer must not execute commands to manufacture it. Missing
+required evidence blocks completion but not unrelated tasks;
+repair it under the existing retry and correction protocol,
+with no forced giant audit of unaffected scope.
+
+_Inspiration note (pinned, no external dependency):_ adopted
+the trigger/tell/fix/proof framing and observable-tell
+discipline from [anti-slop](https://github.com/miqdadbadjuber/anti-slop/blob/9504989f162a92b1996853eccbb3d8a86e73df68/antislop.md)
+and `skills/antislop-code/SKILL.md` at that same commit.
+Excluded: its visual ban list, any new gate stage or
+per-rule-diary mechanism, and any universal quality claim.
+This subsection adds no runtime promise, dependency, schema,
+or gate stage.
+
 ### Parent Acceptance Checkpoint
 
 The parent orchestrator evaluates all module outputs through this canonical verification checkpoint before accepting any stage result or advancing the execution pipeline. These constraints are instructional contracts governing agent reasoning, not runtime enforcement hooks or daemon supervisors.
@@ -298,7 +369,7 @@ This is an **instructional procedural skill rule governing parent reasoning**, N
 
 1. **Proportional Scope by Route:**
    - **Feature & Bugfix Routes:** Existing route-required `daw-review` already executes Stage 2 structural boundary and architectural audits. The parent orchestrator **reuses the existing accepted `daw-review` result** for the current matching artifact revision and scope. It MUST NOT execute a duplicate or redundant review pass if an accepted review already covers the current diff.
-   - **Patch Route:** The patch route remains strictly streamlined (`daw-build` -> `daw-verify`). The parent orchestrator performs a bounded, proportional inspection of the changed diff and directly affected interfaces. It MUST NOT mandate a new intermediate reviewer stage or invoke `daw-untangle` for localized, low-risk, or single-file fixes. When operating without an independent review stage, the parent explicitly notes the single-perspective verification fallback limitation in its acceptance record rather than claiming simulated independent acceptance.
+   - **Patch Route:** The patch route remains strictly streamlined (`daw-build` -> `daw-verify`). The parent orchestrator performs a bounded, proportional inspection of the changed diff and directly affected interfaces. It MUST NOT mandate a new intermediate reviewer stage or routine `daw-untangle` escalation. A structurally-free local patch MAY record one-line N/A only after that bounded diff confirms no affected interface, shared state, order, or cross-module dependency; file count alone never exempts demonstrated risk. When operating without an independent review stage, the parent explicitly notes the single-perspective verification fallback limitation in its acceptance record rather than claiming simulated independent acceptance.
    - **Documentation & Non-Code Routes:** Tasks with zero structural code changes (docs-only, configuration descriptions, comments) record an explicit inline N/A rationale (e.g., `coupling_check: "N/A - documentation-only, no structural code changes"`) without structural analysis overhead.
    - **Implementation Rail:** During construction, `daw-build` applies lightweight change-coupling self-checks (minimal diff, avoiding accidental co-change, preserving public contracts) and notes observations inline in its handoff details.
 
@@ -317,6 +388,7 @@ This is an **instructional procedural skill rule governing parent reasoning**, N
 4. **Observability & Acceptance Record:**
    - Coupling verification is recorded directly within existing plan, handoff, or parent checkpoint records. It requires NO mandatory new files, custom schemas, or hidden storage.
    - Populates existing fields inline: `scope` (paths and interfaces evaluated), `revision` (artifact revision snapshot), `evidence` (accepted review ref, diff inspection summary, or untangle finding IDs), and `disposition` (`accepted`, `not accepted`, or `N/A` with clear rationale).
+   - Before final delivery, the parent answers the canonical three questions of [`references/change-coupling.md#prefinal-coupling-checkpoint`](change-coupling.md#prefinal-coupling-checkpoint) inside these existing fields — affected interfaces/dependencies; essential vs. accidental coupling with evidence; sufficient evidence or specific unresolved boundary plus disposition/escalation reason. Do not duplicate the canonical trigger table here; cite and follow it.
    - Default human final reporting remains concise and action-first; comprehensive JSON records remain internal to the parent orchestrator.
 
 ---

@@ -25,7 +25,7 @@ The advisor serves as a conversational front door and Socratic sounding board fo
 - **No Untrusted Execution:** Reads recorded evidence (specs, source files, static configs, past logs); does not run untrusted workspace scripts, test suites, or benchmarks in read-only advisory mode.
 - **External Network Policy:** External network lookups occur only when explicitly requested by the user and within authorized boundaries.
 - **No Direct Execution:** Never transitions into mutating code within ask mode; returns stage handoffs for the orchestrator to route.
-- **Native Clarify Transport:** For unresolved material user decisions, use the shared grilling native clarify transport via parent capability-based routing (native clarify, or the equivalent ask/question tool actually exposed — never invent a tool call). Discoverable facts stay automatic (answer/share directly); ask material unresolved decisions only, at most 5 per round along the active decision frontier, emitting decision context before blocking. Use tool-supplied recommendation/custom/free-text/multiselect semantics; do not hardcode a schema or synthesize `Other`. No duplicate text questionnaire alongside the tool. Cancel/unanswered stays unresolved, never default consent; ordinary clarification never substitutes for provider/security point-risk authorization. Strict read-only scope is unchanged. See `../../references/grilling.md`.
+- **Material Clarification:** Discover facts automatically; ask only unresolved material decisions on the active frontier, at most 5 per round. Use the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): real exposed tools only, cancellation remains unresolved, and clarification never grants execution or point-of-risk approval.
 
 ---
 
@@ -39,22 +39,25 @@ The advisor serves as a conversational front door and Socratic sounding board fo
   - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-ask`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.
   - The suite root is the canonical module directory's `../..`.
   - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-- **Mandatory Governance & Protocol Loading:**
-  - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
-  - Load the canonical shared grilling protocol (`../../references/grilling.md`) for structured inquiry, decision frontier tracking, and fact-vs-decision separation. Loading protocol references grants no additional permissions or tools and spawns no background workers.
-  - `daw-ask` is strictly conversational/advisory and read-only. It never performs file mutations or executes side-effect commands. Preflight evaluation confirms read-only scope without requiring production credentials or mutating authorizations.
+- **Governance & Conditional Protocol Loading:**
+  - Before advisory work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract) and canonical routing §6, reusing unchanged rules already loaded. Reading governance is not recursive router execution.
+  - A direct factual answer with no material decision or actual parent/downstream handoff may defer routing §5 schema/transport detail and the full grilling protocol. Read-only intake, factual evidence, route selection, and all local safety limits still apply.
+  - Before an unresolved material decision, load the [canonical clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule) and relevant shared grilling protocol. Before any actual parent return or downstream transition, load routing §5 and deliver its complete handoff.
+  - Protocol loading grants no permissions, tools, or background workers. Read-only preflight requires neither production credentials nor mutation authorization; ask mode never executes side-effect commands or file mutations.
 
 ## 3. Operational Steps
 
-`daw-ask` executes structured advisory elicitation by applying the canonical shared grilling protocol (`../../references/grilling.md`) under read-only constraints:
+Start with factual discovery. Use the full shared grilling protocol only when unresolved material decisions require it; neither path permits execution or mutation.
 
 ### Step 1: Context & Fact Discovery (Agent Work)
 
-1. Apply `../../references/grilling.md` §2 Step 1: inspect recorded evidence (specs, code, static configurations, commit logs) non-destructively.
-2. Distinguish established codebase facts from open design uncertainties.
-3. Differentiate repo facts from user decisions. Direct factual inquiries or small settled clarifications are answered immediately without triggering multi-round ceremony.
+1. Inspect recorded evidence (specs, code, static configurations, commit logs) non-destructively; discover facts rather than asking the user to supply them.
+2. Separate established codebase facts, uninspected assumptions, and unresolved material user decisions.
+3. If the inquiry is factual and needs no material decision or actual handoff, answer directly in natural language and stop. Do not manufacture options, a next-stage transition, or a JSON envelope. Otherwise continue with the applicable decision or handoff steps below.
 
 ### Step 2: Build Decision Dependency Graph & Identify Frontier
+
+Apply this step when material user decisions remain; load the shared grilling protocol first.
 
 1. Apply `../../references/grilling.md` §2 Step 2: map upstream choices to downstream implications.
 2. Focus inquiries strictly on the **decision frontier** (immediate unresolved material user trade-offs whose prerequisites are settled). NEVER query internal implementation details or refactoring naming decisions (e.g. renaming internal variables/collections) absent consumer consequence.
@@ -64,59 +67,39 @@ The advisor serves as a conversational front door and Socratic sounding board fo
 
 ### Step 3: Recommendation-First Framing & Trade-Offs
 
-1. **Direct Questions:** Provide a grounded, factual answer directly.
+1. **Settled Questions:** Answer from evidence without forcing a clarification round.
 2. **Architectural / Strategic Decisions:** Provide a clear recommendation first, backed by recorded evidence (`../../references/grilling.md` §1). Present genuine alternatives only when meaningful divergence exists; do not manufacture strawmen, fabricate agreement, or claim technical guarantees from product labels. Distinguish desired behavior from implementation proof.
 3. Low-risk, reversible defaults may be agent choices labeled as such, avoiding unnecessary confirmation rounds for trivial details. Cap interactive questions at 5 per round and wait between rounds.
-4. **Pre-Send Response Check:** Before returning any advisory response or questions, execute `../../references/grilling.md` §2 Step 3 check: verify (1) repo facts were looked up, (2) inquiries target only frontier material trade-offs (no internal naming), (3) no premature downstream parameters/timeouts, (4) no unproven technical guarantees from product labels (qualify claims), and (5) user requirements are preserved. Correct violations before outputting.
+4. **Pre-Send Response Check:** For decision framing, apply `../../references/grilling.md` §2 Step 3: facts were looked up; questions target frontier material trade-offs, not internal naming; downstream parameters/timeouts are not premature; product labels are not technical proof; user requirements remain intact. Correct violations before output. A direct factual answer still requires factual grounding, qualified assumptions, and preservation of the user's requirements, without loading the full protocol.
 5. Note confidence level and uninspected assumptions.
 
 ### Step 4: Exit State & Stage Handoff Suggestion
 
-1. Record `details.decision_state` (`settled`, `deferred`, `blocked`) per `../../references/grilling.md` §2 Step 5. Because `daw-ask` is an advisory stage, it may return `status: "pass"` for successfully delivered advice while reporting downstream implementation blockers under `details`.
-2. Record repo facts, verified paths, user preferences, and recommended decisions.
-3. Propose the next appropriate DAW module (`daw-wizard` for greenfield specs, `daw-design` for spec adoption, `daw-plan`, `daw-debug`, etc.) for user approval or orchestrator routing.
+1. At an actual handoff, record `details.decision_state` (`settled`, `deferred`, `blocked`) per `../../references/grilling.md` §2 Step 5 and the facts, paths, preferences, and recommendations informing it.
+2. Select the appropriate next DAW module only when further work is needed (`daw-wizard` for greenfield specs, `daw-design` for architecture/spec adoption, `daw-plan` for settled decomposition, `daw-debug` for failures). The recommendation is opt-in or parent-routed, never execution permission.
+3. A proposed `status: "pass"` means advice was delivered within read-only criteria, not implementation completion or parent acceptance. Downstream blockers remain explicit under `details`.
 
 ---
 
 ## 4. Output Contract
 
-Every completion of `daw-ask` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return or an explicit inline checkpoint fallback; read-only modules never create unasked files). Direct-user responses default to concise natural language. Rich diagnostic summaries, recommendations, and frontier trade-offs are preserved under `details`:
+A direct factual no-transition answer is concise natural language; it needs no fictitious handoff or unconditional JSON. For an actual return to a parent or downstream transition, use the complete outer envelope and transport in [routing §5](../../references/routing.md#5-canonical-module-handoff-contract). Full JSON must be inspectable before transition; read-only ask never writes transport files. User-facing reports remain natural language unless an explicit format request or the canonical inline fallback applies.
+
+Required `details`: `core_intent`, `recommendation`, `trade_offs` (or `null`), `frontier_questions`, `confidence`, `unverified_assumptions`, and `decision_state` (`settled`, `deferred`, `blocked`). Preserve recorded repo facts, verified paths, user preferences, and recommended decisions in this payload and the outer evidence. Illustrative `details` for a handoff:
 
 ```json
 {
-  "objective": "Answer user query regarding repository test runners and architectural patterns.",
-  "input_paths": ["package.json", "docs/specs/blueprint.md"],
-  "output_paths": [],
-  "acceptance_criteria": [
-    {
-      "criterion": "Address user query accurately using recorded workspace facts",
-      "status": "pass"
-    },
-    {
-      "criterion": "Zero file modifications or state-mutating commands executed",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "package.json",
-      "summary": "Inspected test scripts confirming vitest as configured test framework"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-design",
-  "details": {
-    "core_intent": "Inquire regarding test runner setup and architectural patterns",
-    "recommendation": "The repository uses vitest for unit tests and playwright for e2e tests. New unit tests should follow the *.test.ts convention in tests/.",
-    "trade_offs": null,
-    "frontier_questions": [],
-    "confidence": "High",
-    "unverified_assumptions": []
-  }
+  "core_intent": "Advise on repository test conventions before planning",
+  "recommendation": "Follow the test runner and file conventions established by the inspected repository evidence.",
+  "trade_offs": null,
+  "frontier_questions": [],
+  "confidence": "High for inspected conventions; implementation not evaluated",
+  "unverified_assumptions": [],
+  "decision_state": "settled"
 }
 ```
 
-_(Note: `status: "pass"` indicates that the advisory inquiry has been answered and read-only criteria satisfied; it does not indicate implementation or code mutation. Empty `output_paths` is standard for read-only advisory responses)._
+At handoff, `output_paths` is empty. A proposed `status: "pass"` covers answered advice and read-only compliance only; it certifies neither code changes nor downstream readiness. `fail` and `blocked` retain routing §5 semantics; advisory downstream blockers do not falsely imply that delivered advice failed.
 
 ---
 
@@ -125,7 +108,7 @@ _(Note: `status: "pass"` indicates that the advisory inquiry has been answered a
 - [ ] Addressed user inquiry using recorded workspace facts.
 - [ ] Zero files mutated, zero side-effect commands or untrusted scripts executed.
 - [ ] No artificial options manufactured for straightforward factual questions.
-- [ ] Recommended next DAW module provided as an opt-in handoff.
+- [ ] Any needed next DAW module is an opt-in recommendation; a complete factual answer requires no transition.
 
 ---
 
@@ -141,6 +124,6 @@ _(Note: `status: "pass"` indicates that the advisory inquiry has been answered a
 - **To `daw-design`:** For architectural changes, new components, or multi-module contracts.
 - **To `daw-plan`:** When architecture is settled and requires task decomposition.
 - **To `daw-debug`:** For investigating reproducible bugs or failures.
-- **To Orchestrator:** Return structured handoff payload; orchestrator executes downstream dispatch.
+- **To Orchestrator:** For an actual parent handoff, return the canonical structured payload; only the orchestrator dispatches downstream work.
 
 _Reference Link:_ See [Shared Routing Contract](../../references/routing.md) and [Parent Specification](../../SKILL.md).

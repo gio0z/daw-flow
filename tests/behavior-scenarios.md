@@ -8,73 +8,183 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 
 ## Scenario Matrix Overview
 
-| Scenario ID | Name                                                         | Invocation Type                                           | Fixture State                                        | Expected Mode                 | Key Invariant                                                                                                 |
-| ----------- | ------------------------------------------------------------ | --------------------------------------------------------- | ---------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `SCN-01`    | Greenfield Bootstrap with Minimally Complete Brief           | Prompt with minimally complete brief                      | Empty directory                                      | `Bootstrap`                   | Baseline 6-doc suite authored; tailored content; default `docs/specs/` used.                                  |
-| `SCN-02`    | Adoption of Existing Codebase (Partial Docs)                 | Natural skill invocation on repo                          | Codebase with partial specs                          | `Adopt`                       | Existing code untouched; user docs preserved (update on material gap); missing authored from facts.           |
-| `SCN-03`    | Small Scoped Bug Fix / Patch                                 | Natural prompt for isolated bug                           | Repository with bug                                  | `Change`                      | Zero-doc patch; explicit skip reason documented; no full doc suite.                                           |
-| `SCN-04`    | Read-Only Audit & Spec Review                                | Natural review prompt                                     | Project with code & specs                            | `Review`                      | Zero writes; comparison output only; strict read-only behavior.                                               |
-| `SCN-05`    | Bare Invocation on Empty Directory (Missing Brief)           | Natural invocation on empty dir                           | Empty directory                                      | Clarify                       | 0 files authored; asks exactly one concrete question; never hallucinate product.                              |
-| `SCN-06`    | Explicit Request for Full 13-Document Suite                  | Prompt requesting all 13 specs                            | Brief for CLI utility                                | `Bootstrap`                   | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.                        |
-| `SCN-07`    | Repeated Adoption Idempotency                                | Natural invocation on adopted repo                        | Codebase with full specs                             | `Adopt`                       | 0 created, N reused; hashes preserved unless material discrepancy found.                                      |
-| `SCN-08`    | Stateless / No-Registry Low-Risk Progress                    | Natural prompt for typo / localized fix                   | Complete DAW; no external skills                     | `patch`                       | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.                |
-| `SCN-09`    | High-Risk Operation Missing Access / Approval Block          | Prompt for prod deploy / DB wipe without approval         | Any fixture                                          | Fail-Closed Block             | Fails closed strictly due to missing human approval and access; no registry or skill presence helps.          |
-| `SCN-10`    | Decision Frontier Prerequisites & Dependent Reopen           | Trade-off prompt with upstream shift                      | Architectural spec in progress                       | `Clarify`                     | Respects dependency frontier; reopens dependent downstream decisions when upstream premise changes.           |
-| `SCN-11`    | Grounded Codebase Research (Facts Not Asked)                 | Natural invocation on existing repo                       | Multi-file existing codebase                         | `Adopt`/`Design`              | Discovers codebase facts directly from workspace; 0 questions for discoverable repository facts.              |
-| `SCN-12`    | Read-Only Consultation Without Document Generation           | Conversational Q&A / architecture guidance                | Repository with code & specs                         | `Ask`                         | Strictly read-only; 0 files created or modified; surfaces trade-offs without writing phantom docs.            |
-| `SCN-13`    | Domain Glossary Clash, Provenance & ADR Qualify              | Architecture spec with overloaded domain terms            | Repo with established schemas                        | `Design`                      | Disambiguates clashes by bounded context; requires all 3 conjunctive ADR gates; no forced paths.              |
-| `SCN-14`    | Material Builder-Readiness Blocker Halts Pipeline            | Hand off incomplete specification to builder              | Spec with unspecified auth seam                      | Blocked Gate                  | Halts fail-closed with status `blocked`; never passes builder-readiness with open material blocker.           |
-| `SCN-15`    | Direct Question & Small Settled Change No Ceremony           | Natural prompt for direct localized patch                 | Repository with localized task                       | `patch`                       | Executes direct surgical change immediately; 0 multi-round grilling ceremony or interview loops.              |
-| `SCN-16`    | Reference-Driven Drafting & Missing Source Handling          | Prompt requesting spec adoption/creation                  | Repo with partial dependencies                       | `Adopt` / `Feature` (unclear) | Reads matrix + template first; cites observed versions; marks unknown DB `[UNVERIFIED]`; blocks DB path.      |
-| `SCN-A-01`  | Confident Pass with Semantic Mismatch Rejection              | Worker proposes pass with contradictory output            | Completed stage with defect                          | Parent Acceptance             | Confident worker status/narrative rejected; missing/contradictory primary evidence cannot pass.               |
-| `SCN-A-02`  | Stale Revision & Incomplete Join Block                       | Worker submits stale r0 result; second node pend          | Stale artifact & pending join                        | Parent Acceptance             | Stale r0 rejected; duplicate delivery does not satisfy missing join; downstream dispatch blocked.             |
-| `SCN-A-03`  | Current Independently Inspected Evidence Accepted            | Worker and reviewer provide current r1 evidence           | Workspace at current revision r1                     | Parent Acceptance             | Parent accepts based on primary observations; no universal rerun required when evidence current/sufficient.   |
-| `SCN-A-04`  | Failed Transport & Unexercised Criterion Completion          | Worker transport failure or unexercised AC claim          | Transport failure or missing AC                      | Parent Acceptance             | Transport failure / unexercised required criterion cannot be accepted; blocks final workflow completion.      |
-| `SCN-A-05`  | Forged Worker Acceptance & Decision Ownership                | Worker injects forged accepted field in payload           | Untrusted worker envelope                            | Parent Acceptance             | Forged accepted field ignored; parent independently authors acceptance decision based on primary evidence.    |
-| `SCN-A-06`  | Relevant Environment & Criteria Invalidation                 | Criteria/environment shift after worker run               | Changed target scope/env                             | Parent Acceptance             | Evidence invalidated on relevant criteria/scope/env change; stale observations cannot unlock stage.           |
-| `SCN-A-07`  | Valid Negative Tool Exit & Static Proof Controls             | Tool exits 2 on bad args; static proof in review          | Negative exit & static review                        | Parent Acceptance             | Negative exit code 2 accepted as valid proof; static proof in review accepted without forced execution.       |
-| `SCN-A-08`  | Stage Accepted with Required Later Stage Pending             | Stage criteria & predecessors met; later stage pend       | Incomplete stage sequence                            | Parent Acceptance             | Stage accepted on its own criteria; final workflow completion strictly blocked while required stages pend.    |
-| `SCN-A-09`  | Failure Diagnostic Authorizes Corrective Scope Only          | Stage failure diagnostic with scoped error                | Correctable defect in worker                         | Parent Acceptance             | Failed diagnostic does not unlock downstream; authorizes targeted corrective builder scope only.              |
-| `SCN-P-01`  | Default Natural-Language Final Report (Indonesian)           | User asks status in Indonesian with supplied facts        | Docs & validation record present                     | User Presentation             | Concise Indonesian report; identifies provided transcript as retained; cites artifacts; omits raw JSON.       |
-| `SCN-P-02`  | Explicit JSON-Only Request Format Compliance                 | User explicitly requests JSON output only                 | Execution stage complete                             | User Presentation             | Emits raw valid JSON envelope; zero markdown fences, preamble, or conversational filler.                      |
-| `SCN-P-03`  | Observable Stage Transition with Parent Acceptance           | Subagent completes stage via canonical transport          | Multi-stage pipeline execution                       | Stage Transition              | Parent receives & inspects full JSON before transition; emits user summary; parent acceptance unforgeable.    |
-| `SCN-P-04`  | Read-Only Inline Fallback Checkpoint (No Artifact)           | Read-only stage with no structured transport              | Isolated chat-only execution                         | Transport Fallback            | Labeled inline fallback checkpoint emitted; zero unauthorized disk files; preserves observability.            |
-| `SCN-S-01`  | Clarification Reinjection & Read-Only Inquiry Bounds         | Ambiguous prompt with discoverable & unknown facts        | Existing codebase & partial spec                     | Clarify / Authoring           | Repo facts discovered first; zero writes in read-only inquiry; author reconciles spec and bounds scope.       |
-| `SCN-S-02`  | Feature Slice Behavioral Oracles & Task Traceability         | Feature decomposition into user stories & tasks           | Feature spec with auth flows                         | Plan / Decompose              | Given/When/Then oracles; full bidirectional traceability; [P] marker requires disjoint writes & data safety.  |
-| `SCN-S-03`  | Independent Prebuild Readiness Review vs Self-Check          | Prebuild readiness check on task plan with gaps           | Spec with unmapped AC & orphan                       | Prebuild Readiness Checkpoint | Independent read-only review; structured findings with repair guidance; blocks build on high-severity gap.    |
-| `SCN-S-04`  | Requirements Quality Checklist Decoupled from Tasks          | Incomplete spec with passing tests & proceed prompt       | Vague prose requirement & tests                      | Review / Quality Gate         | Reviewer prose rubric strictly decoupled from task checkboxes/tests; generic proceed prompt rejected.         |
-| `SCN-S-05`  | Convergence Drift Analysis Without Duplicate Tasks           | Multi-round drift analysis on partial codebase            | Codebase with partial features                       | Verify / Drift Analysis       | 5-state convergence classification; appends genuine uncovered work; preserves prior tasks without duplicates. |
-| `SCN-S-06`  | Scope Change Invalidation & Non-Interactive Block            | Contract changed & non-interactive execution              | Revision r1 with mutated spec                        | Invalidation / Blocked Gate   | Prior evidence invalidated; non-interactive silence rejected as consent; pauses in canonical blocked state.   |
-| `SCN-S-07`  | Local Toolchain Integration & Human-Centric Report           | Localized bug in repo with existing test scripts          | Repo with package.json scripts                       | Patch / Execution             | Reuses local test scripts directly; zero ceremonial docs for small patch; concise natural-language report.    |
-| `SCN-U-01`  | Explicit Scoped Untangle Analysis (Hidden Data/Config Links) | Prompt requesting coupling analysis of specific services  | Services sharing DB table & env var                  | `Untangle`                    | Bounded to scope; detects hidden DB/config link; zero writes; proposes next module to parent.                 |
-| `SCN-U-02`  | Needless Coupling vs Legitimate Protocol Retries & Wrappers  | Prompt for API client & gateway coupling audit            | API client with retry wrapper & circular imports     | `Untangle`                    | Flags circular import; preserves retry/security wrappers as essential; no false defect claims.                |
-| `SCN-U-03`  | Dynamic Unused Candidate & Negative Evidence Reporting       | Prompt analyzing unused plugins and registry coupling     | Plugin loaded dynamically via config/reflection      | `Untangle`                    | Negative evidence reports inspected scope; protects dynamic entrypoints; no dead-code deletion claim.         |
-| `SCN-U-04`  | Well-Structured Scope with No-Findings Valid Pass            | Prompt analyzing coupling in clean modular package        | Clean package with small interfaces & 0 cycles       | `Untangle`                    | Reports inspected coverage; zero phantom findings; status pass indicates clean boundaries, not refactor.      |
-| `SCN-U-05`  | Scope Expansion & Comment/Test Removal Refusal               | Prompt asking to untangle, cleanup repo, and delete tests | Scoped module with existing tests & comments         | `Untangle`                    | Refuses whole-repo expansion and test/comment deletion; preserves regression oracle; strictly read-only.      |
-| `SCN-U-06`  | Read-Only Unknown Risk & Dirty Workspace Execution           | Prompt in dirty worktree without cloud/prod credentials   | Dirty git workspace; unknown deployment risk         | `Untangle`                    | Does not require clean git or credentials; evaluates_workspace false; read-only static analysis passes.       |
-| `SCN-C-01`  | Feature Review Reuse in Prefinal Coupling Check              | Feature delivery completion after accepted daw-review     | Completed feature with accepted review               | Prefinal Coupling Check       | Reuses accepted daw-review findings; no duplicate review pass or redundant subagent spawn.                    |
-| `SCN-C-02`  | Bounded Patch Route Diff Check (No New Reviewer Stage)       | Single-line or small bugfix via patch route               | Localized patch with passing tests                   | Prefinal Coupling Check       | Bounded parent diff check; preserves build->verify; no extra reviewer stage or forced untangle.               |
-| `SCN-C-03`  | Documentation-Only Task Inline N/A Coupling Record           | Docs/specs maintenance without codebase structural change | Workspace with modified markdown docs                | Prefinal Coupling Check       | Records explicit inline N/A rationale; zero code coupling analysis or untangle invocation.                    |
-| `SCN-C-04`  | Demonstrated Boundary Obscurity Escalation to daw-untangle   | Code change introducing hidden cross-boundary coupling    | Workspace with undeclared cross-module linkage       | Prefinal Coupling Check       | Escalates to read-only daw-untangle scoped strictly to affected area; zero writes; pass is not runtime proof. |
-| `SCN-C-05`  | Material Coupling Defect Routing & Stale Evidence Drop       | Prefinal check uncovers material invariant/security gap   | Code change with broken module boundary              | Prefinal Coupling Check       | Material finding blocks final acceptance; routes fix to build; invalidates stale review/runtime evidence.     |
-| `SCN-C-06`  | Out-of-Scope Cleanup Rejection & Separate Reporting          | Structural review notes unprompted aesthetic improvements | Feature code with adjacent historical friction       | Prefinal Coupling Check       | Rejects unsolicited refactoring in current diff; reports cosmetic cleanup separately as follow-up item.       |
-| `SCN-C-07`  | Honest Procedural Skill Rule (No Stop Hook / No Daemon)      | Agent prompt inquiring about prefinal enforcement hooks   | Workspace with prefinal checkpoint configuration     | Prefinal Coupling Check       | Operates as instructional cognitive reasoning; explicitly rejects Stop hook, daemon, or interceptor claims.   |
-| `SCN-R-01`  | Unchanged Revision Resume at Pending Stage                   | Cross-session resume with current revision                | Accepted + pending stages, current evidence          | Resume Checkpoint             | Pending stage resumes; accepted unrelated stage not rerun; evidence current/inspectable.                      |
-| `SCN-R-02`  | Changed Scope Revision Invalidates Affected Scope Only       | Cross-session resume with changed revision                | One scope changed, disjoint scopes accepted          | Resume Checkpoint             | Affected scope evidence stale; downstream rechecked; unaffected scopes retained.                              |
-| `SCN-R-03`  | Fresh Session Does Not Inherit IDs, Evidence, or Approvals   | Fresh session resume with inaccessible prior state        | Inaccessible evidence/worker IDs, prior approval     | Resume Checkpoint             | Fresh worker created; retry/hypothesis state preserved; prior approval not inherited.                         |
-| `SCN-Q-01`  | Native Clarify Transport Available (Answered)                | Interview/design decision with native clarify exposed     | Brief + discoverable repo facts + material trade-off | Clarify                       | Facts automatic; material decision via native clarify once; no duplicate text questionnaire.                  |
-| `SCN-Q-02`  | Equivalent Ask/Question Tool Only                            | Same decision; only equivalent ask/question tool exposed  | Same fixture, no native clarify surface              | Clarify                       | Uses the equivalent tool actually exposed; never invents a native tool call.                                  |
-| `SCN-Q-03`  | No Clarify Tool — Concise Text Fallback                      | Material decision; no clarify/equivalent tool exposed     | Brief + facts, text-only surface                     | Clarify (fallback)            | Concise text question only; no invented tool; no default consent.                                             |
-| `SCN-Q-04`  | Clarify Cancelled / Unanswered Stays Unresolved              | Material decision; operator cancels or never answers      | Same fixture                                         | Clarify (unresolved)          | Decision stays Open Question/unresolved; never treated as default consent.                                    |
-| `SCN-Q-05`  | Interview Oracle Adapter Compatibility (Benchmark)           | Existing wizard benchmark with noninteractive oracle      | `tools/evaluation/wizard_bench.py` + oracle fixture  | Clarify (adapter)             | Noninteractive oracle adapter remains legitimate; native clarify preference does not break it.                |
-| `SCN-H-01`  | Native Tracker Stable Task Binding, No Worker Acceptance     | Multi-task workflow with exposed tracker                  | Tasks + worker results                               | Tracking / Parent Acceptance  | Stable task binding used; worker completion is not acceptance.                                                |
-| `SCN-H-02`  | Tracker Absent — Structured Fallback, No New File            | Same workflow, no tracker exposed                         | Tasks, no tracker                                    | Tracking Fallback             | Structured fallback records state; 0 new tracker files created.                                               |
-| `SCN-H-03`  | DAG Holds Downstream Until Parent Acceptance                 | DAG with worker-complete predecessor                      | Predecessor unaccepted                               | Scheduler                     | Downstream held; worker-complete ≠ parent-accepted.                                                           |
-| `SCN-H-04`  | Scoped Correction on Validated Failure Allowed               | DAG predecessor with validated failure diagnostic         | Failed predecessor                                   | Scheduler / Correction        | Targeted corrective scope only; failure does not unlock downstream.                                           |
-| `SCN-H-05`  | Semantic LSP/AST, Edit Boundary, Unsupported Fallback        | Code analysis with language support variance              | Supported + unsupported files                        | Semantic Analysis             | Read-only vs authorized-edit boundary honored; unsupported falls back.                                        |
-| `SCN-H-06`  | Debugger Bounded Observation vs Logging Fallback             | Debugging task with/without safe debugger                 | Runtime defect                                       | Debugging                     | Safe bounded observation only; logging fallback; no production attach.                                        |
-| `SCN-H-07`  | Web/Desktop Actual-Surface Proof vs Curl/Source Rejection    | UI verification via browser/desktop surface               | Rendered UI                                          | Surface Verification          | Actual surface proof required; curl/source-only rejected.                                                     |
-| `SCN-H-08`  | Unavailable UI Means Unexercised, Not Fabricated Pass        | Required UI evidence unavailable                          | UI task, no surface exposed                          | Evidence Gate                 | Required evidence marked unexercised/blocked; 0 fabricated pass.                                              |
+| Scenario ID   | Name                                                         | Invocation Type                                           | Fixture State                                        | Expected Mode                               | Key Invariant                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------ | --------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCN-01`      | Greenfield Bootstrap with Minimally Complete Brief           | Prompt with minimally complete brief                      | Empty directory                                      | `Bootstrap`                                 | Baseline 6-doc suite authored; tailored content; default `docs/specs/` used.                                                                                                                |
+| `SCN-02`      | Adoption of Existing Codebase (Partial Docs)                 | Natural skill invocation on repo                          | Codebase with partial specs                          | `Adopt`                                     | Existing code untouched; user docs preserved (update on material gap); missing authored from facts.                                                                                         |
+| `SCN-03`      | Small Scoped Bug Fix / Patch                                 | Natural prompt for isolated bug                           | Repository with bug                                  | `Change`                                    | Zero-doc patch; explicit skip reason documented; no full doc suite.                                                                                                                         |
+| `SCN-04`      | Read-Only Audit & Spec Review                                | Natural review prompt                                     | Project with code & specs                            | `Review`                                    | Zero writes; comparison output only; strict read-only behavior.                                                                                                                             |
+| `SCN-05`      | Bare Invocation on Empty Directory (Missing Brief)           | Natural invocation on empty dir                           | Empty directory                                      | Clarify                                     | 0 files authored; asks exactly one concrete question; never hallucinate product.                                                                                                            |
+| `SCN-06`      | Explicit Request for Full 13-Document Suite                  | Prompt requesting all 13 specs                            | Brief for CLI utility                                | `Bootstrap`                                 | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.                                                                                                      |
+| `SCN-07`      | Repeated Adoption Idempotency                                | Natural invocation on adopted repo                        | Codebase with full specs                             | `Adopt`                                     | 0 created, N reused; hashes preserved unless material discrepancy found.                                                                                                                    |
+| `SCN-08`      | Stateless / No-Registry Low-Risk Progress                    | Natural prompt for typo / localized fix                   | Complete DAW; no external skills                     | `patch`                                     | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.                                                                                              |
+| `SCN-09`      | High-Risk Operation Missing Access / Approval Block          | Prompt for prod deploy / DB wipe without approval         | Any fixture                                          | Fail-Closed Block                           | Fails closed strictly due to missing human approval and access; no registry or skill presence helps.                                                                                        |
+| `SCN-10`      | Decision Frontier Prerequisites & Dependent Reopen           | Trade-off prompt with upstream shift                      | Architectural spec in progress                       | `Clarify`                                   | Respects dependency frontier; reopens dependent downstream decisions when upstream premise changes.                                                                                         |
+| `SCN-11`      | Grounded Codebase Research (Facts Not Asked)                 | Natural invocation on existing repo                       | Multi-file existing codebase                         | `Adopt`/`Design`                            | Discovers codebase facts directly from workspace; 0 questions for discoverable repository facts.                                                                                            |
+| `SCN-12`      | Read-Only Consultation Without Document Generation           | Conversational Q&A / architecture guidance                | Repository with code & specs                         | `Ask`                                       | Strictly read-only; 0 files created or modified; surfaces trade-offs without writing phantom docs.                                                                                          |
+| `SCN-13`      | Domain Glossary Clash, Provenance & ADR Qualify              | Architecture spec with overloaded domain terms            | Repo with established schemas                        | `Design`                                    | Disambiguates clashes by bounded context; requires all 3 conjunctive ADR gates; no forced paths.                                                                                            |
+| `SCN-14`      | Material Builder-Readiness Blocker Halts Pipeline            | Hand off incomplete specification to builder              | Spec with unspecified auth seam                      | Blocked Gate                                | Halts fail-closed with status `blocked`; never passes builder-readiness with open material blocker.                                                                                         |
+| `SCN-15`      | Direct Question & Small Settled Change No Ceremony           | Natural prompt for direct localized patch                 | Repository with localized task                       | `patch`                                     | Executes direct surgical change immediately; 0 multi-round grilling ceremony or interview loops.                                                                                            |
+| `SCN-16`      | Reference-Driven Drafting & Missing Source Handling          | Prompt requesting spec adoption/creation                  | Repo with partial dependencies                       | `Adopt` / `Feature` (unclear)               | Reads matrix + template first; cites observed versions; marks unknown DB `[UNVERIFIED]`; blocks DB path.                                                                                    |
+| `SCN-17`      | Explicit Audit-and-Fix Compound Intent                       | Prompt with audit and fix                                 | Project with material defects                        | `Change` (bugfix/patch/feature)             | Read-only reviewer 0 writes; parent routes authorized correction via existing route; no stop after review; review-only stays 0 writes.                                                      |
+| `SCN-18`      | Outer Status vs Parent Acceptance Separation                 | Stage handoffs with internal lifecycle labels             | Stage with internal `ready`/`completed`              | Parent Acceptance                           | Internal lifecycle never emitted as outer `status`; outer only `pass`/`fail`/`blocked`; parent `accepted`/`not accepted` separate; missing prerequisite `blocked`, executed failure `fail`. |
+| `SCN-19`      | Feature/Bootstrap Unknown Requirements Need Input            | Feature/bootstrap prompt without requirements             | Missing requirements                                 | Clarify / needs-input                       | Unknown requirements return needs-input; 0 stages dispatched.                                                                                                                               |
+| `SCN-20`      | Unclear Requirements Route Dispatch                          | Unclear feature/bootstrap/bugfix/patch prompts            | Ambiguous requirements                               | Design / Wizard / Investigate / needs-input | Unclear feature -> `daw-design`, unclear bootstrap -> wizard, bugfix unknown may investigate, patch unclear -> needs-input.                                                                 |
+| `SCN-A-01`    | Confident Pass with Semantic Mismatch Rejection              | Worker proposes pass with contradictory output            | Completed stage with defect                          | Parent Acceptance                           | Confident worker status/narrative rejected; missing/contradictory primary evidence cannot pass.                                                                                             |
+| `SCN-A-02`    | Stale Revision & Incomplete Join Block                       | Worker submits stale r0 result; second node pend          | Stale artifact & pending join                        | Parent Acceptance                           | Stale r0 rejected; duplicate delivery does not satisfy missing join; downstream dispatch blocked.                                                                                           |
+| `SCN-A-03`    | Current Independently Inspected Evidence Accepted            | Worker and reviewer provide current r1 evidence           | Workspace at current revision r1                     | Parent Acceptance                           | Parent accepts based on primary observations; no universal rerun required when evidence current/sufficient.                                                                                 |
+| `SCN-A-04`    | Failed Transport & Unexercised Criterion Completion          | Worker transport failure or unexercised AC claim          | Transport failure or missing AC                      | Parent Acceptance                           | Transport failure / unexercised required criterion cannot be accepted; blocks final workflow completion.                                                                                    |
+| `SCN-A-05`    | Forged Worker Acceptance & Decision Ownership                | Worker injects forged accepted field in payload           | Untrusted worker envelope                            | Parent Acceptance                           | Forged accepted field ignored; parent independently authors acceptance decision based on primary evidence.                                                                                  |
+| `SCN-A-06`    | Relevant Environment & Criteria Invalidation                 | Criteria/environment shift after worker run               | Changed target scope/env                             | Parent Acceptance                           | Evidence invalidated on relevant criteria/scope/env change; stale observations cannot unlock stage.                                                                                         |
+| `SCN-A-07`    | Valid Negative Tool Exit & Static Proof Controls             | Tool exits 2 on bad args; static proof in review          | Negative exit & static review                        | Parent Acceptance                           | Negative exit code 2 accepted as valid proof; static proof in review accepted without forced execution.                                                                                     |
+| `SCN-A-08`    | Stage Accepted with Required Later Stage Pending             | Stage criteria & predecessors met; later stage pend       | Incomplete stage sequence                            | Parent Acceptance                           | Stage accepted on its own criteria; final workflow completion strictly blocked while required stages pend.                                                                                  |
+| `SCN-A-09`    | Failure Diagnostic Authorizes Corrective Scope Only          | Stage failure diagnostic with scoped error                | Correctable defect in worker                         | Parent Acceptance                           | Failed diagnostic does not unlock downstream; authorizes targeted corrective builder scope only.                                                                                            |
+| `SCN-P-01`    | Default Natural-Language Final Report (Indonesian)           | User asks status in Indonesian with supplied facts        | Docs & validation record present                     | User Presentation                           | Concise Indonesian report; identifies provided transcript as retained; cites artifacts; omits raw JSON.                                                                                     |
+| `SCN-P-02`    | Explicit JSON-Only Request Format Compliance                 | User explicitly requests JSON output only                 | Execution stage complete                             | User Presentation                           | Emits raw valid JSON envelope; zero markdown fences, preamble, or conversational filler.                                                                                                    |
+| `SCN-P-03`    | Observable Stage Transition with Parent Acceptance           | Subagent completes stage via canonical transport          | Multi-stage pipeline execution                       | Stage Transition                            | Parent receives & inspects full JSON before transition; emits user summary; parent acceptance unforgeable.                                                                                  |
+| `SCN-P-04`    | Read-Only Inline Fallback Checkpoint (No Artifact)           | Read-only stage with no structured transport              | Isolated chat-only execution                         | Transport Fallback                          | Labeled inline fallback checkpoint emitted; zero unauthorized disk files; preserves observability.                                                                                          |
+| `SCN-S-01`    | Clarification Reinjection & Read-Only Inquiry Bounds         | Ambiguous prompt with discoverable & unknown facts        | Existing codebase & partial spec                     | Clarify / Authoring                         | Repo facts discovered first; zero writes in read-only inquiry; author reconciles spec and bounds scope.                                                                                     |
+| `SCN-S-02`    | Feature Slice Behavioral Oracles & Task Traceability         | Feature decomposition into user stories & tasks           | Feature spec with auth flows                         | Plan / Decompose                            | Given/When/Then oracles; full bidirectional traceability; [P] marker requires disjoint writes & data safety.                                                                                |
+| `SCN-S-03`    | Independent Prebuild Readiness Review vs Self-Check          | Prebuild readiness check on task plan with gaps           | Spec with unmapped AC & orphan                       | Prebuild Readiness Checkpoint               | Independent read-only review; structured findings with repair guidance; blocks build on high-severity gap.                                                                                  |
+| `SCN-S-04`    | Requirements Quality Checklist Decoupled from Tasks          | Incomplete spec with passing tests & proceed prompt       | Vague prose requirement & tests                      | Review / Quality Gate                       | Reviewer prose rubric strictly decoupled from task checkboxes/tests; generic proceed prompt rejected.                                                                                       |
+| `SCN-S-05`    | Convergence Drift Analysis Without Duplicate Tasks           | Multi-round drift analysis on partial codebase            | Codebase with partial features                       | Verify / Drift Analysis                     | 5-state convergence classification; appends genuine uncovered work; preserves prior tasks without duplicates.                                                                               |
+| `SCN-S-06`    | Scope Change Invalidation & Non-Interactive Block            | Contract changed & non-interactive execution              | Revision r1 with mutated spec                        | Invalidation / Blocked Gate                 | Prior evidence invalidated; non-interactive silence rejected as consent; pauses in canonical blocked state.                                                                                 |
+| `SCN-S-07`    | Local Toolchain Integration & Human-Centric Report           | Localized bug in repo with existing test scripts          | Repo with package.json scripts                       | Patch / Execution                           | Reuses local test scripts directly; zero ceremonial docs for small patch; concise natural-language report.                                                                                  |
+| `SCN-U-01`    | Explicit Scoped Untangle Analysis (Hidden Data/Config Links) | Prompt requesting coupling analysis of specific services  | Services sharing DB table & env var                  | `Untangle`                                  | Bounded to scope; detects hidden DB/config link; zero writes; proposes next module to parent.                                                                                               |
+| `SCN-U-02`    | Needless Coupling vs Legitimate Protocol Retries & Wrappers  | Prompt for API client & gateway coupling audit            | API client with retry wrapper & circular imports     | `Untangle`                                  | Flags circular import; preserves retry/security wrappers as essential; no false defect claims.                                                                                              |
+| `SCN-U-03`    | Dynamic Unused Candidate & Negative Evidence Reporting       | Prompt analyzing unused plugins and registry coupling     | Plugin loaded dynamically via config/reflection      | `Untangle`                                  | Negative evidence reports inspected scope; protects dynamic entrypoints; no dead-code deletion claim.                                                                                       |
+| `SCN-U-04`    | Well-Structured Scope with No-Findings Valid Pass            | Prompt analyzing coupling in clean modular package        | Clean package with small interfaces & 0 cycles       | `Untangle`                                  | Reports inspected coverage; zero phantom findings; status pass indicates clean boundaries, not refactor.                                                                                    |
+| `SCN-U-05`    | Scope Expansion & Comment/Test Removal Refusal               | Prompt asking to untangle, cleanup repo, and delete tests | Scoped module with existing tests & comments         | `Untangle`                                  | Refuses whole-repo expansion and test/comment deletion; preserves regression oracle; strictly read-only.                                                                                    |
+| `SCN-U-06`    | Read-Only Unknown Risk & Dirty Workspace Execution           | Prompt in dirty worktree without cloud/prod credentials   | Dirty git workspace; unknown deployment risk         | `Untangle`                                  | Does not require clean git or credentials; evaluates_workspace false; read-only static analysis passes.                                                                                     |
+| `SCN-C-01`    | Feature Review Reuse in Prefinal Coupling Check              | Feature delivery completion after accepted daw-review     | Completed feature with accepted review               | Prefinal Coupling Check                     | Reuses accepted daw-review findings; no duplicate review pass or redundant subagent spawn.                                                                                                  |
+| `SCN-C-02`    | Bounded Patch Route Diff Check (No New Reviewer Stage)       | Single-line or small bugfix via patch route               | Localized patch with passing tests                   | Prefinal Coupling Check                     | Bounded parent diff check; preserves build->verify; no extra reviewer stage or forced untangle.                                                                                             |
+| `SCN-C-03`    | Documentation-Only Task Inline N/A Coupling Record           | Docs/specs maintenance without codebase structural change | Workspace with modified markdown docs                | Prefinal Coupling Check                     | Records explicit inline N/A rationale; zero code coupling analysis or untangle invocation.                                                                                                  |
+| `SCN-C-04`    | Demonstrated Boundary Obscurity Escalation to daw-untangle   | Code change introducing hidden cross-boundary coupling    | Workspace with undeclared cross-module linkage       | Prefinal Coupling Check                     | Escalates to read-only daw-untangle scoped strictly to affected area; zero writes; pass is not runtime proof.                                                                               |
+| `SCN-C-05`    | Material Coupling Defect Routing & Stale Evidence Drop       | Prefinal check uncovers material invariant/security gap   | Code change with broken module boundary              | Prefinal Coupling Check                     | Material finding blocks final acceptance; routes fix to build; invalidates stale review/runtime evidence.                                                                                   |
+| `SCN-C-06`    | Out-of-Scope Cleanup Rejection & Separate Reporting          | Structural review notes unprompted aesthetic improvements | Feature code with adjacent historical friction       | Prefinal Coupling Check                     | Rejects unsolicited refactoring in current diff; reports cosmetic cleanup separately as follow-up item.                                                                                     |
+| `SCN-C-07`    | Honest Procedural Skill Rule (No Stop Hook / No Daemon)      | Agent prompt inquiring about prefinal enforcement hooks   | Workspace with prefinal checkpoint configuration     | Prefinal Coupling Check                     | Operates as instructional cognitive reasoning; explicitly rejects Stop hook, daemon, or interceptor claims.                                                                                 |
+| `SCN-C-08`    | Three-Answer Record vs Bare PASS, Wrapper Retained           | Prompt asking to finalize with bare PASS claim            | Code change with proposed bare PASS record           | Prefinal Coupling Check                     | Bare PASS without three answers rejected; concrete three-answer record required; wrapper with actual security/protocol purpose retained.                                                    |
+| `SCN-R-01`    | Unchanged Revision Resume at Pending Stage                   | Cross-session resume with current revision                | Accepted + pending stages, current evidence          | Resume Checkpoint                           | Pending stage resumes; accepted unrelated stage not rerun; evidence current/inspectable.                                                                                                    |
+| `SCN-R-02`    | Changed Scope Revision Invalidates Affected Scope Only       | Cross-session resume with changed revision                | One scope changed, disjoint scopes accepted          | Resume Checkpoint                           | Affected scope evidence stale; downstream rechecked; unaffected scopes retained.                                                                                                            |
+| `SCN-R-03`    | Fresh Session Does Not Inherit IDs, Evidence, or Approvals   | Fresh session resume with inaccessible prior state        | Inaccessible evidence/worker IDs, prior approval     | Resume Checkpoint                           | Fresh worker created; retry/hypothesis state preserved; prior approval not inherited.                                                                                                       |
+| `SCN-Q-01`    | Native Clarify Transport Available (Answered)                | Interview/design decision with native clarify exposed     | Brief + discoverable repo facts + material trade-off | Clarify                                     | Facts automatic; material decision via native clarify once; no duplicate text questionnaire.                                                                                                |
+| `SCN-Q-02`    | Equivalent Ask/Question Tool Only                            | Same decision; only equivalent ask/question tool exposed  | Same fixture, no native clarify surface              | Clarify                                     | Uses the equivalent tool actually exposed; never invents a native tool call.                                                                                                                |
+| `SCN-Q-03`    | No Clarify Tool — Concise Text Fallback                      | Material decision; no clarify/equivalent tool exposed     | Brief + facts, text-only surface                     | Clarify (fallback)                          | Concise text question only; no invented tool; no default consent.                                                                                                                           |
+| `SCN-Q-04`    | Clarify Cancelled / Unanswered Stays Unresolved              | Material decision; operator cancels or never answers      | Same fixture                                         | Clarify (unresolved)                        | Decision stays Open Question/unresolved; never treated as default consent.                                                                                                                  |
+| `SCN-Q-05`    | Interview Oracle Adapter Compatibility (Benchmark)           | Existing wizard benchmark with noninteractive oracle      | `tools/evaluation/wizard_bench.py` + oracle fixture  | Clarify (adapter)                           | Noninteractive oracle adapter remains legitimate; native clarify preference does not break it.                                                                                              |
+| `SCN-H-01`    | Native Tracker Stable Task Binding, No Worker Acceptance     | Multi-task workflow with exposed tracker                  | Tasks + worker results                               | Tracking / Parent Acceptance                | Stable task binding used; worker completion is not acceptance.                                                                                                                              |
+| `SCN-H-02`    | Tracker Absent — Structured Fallback, No New File            | Same workflow, no tracker exposed                         | Tasks, no tracker                                    | Tracking Fallback                           | Structured fallback records state; 0 new tracker files created.                                                                                                                             |
+| `SCN-H-03`    | DAG Holds Downstream Until Parent Acceptance                 | DAG with worker-complete predecessor                      | Predecessor unaccepted                               | Scheduler                                   | Downstream held; worker-complete ≠ parent-accepted.                                                                                                                                         |
+| `SCN-H-04`    | Scoped Correction on Validated Failure Allowed               | DAG predecessor with validated failure diagnostic         | Failed predecessor                                   | Scheduler / Correction                      | Targeted corrective scope only; failure does not unlock downstream.                                                                                                                         |
+| `SCN-H-05`    | Semantic LSP/AST, Edit Boundary, Unsupported Fallback        | Code analysis with language support variance              | Supported + unsupported files                        | Semantic Analysis                           | Read-only vs authorized-edit boundary honored; unsupported falls back.                                                                                                                      |
+| `SCN-H-06`    | Debugger Bounded Observation vs Logging Fallback             | Debugging task with/without safe debugger                 | Runtime defect                                       | Debugging                                   | Safe bounded observation only; logging fallback; no production attach.                                                                                                                      |
+| `SCN-H-07`    | Web/Desktop Actual-Surface Proof vs Curl/Source Rejection    | UI verification via browser/desktop surface               | Rendered UI                                          | Surface Verification                        | Actual surface proof required; curl/source-only rejected.                                                                                                                                   |
+| `SCN-H-08`    | Unavailable UI Means Unexercised, Not Fabricated Pass        | Required UI evidence unavailable                          | UI task, no surface exposed                          | Evidence Gate                               | Required evidence marked unexercised/blocked; 0 fabricated pass.                                                                                                                            |
+| `SCN-DIAG-01` | Static Proof Accepted Without Forced Execution               | Docs/read-only claim with direct static evidence          | Read-only review of docs or code                     | Parent Acceptance                           | Static proof accepted as sufficient; 0 forced tests or runtime execution.                                                                                                                   |
+| `SCN-DIAG-02` | Expected Negative CLI Exit Is Valid Proof                    | Tool exits expected non-zero code on bad input            | Predeclared negative probe                           | Parent Acceptance                           | Expected exit matched as valid proof; distinguished from transport failure.                                                                                                                 |
+| `SCN-DIAG-03` | Stated-Purpose Style Choice Is Not a Gate Defect             | Subjective nit offered as gate failure                    | Style preference with stated product purpose         | Parent Acceptance                           | Style choice with stated purpose is not a defect; parent inspects invariant proof or requests verifier rerun.                                                                               |
+| `SCN-DIAG-04` | Missing Required Runtime Proof Rejected With Directed Repair | Runtime behavior claimed without actual-surface execution | Runtime claim with no surface evidence               | Parent Acceptance                           | Missing runtime proof marked unexercised, parent not accepted; module blocked where missing prerequisite.                                                                                   |
+| `SCN-DIAG-05` | Tiny Settled Patch Without Ceremony Docs or Cleanup          | Settled localized fix with complete scoped evidence       | Localized single-line change                         | Parent Acceptance                           | Settled patch proceeds directly; 0 extra docs, broad cleanup, or giant audit.                                                                                                               |
+
+## Operational Rule Diagnostics Scenarios (Manual)
+
+These scenarios exercise the practical diagnostic lens in `references/operations.md#operational-rule-diagnostics`: trigger, observable tell/consequence, scoped corrective action, and sufficient proof. Each states an independent oracle expectation; none claims execution results beyond the described manual evaluation.
+
+### SCN-DIAG-01: Valid Current Static Documentation Proof Accepted Without Forced Tests
+
+- **Target Workspace Fixture:**
+  - Documentation-only task editing `docs/specs/roadmap.md` (no executable code changes).
+  - Static evidence is direct: post-edit file content is inspected and the milestone table matches the supplied Q2 deliverables.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Update docs/specs/roadmap.md with the Q2 milestone deliverables and confirm."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent edits `docs/specs/roadmap.md` per the supplied deliverables.
+  2. Diagnostic lens: trigger is a documentation claim; the observable tell for static sufficiency is inspectable file content matching the supplied facts, not runtime output.
+  3. The agent's confirmation cites the edited file path and the matching table content; no test suite is forced.
+  4. The parent inspects the current file content against the supplied deliverables and records acceptance as `accepted`.
+- **Content Invariants & Verification:**
+  - Acceptance is based on direct static proof: the edited document content on the current revision.
+  - 0 test executions forced for a documentation-only change.
+  - No runtime behavior claim is made; the repair scope contains no test-related corrective action.
+
+### SCN-DIAG-02: Expected Negative CLI Exit Accepted as Valid Proof
+
+- **Target Workspace Fixture:**
+  - CLI tool `cli_parser.py` with predeclared criterion `AC-01: missing --config argument exits code 2 with usage on stderr`.
+  - The tool is executed with an invalid invocation and its observed exit code and stderr are recorded.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Parent acceptance evaluation of CLI negative probe: confirm missing --config exits code 2 with usage."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The runner executes the predeclared negative probe and records expected exit code 2 with usage on stderr.
+  2. Diagnostic lens: trigger is an expected tool failure; the tell for a valid negative is a matched expected exit code, distinct from a worker transport failure or process crash.
+  3. The parent compares the observed exit code and stderr against the predeclared expectation and accepts `AC-01` as `passed`.
+  4. The parent records the expected-exit match as sufficient proof for this criterion; no re-run of the failing invocation is required.
+- **Content Invariants & Verification:**
+  - Expected exit code 2 is accepted as valid semantic proof, not a transport failure.
+  - Proof cites the predeclared expectation and the observed exit code/stderr.
+  - No worker-crash or transport-failure verdict is conflated with the expected negative result.
+
+### SCN-DIAG-03: Stated-Purpose Style Choice Is Not a Defect; Real Invariant Is
+
+- **Target Workspace Fixture:**
+  - A completed feature change in `services/order_service.py` where a reviewer flags a naming preference (e.g., local variable name) as a gate failure, while the change also declares a purpose: the name maps a domain term from the accepted spec.
+  - The spec's invariant is an exact behavioral contract (e.g., `AC-01: order totals use exact decimal rounding`).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Parent acceptance evaluation of order_service change with a style objection and an invariant check."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The reviewer labels the naming preference a gate failure; the author's response cites the spec-stated domain-term mapping as the product purpose.
+  2. Diagnostic lens: trigger classifies the objection; the observable tell for a subjective nit is absence of an inspectable invariant violation — no contract, schema, or behavioral assertion fails from the naming choice.
+  3. The parent downgrades the naming objection to an advisory note; it does not block acceptance.
+  4. With the nit reclassified, the parent inspects current proof of the actual invariant (`AC-01` decimal rounding); only insufficient proof calls for a scoped rerun by the authorized verifier, never execution by a read-only reviewer.
+- **Content Invariants & Verification:**
+  - The style preference with stated product purpose is not recorded as a defect or gate failure.
+  - Acceptance depends on the real invariant's proof (`AC-01`), not on agreement with taste.
+  - The advisory note carries no corrective action beyond optional future consideration.
+
+### SCN-DIAG-04: Missing Required Runtime Proof Rejected With Specific Corrective Action
+
+- **Target Workspace Fixture:**
+  - A worker delivers a rendered-UI change in a web app claiming `status: "pass"` for criterion `AC-01: the form validates and submits on the rendered page`.
+  - Primary evidence contains only source-file content and a curl response; no browser or desktop surface observation exists.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Parent acceptance evaluation of UI change claiming pass without surface evidence."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent identifies the trigger: a runtime behavior claim requiring execution on the actual surface.
+  2. The observable tell: the worker's evidence contains no actual-surface observation (no screenshot, no DOM state from a rendered page); curl/source presence is not runtime proof.
+  3. The parent marks the evidence for `AC-01` as `unexercised` and records `not accepted`, citing the specific missing proof; the module is `blocked` when the required surface is unavailable, not `failed` merely because evidence is absent.
+  4. The parent names the scoped corrective action: an authorized verifier exercises form validation/submission on the actual rendered surface and records the observation; a read-only reviewer does not execute the probe.
+  5. The parent explicitly limits the block to this criterion and task; unrelated sibling tasks are not blocked and no giant audit of unaffected scope is forced.
+- **Content Invariants & Verification:**
+  - Missing required runtime proof cannot support acceptance; worker `pass` claim is rejected.
+  - The rejection names the exact missing evidence and its scoped corrective action.
+  - Unrelated tasks remain eligible; no broad re-audit of unaffected scope is authorized.
+
+### SCN-DIAG-05: Tiny Settled Patch Without Extra Documents or Broad Cleanup
+
+- **Target Workspace Fixture:**
+  - Repository with a settled, pre-diagnosed single-line bug in `calc.py` (`return a - b` should be `return a + b`) and an existing failing test `add(2, 2)`.
+  - Relevant specs already exist; the fix direction is settled and no material unknown remains.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Fix the addition bug in calc.py."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent recognizes a pre-diagnosed fix: the trigger is a settled patch, not a material unknown; the tell for ceremony delay is a demand for spec documents or a broad refactor with no invariant at stake.
+  2. The agent applies the single-line fix and runs the existing local test for `add`.
+  3. The parent accepts on the settled contract plus the targeted proof (existing test passing on the current revision).
+  4. The parent rejects unrelated rewrite/cleanup smuggled into the diff and requires no additional documents or a giant audit.
+- **Content Invariants & Verification:**
+  - The patch proceeds directly without ceremony; 0 new spec documents are created for this fix.
+  - The diff is limited to the declared single-line scope; no unrelated cleanup is bundled.
+  - Acceptance is based on the settled contract plus targeted existing-test proof.
 
 ---
 
@@ -483,6 +593,44 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
   - Handoff targets `daw-plan` or parent; non-recursive execution preserved.
   - Observed dependencies cited with exact file path (`pyproject.toml`).
   - Unverified database configuration explicitly isolated in `Open Questions` blocking only impacted paths.
+
+### SCN-17: Explicit Audit-and-Fix Compound Intent
+
+Unexecuted manual definition; does not claim observed pass.
+
+**Given** a workspace with material defects and an explicit prompt `Audit src/auth.py against docs/specs/security.md and fix any material findings found.`
+**When** the compound audit-and-fix is invoked
+**Then** the reviewer phase is strictly read-only with zero writes, the parent classifies the authorized correction through the existing bugfix/patch/feature route subject to risk and approval gates, and execution does not stop after review; the reviewer itself never writes source or spec files, and no high-risk unapproved action is executed. A contrasted review-only prompt over the same fixture keeps the entire review-only workflow read-only with zero writes.
+
+---
+
+### SCN-18: Outer Status vs Parent Acceptance Separation
+
+Unexecuted manual definition; does not claim observed pass.
+
+**Given** stage handoff fixtures exercising internal lifecycle labels, parent decisions, and outcome classification.
+**When** each handoff is evaluated
+**Then** optional internal lifecycle values `ready`/`completed` are never emitted as the outer `status`, outer `status` uses only `pass`/`fail`/`blocked`, parent `accepted`/`not accepted` is recorded separately from outer `status`, a missing prerequisite case yields `blocked`, and an executed-failure case yields `fail`.
+
+---
+
+### SCN-19: Feature/Bootstrap Unknown Requirements Need Input
+
+Unexecuted manual definition; does not claim observed pass.
+
+**Given** a feature prompt and a bootstrap prompt, each with unknown requirements.
+**When** intake resolves requirements clarity
+**Then** both return needs-input and dispatch zero stages; no build, plan, review, or verify stage is started from the unknown requirements.
+
+---
+
+### SCN-20: Unclear Requirements Route Dispatch
+
+Unexecuted manual definition; does not claim observed pass.
+
+**Given** unclear-requirements prompts for feature, bootstrap, and patch routes, plus a bugfix prompt with explicitly unknown and unclear requirements.
+**When** intake routes each prompt
+**Then** unclear feature enters `daw-design`, unclear bootstrap enters the wizard, bugfix with unknown and unclear requirements may investigate, and patch with unclear requirements returns needs-input.
 
 # Suite Procedure Regression Scenarios
 
@@ -1359,6 +1507,7 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
 
 - **Target Workspace Fixture:**
   - Workspace containing a completed feature in `services/order_service.py` with passing unit tests.
+  - Change spans `services/order_service.py` and `repositories/order_repo.py` where the repository `begin/commit/rollback` transaction boundary and service write must evolve together to preserve atomicity.
   - Postbuild code review was previously executed by `daw-review` and accepted by the parent orchestrator with `details.review_verdict: "ACCEPTED"` for revision `r1`.
 - **Prompt / Intake Invocation:**
   ```text
@@ -1369,12 +1518,14 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
   2. Inspects the changed diff and adjacent interfaces in `services/order_service.py`.
   3. Observes that the postbuild `daw-review` stage already audited these exact files and interfaces for revision `r1` with an accepted verdict.
   4. Reuses the accepted review findings without dispatching a duplicate `daw-review` stage or spawning redundant review workers.
-  5. Records the reuse in the parent acceptance record citing revision `r1` and existing review evidence.
+  5. Records the reuse in the parent acceptance record citing revision `r1` and existing review evidence, with three short answers: affected interfaces/dependencies, essential transaction co-change versus accidental coupling with evidence, and sufficient current evidence with disposition.
   6. Delivers a concise final user-facing summary.
 - **Content Invariants & Verification:**
   - 0 duplicate `daw-review` subagents or stages dispatched.
   - Parent acceptance notes reuse of existing accepted review for matching scope and revision `r1`.
   - Final response summarizes completed feature concisely in natural language.
+  - Legitimate transaction co-change is accepted as essential (service write and transaction boundary must change together for atomicity), not flagged as accidental coupling.
+  - Acceptance record contains the three answers; bare PASS without them is not used.
 
 ---
 
@@ -1390,7 +1541,7 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
 - **Execution & Cognitive Behavior:**
   1. The agent executes `daw-build` to apply the surgical two-line fix and `daw-verify` to confirm passing tests.
   2. The parent orchestrator performs the prefinal coupling check directly on the changed diff and direct callers.
-  3. Confirms the fix touches only localized internal logic with zero interface or dependency drift.
+  3. Confirms the fix touches only localized internal logic with zero interface or dependency drift; records one-line N/A with concrete reason (no interface/dependency change), without pretending a structural audit was performed.
   4. Does NOT force a new reviewer stage, inject an extra approval gate, or escalate to `daw-untangle`.
   5. Preserves the canonical minimal `build -> verify` patch route.
   6. Records the bounded diff check directly in the handoff/checkpoint details.
@@ -1399,6 +1550,7 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
   - 0 reviewer stages or subagents spawned.
   - 0 invocations of `daw-untangle`.
   - Parent records bounded diff check inline without ceremonial documents.
+  - Prefinal record is one-line N/A with concrete no-interface-change reason; bare PASS or claimed audit is rejected.
 
 ---
 
@@ -1435,16 +1587,24 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
   ```
 - **Execution & Cognitive Behavior:**
   1. The parent orchestrator inspects the changed diff and detects that `services/payment.py` accesses undocumented internal mutable state of `services/inventory.py`.
-  2. Because the cross-module boundary impact is obscure and cannot be verified from the diff alone, the parent escalates to `daw-untangle`.
+  2. Because the cross-module boundary impact is obscure and cannot be verified from the diff alone — unresolved hidden-order/shared-state coupling is recorded as the specific unresolved boundary — the parent escalates to `daw-untangle` with that escalation reason in the three-answer disposition.
   3. The escalation is scoped strictly to `services/payment.py` and `services/inventory.py`; the parent explicitly refuses a whole-codebase scan.
-  4. `daw-untangle` performs read-only structural analysis, maps the hidden link, and returns structured findings.
-  5. The parent recognizes that `daw-untangle`'s `pass` indicates static diagnostic completion, NOT runtime behavior proof.
-  6. The parent marks the prefinal check `not accepted`, blocks delivery, and routes a boundary remediation task to `daw-build`.
+  4. `daw-untangle` performs read-only structural analysis, maps the hidden link, and returns structured findings with zero workspace writes.
+  5. The parent recognizes that `daw-untangle`'s `pass` indicates static diagnostic completion only — never runtime behavior proof and never mutation authorization.
+  6. Evaluate the current diagnosis in existing `scope`/`revision`/`evidence`/`disposition` in the following fixed order; select the first matching branch:
+     - **C — Proven material defect:** Current evidence identifies a concrete location and accepted invariant with an expected-versus-actual violation. Record `not accepted` and evidence `failed`; a claimed legitimate purpose cannot override the violation. Route only authorized, bounded `daw-plan`/`daw-build` correction under existing rules; invalidate affected review/runtime evidence and require re-verification before acceptance.
+     - **B — Required evidence insufficient:** If C does not apply and required ownership/invariant evidence is missing, stale, or conflicting, record `not accepted`, mark the missing current proof `unexercised`, and hold acceptance of the affected criterion and dependent delivery. Preserve any actual failed checks separately. Name the exact evidence gap and next permitted read-only observation; do not dispatch `daw-build` merely to resolve uncertainty.
+     - **A — Structural criterion satisfied:** Otherwise, sufficient current evidence must positively establish the accepted invariant and legitimate coupling, with no material violation in the inspected scope. Record `accepted` and evidence `passed` for this structural criterion only, without refactor/build dispatch; all remaining runtime criteria and stages still apply. If positive proof is insufficient, use B, never infer success from absence of contradiction.
+- **Manual variants / controls (given observations; not claims of execution):**
+  - **C04-A given:** Current `r1` diagnosis traces the initially suspected internal-state access to a documented, lock-protected transaction owner shared by payment and inventory, positively establishing the accepted reservation invariant in the inspected paths. **Expected:** (A) `accepted`, `passed`, structural criterion only; no refactor; other stages pending.
+  - **C04-B given:** Shared state mapped, but ownership/invariant record missing or stale (`r0` vs `r1` diff), no proven contradiction. **Expected:** (B) `not accepted`, `unexercised`; only affected criterion held (no blanket module fail), no build dispatch; record names exact missing evidence/next read-only inspection.
+  - **C04-C given:** Direct mutation bypasses documented atomic `reserve()` — expected reserve-or-fail, actual oversell possible. **Expected:** (C) `not accepted`, `failed`; bounded correction only, affected evidence invalidated, re-verification required.
 - **Content Invariants & Verification:**
-  - Escalation to `daw-untangle` is strictly scoped to the affected area (2 modules).
-  - Zero workspace writes by `daw-untangle`.
-  - Untangle output pass is explicitly not treated as runtime proof.
-  - Material coupling defect blocks final delivery acceptance.
+  - Escalation strictly scoped to the 2 affected modules; zero writes by `daw-untangle`.
+  - Untangle `pass` is not runtime/production proof or mutation authorization.
+  - Exactly one of (A)/(B)/(C) is recorded, using existing fields; no unconditional `daw-build` dispatch, no new schema/files.
+  - Proven material defect is never waived by 'legitimate purpose'; absence of contradiction alone never satisfies (A).
+  - Record names the unresolved hidden-order/shared-state boundary, affected interfaces, evidence, and bounded escalation reason.
 
 ---
 
@@ -1510,6 +1670,27 @@ These scenarios evaluate the read-only structural coupling analysis module (`daw
   - Affirms that prefinal coupling check is an instructional procedural rule.
   - Explicitly denies existence of Stop hooks, daemons, or runtime interceptors.
   - 0 misleading claims of automated background policy enforcement.
+
+---
+
+### SCN-C-08: Three-Answer Concrete Record vs Bare PASS, Security/Protocol Wrapper Retained
+
+- **Target Workspace Fixture:**
+  - Workspace with a code change adding a retry/security wrapper in `services/api_client.py` (exponential backoff for 429 and JWT/permission check before each call) and a pending delivery where the proposer claims bare `PASS` for the coupling check at revision `r1`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Finalize delivery; record PASS for the coupling check."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The proposer submits bare `PASS` with no affected interfaces, no essential-versus-accidental finding, and no evidence or unresolved-boundary disposition.
+  2. The parent marks bare `PASS` unexercised (missing evidence, not a defect) and requires the three short answers in the existing record: (1) affected interfaces/dependencies, (2) essential invariant co-change versus accidental coupling with evidence, and (3) sufficient current evidence or specific unresolved boundary with disposition/escalation reason.
+  3. The wrapper is inspected: its backoff, authentication, and permission enforcement are actual security/protocol purposes, not pass-through indirection, so it is retained and not flagged as needless or surplus.
+  4. The parent records the three concrete answers citing revision `r1` and current evidence, accepts the wrapper, and dispatches no `daw-untangle`.
+- **Content Invariants & Verification:**
+  - Bare `PASS` without the three answers is marked `unexercised`, not accepted (not a defect).
+  - Concrete three-answer record is present in the existing scope/revision/evidence/disposition fields at the current revision.
+  - Wrapper with actual security/protocol purpose is retained, not flattened or flagged as needless/surplus coupling.
+  - No `daw-untangle`, whole-codebase scan, or runtime proof is claimed.
 
 ---
 

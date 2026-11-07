@@ -84,6 +84,7 @@ Every claim in a verification report must bind to an explicit check and the actu
 3. **Actual:** The exact observed output, exit code, response status, DOM/accessibility tree, screenshot, or other inspected artifact. Never summarize with "verified" or "works" without showing the evidence. Tool actions and their observations (navigation, clicks, typing, AX queries, screenshots, HTTP responses) count in the triad exactly as shell commands do; record the action, its context, and the observation, not only a shell invocation.
 
 Declare the expected exit code, response status, or observable state, as applicable, before execution. Negative probes may expect a nonzero exit or an error response; they pass only when that exact expected rejection and its output are observed. Never revise an expectation merely to make a failed check pass.
+Apply [Operational Rule Diagnostics](../../references/operations.md#operational-rule-diagnostics) to each claim: map it to expected versus actual evidence, keep static proof separate from runtime proof, and record absent evidence as unexercised (required missing evidence blocks completion) while an executed contradiction remains failed.
 
 ### Rule 2: Fresh Failing Scenario (Before & After)
 
@@ -114,6 +115,7 @@ Declare the expected exit code, response status, or observable state, as applica
 Map all changes to required verification tiers **by surface** — select the proof method that matches where the behavior actually lives, not a single universal probe:
 
 - **Web UI:** Actual browser evidence matched to the claim — live DOM and/or accessibility-tree observation for semantic controls when exposed, and/or screenshot plus real interaction (navigation, click, typing, form submission) against the running page. For layout/visual claims, a rendered screenshot may prove the visual property; for interaction claims, screenshot alone is insufficient. Do NOT require both DOM/AX and screenshot for every claim.
+- **Animated UI:** When verifying a Web UI change that alters animation, or an explicitly requested animation audit, capture a baseline/after frame trace per [Animation Performance Reference](../../references/animation-performance.md) §4 (reproducible browser/device/viewport/throttling/interaction context, refresh-rate-aware budget, runtime reduced-motion check, pause/offscreen/unmount cleanup) and record each finding as passed/failing/blocked/unexercised. Verifier records evidence only and never implements fixes.
 - **Native desktop UI:** Actual computer-use evidence matched to the claim — AX tree queries for exposed semantic controls, and/or window screenshot plus real input interaction against the running application window. For custom canvas, mirrored, or custom-drawn surfaces use actual pixels/screenshot/input; missing AX alone is not a block on valid visual evidence. Do NOT require both AX and screenshot for every claim.
 - **CLI:** Real command execution — help text, flag parsing, exits on invalid arguments, exit 0 on primary happy path, observed stdout/stderr and exit codes.
 - **API:** Direct probes appropriate to the contract — endpoint responses, status codes, payload schemas, auth error handling, against a real (local or authorized) instance; `curl` or a typed HTTP client is acceptable here because the surface is the wire contract, not rendered UI.
@@ -183,91 +185,73 @@ Inspect the actual codebase and latest runtime evidence against authoritative co
 
 ## 5. Output Contract
 
-Every completion of `daw-verify` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable as complete JSON BEFORE concluding the workflow or advancing stages per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized workflow artifact, or an explicit inline fallback). Direct-user responses default to concise natural language. Rich verification checks, latest CLI runtime evidence (commands, exit codes, observed output snippets), regression counts, and diagnostic observations are preserved under `evidence` and `details`:
+Return a complete, observable JSON handoff before concluding this stage or advancing using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. This read-only module never creates unasked transport files; direct-user reports remain concise prose. `status: "pass"` proposes only verification-stage success on current-revision evidence, not parent acceptance or final workflow completion. Keep runtime observations under `evidence` and the verification payload under `details`; no competing top-level verdict exists outside the canonical outer `status`.
 
 - **Mandatory Runtime Evidence:** `details.checks` MUST include the actual executed check (shell command, native tool action, or explicitly cited equivalent), its target surface and session/context, expected exit code/status/observable state, observed exit code/status, and observed output/observation snippets (DOM/AX tree, screenshot reference, HTTP response, stdout/stderr). For UI checks record the tool actions performed and their observations, not only a shell invocation. Fabricated, dry-run, or mock evidence is prohibited; unavailable native capability is reported honestly as `blocked`/`unexercised`, never as a fabricated visual pass. Shell remains the proof method for non-UI (CLI/API/test-suite) surfaces.
+- **Verification Payload:** Preserve `verification_verdict`, `summary`, `checks` (each binding claim -> check -> actual), `regressions` (suite and observed counts), `convergence`, `coverage` (all scoped criteria, justified exclusions, denominator, verified criteria and unverified gaps), and `limitations`. Mark missing execution honestly; never substitute example values or stale results for current observations.
+
+Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
 
 ```json
 {
-  "objective": "Verify session serializer token rotation and CLI error handling.",
-  "input_paths": [
-    "src/auth/serializer.py",
-    "tests/auth/test_session_serializer.py"
-  ],
-  "output_paths": [],
-  "acceptance_criteria": [
+  "verification_verdict": "passed",
+  "summary": "All exercised behavioral checks and regression suites passed with zero failures.",
+  "checks": [
     {
-      "criterion": "CLI exits with code 2 on missing required arguments",
-      "status": "pass"
-    },
-    {
-      "criterion": "SessionSerializer round-trips token_version without data loss",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "tests/auth/test_session_serializer.py",
-      "summary": "pytest tests/auth/test_session_serializer.py exited 0 (2 passed)"
-    },
-    {
-      "reference": "scripts/route.py",
-      "summary": "scripts/route.py executed without args exited 2 with usage instructions"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": null,
-  "details": {
-    "verification_verdict": "passed",
-    "summary": "All exercised behavioral checks and regression suites passed with zero failures.",
-    "checks": [
-      {
-        "claim": "CLI exits with code 2 on missing required arguments.",
-        "check_command": "scripts/route.py",
-        "expected_exit_code": 2,
-        "exit_code": 2,
-        "status": "passed",
-        "observed_output": "Usage: scripts/route.py REQUEST [--format text|json] ...",
-        "evidence_tier": "cli_smoke"
+      "claim": "CLI exits with code 2 on missing required arguments.",
+      "check_command": "scripts/route.py",
+      "surface": "CLI",
+      "context": {
+        "working_directory": "/workspace/project",
+        "target": "scripts/route.py"
       },
-      {
-        "claim": "SessionSerializer round-trips token_version without data loss.",
-        "check_command": "pytest tests/auth/test_session_serializer.py",
-        "expected_exit_code": 0,
-        "exit_code": 0,
-        "status": "passed",
-        "observed_output": "2 passed in 0.04s",
-        "evidence_tier": "unit_behavioral"
-      }
-    ],
-    "regressions": {
-      "suite": "pytest tests/",
-      "total": 42,
-      "passed": 42,
-      "failed": 0,
-      "skipped": 0
+      "expected_exit_code": 2,
+      "exit_code": 2,
+      "status": "passed",
+      "observed_output": "Usage: scripts/route.py REQUEST [--format text|json] ...",
+      "evidence_tier": "cli_smoke"
     },
-    "convergence": {
-      "implemented_verified": ["AC-01", "AC-02"],
-      "implemented_unverified": [],
-      "missing": [],
-      "contradicted": [],
-      "blocked": []
-    },
-    "coverage": {
-      "total_scoped_criteria": 2,
-      "justified_exclusions": 0,
-      "denominator": 2,
-      "verified_criteria": 2,
-      "unverified_gaps": 0,
-      "coverage_ratio": "2/2"
-    },
-    "limitations": []
-  }
+    {
+      "claim": "SessionSerializer round-trips token_version without data loss.",
+      "check_command": "pytest tests/auth/test_session_serializer.py",
+      "surface": "test_suite",
+      "context": {
+        "working_directory": "/workspace/project",
+        "target": "tests/auth/test_session_serializer.py"
+      },
+      "expected_exit_code": 0,
+      "exit_code": 0,
+      "status": "passed",
+      "observed_output": "2 passed in 0.04s",
+      "evidence_tier": "unit_behavioral"
+    }
+  ],
+  "regressions": {
+    "suite": "pytest tests/",
+    "total": 42,
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+  },
+  "convergence": {
+    "implemented_verified": ["AC-01", "AC-02"],
+    "implemented_unverified": [],
+    "missing": [],
+    "contradicted": [],
+    "blocked": []
+  },
+  "coverage": {
+    "total_scoped_criteria": 2,
+    "justified_exclusions": 0,
+    "denominator": 2,
+    "verified_criteria": 2,
+    "unverified_gaps": 0,
+    "coverage_ratio": "2/2"
+  },
+  "limitations": []
 }
 ```
 
-_(Note: `status: "pass"` indicates that the verification stage checks have been executed and passed. No competing top-level verdict exists outside `details`)._
 ---
 
 ## 6. Exit Criteria

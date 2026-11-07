@@ -139,7 +139,7 @@ When invoked to re-plan or reconcile gaps identified during execution, review, o
 
 ## 4. Output Contract
 
-Every completion of `daw-plan` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable BEFORE advancing to the next stage (e.g., `daw-review` or `daw-build`) per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized workflow artifact, or an explicit inline fallback). Direct-user responses default to concise natural language rather than raw JSON. Rich task breakdowns, dependencies, and verification commands are preserved under `details`.
+Return a complete, observable JSON handoff before any transition using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. Direct-user reports remain concise prose. `status: "pass"` proposes only planning-stage criteria and the internal readiness self-check, not independent prebuild acceptance, implementation/test completion, or parent acceptance; observations must identify current scope and revisions. Keep the planning payload under `details` as defined below.
 
 - **Mandatory Task Fields:** Each task in `details.tasks` MUST specify `task_id`, `title`, `target_files`, `depends_on`, `parallel_safe`, `acceptance_criteria`, non-interactive `verification_command`, and `expected_outcome`. If a task lacks a user story, it must include `infrastructure_justification`.
 - **Traceability Mapping:** `details.traceability` records the compact mapping from requirement/AC ID to user story, task IDs, target files, dependencies, verification command, status, and evidence reference.
@@ -147,119 +147,88 @@ Every completion of `daw-plan` delivers a structured handoff payload adhering to
 - **Convergence Metadata:** `details.convergence` records whether the plan is an initial decomposition or a convergence reconciliation, listing preserved task IDs and appended task IDs.
 - **Suite Command:** `details` MUST include `suite_verification_command` covering the full affected test suite.
 
-**Handoff Selection:** Choose `handoff_to` from the active route only; never invoke another module directly:
+**Handoff Selection:** Apply §7 below for the active route; selection is advisory and never dispatches another module.
 
-- **`bootstrap` / `adopt` routes (documentation-only):** `daw-plan` is the terminal stage. Return `handoff_to: null` even when `status: "pass"`. Never recommend `daw-build`; planning completion ends the pipeline.
-- **`feature` / `bugfix` routes (implementation):** Recommend `daw-review` (for the parent-directed prebuild independent readiness conformity checkpoint) or the next ordered stage in the router plan.
-- **Halted (`status: "fail"` or `"blocked"`):** Return `handoff_to: null`; the parent decides replan or routing.
+Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
 
 ```json
 {
-  "objective": "Decompose authentication token refresh implementation into sequential tasks.",
-  "input_paths": ["docs/specs/blueprint.md"],
-  "output_paths": [],
-  "acceptance_criteria": [
+  "route": "feature",
+  "execution_mode": "Sequential",
+  "tasks": [
     {
-      "criterion": "All implementation tasks specify exact file paths and disjoint ownership",
-      "status": "pass"
+      "task_id": "TASK-01",
+      "title": "Implement session version rotation in serializer",
+      "target_files": [
+        "src/auth/serializer.py",
+        "tests/auth/test_session_serializer.py"
+      ],
+      "depends_on": [],
+      "parallel_safe": false,
+      "infrastructure_justification": null,
+      "acceptance_criteria": [
+        "SessionSerializer exports token_version field round-trip"
+      ],
+      "verification_command": "pytest tests/auth/test_session_serializer.py",
+      "expected_outcome": "Tests pass with 0 exit code"
     },
     {
-      "criterion": "Every task has explicit non-interactive verification commands",
-      "status": "pass"
-    },
-    {
-      "criterion": "Plan readiness self-check passes with 100% criteria mapping and acyclic dependencies",
-      "status": "pass"
+      "task_id": "TASK-02",
+      "title": "Add token refresh API endpoint",
+      "target_files": ["src/auth/routes.py", "tests/auth/test_routes.py"],
+      "depends_on": ["TASK-01"],
+      "parallel_safe": false,
+      "infrastructure_justification": null,
+      "acceptance_criteria": [
+        "POST /api/v1/auth/refresh returns 200 with rotated tokens"
+      ],
+      "verification_command": "pytest tests/auth/test_routes.py",
+      "expected_outcome": "Endpoint tests pass with 200 OK on token refresh"
     }
   ],
-  "evidence": [
+  "traceability": [
     {
-      "reference": "docs/specs/blueprint.md",
-      "summary": "Verified inputs and decomposed tasks covering all specified design requirements"
+      "requirement_id": "REQ-AUTH-01",
+      "story_id": "US-01",
+      "task_ids": ["TASK-01"],
+      "target_files": [
+        "src/auth/serializer.py",
+        "tests/auth/test_session_serializer.py"
+      ],
+      "dependencies": [],
+      "verification_command": "pytest tests/auth/test_session_serializer.py",
+      "expected_outcome": "SessionSerializer exports token_version field",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "requirement_id": "REQ-AUTH-02",
+      "story_id": "US-02",
+      "task_ids": ["TASK-02"],
+      "target_files": ["src/auth/routes.py", "tests/auth/test_routes.py"],
+      "dependencies": ["TASK-01"],
+      "verification_command": "pytest tests/auth/test_routes.py",
+      "expected_outcome": "POST /api/v1/auth/refresh returns 200",
+      "status": "pending",
+      "evidence": null
     }
   ],
-  "status": "pass",
-  "handoff_to": "daw-review",
-  "details": {
-    "route": "feature",
-    "execution_mode": "Sequential",
-    "tasks": [
-      {
-        "task_id": "TASK-01",
-        "title": "Implement session version rotation in serializer",
-        "target_files": [
-          "src/auth/serializer.py",
-          "tests/auth/test_session_serializer.py"
-        ],
-        "depends_on": [],
-        "parallel_safe": false,
-        "infrastructure_justification": null,
-        "acceptance_criteria": [
-          "SessionSerializer exports token_version field round-trip"
-        ],
-        "verification_command": "pytest tests/auth/test_session_serializer.py",
-        "expected_outcome": "Tests pass with 0 exit code"
-      },
-      {
-        "task_id": "TASK-02",
-        "title": "Add token refresh API endpoint",
-        "target_files": ["src/auth/routes.py", "tests/auth/test_routes.py"],
-        "depends_on": ["TASK-01"],
-        "parallel_safe": false,
-        "infrastructure_justification": null,
-        "acceptance_criteria": [
-          "POST /api/v1/auth/refresh returns 200 with rotated tokens"
-        ],
-        "verification_command": "pytest tests/auth/test_routes.py",
-        "expected_outcome": "Endpoint tests pass with 200 OK on token refresh"
-      }
-    ],
-    "traceability": [
-      {
-        "requirement_id": "REQ-AUTH-01",
-        "story_id": "US-01",
-        "task_ids": ["TASK-01"],
-        "target_files": [
-          "src/auth/serializer.py",
-          "tests/auth/test_session_serializer.py"
-        ],
-        "dependencies": [],
-        "verification_command": "pytest tests/auth/test_session_serializer.py",
-        "expected_outcome": "SessionSerializer exports token_version field",
-        "status": "pending",
-        "evidence": null
-      },
-      {
-        "requirement_id": "REQ-AUTH-02",
-        "story_id": "US-02",
-        "task_ids": ["TASK-02"],
-        "target_files": ["src/auth/routes.py", "tests/auth/test_routes.py"],
-        "dependencies": ["TASK-01"],
-        "verification_command": "pytest tests/auth/test_routes.py",
-        "expected_outcome": "POST /api/v1/auth/refresh returns 200",
-        "status": "pending",
-        "evidence": null
-      }
-    ],
-    "readiness_self_check": {
-      "status": "pass",
-      "unmapped_criteria": [],
-      "orphan_tasks": [],
-      "dependency_cycles": [],
-      "parallel_violations": [],
-      "findings": []
-    },
-    "convergence": {
-      "mode": "initial",
-      "appended_task_ids": [],
-      "preserved_task_ids": ["TASK-01", "TASK-02"]
-    },
-    "suite_verification_command": "pytest tests/auth/"
-  }
+  "readiness_self_check": {
+    "status": "pass",
+    "unmapped_criteria": [],
+    "orphan_tasks": [],
+    "dependency_cycles": [],
+    "parallel_violations": [],
+    "findings": []
+  },
+  "convergence": {
+    "mode": "initial",
+    "appended_task_ids": [],
+    "preserved_task_ids": ["TASK-01", "TASK-02"]
+  },
+  "suite_verification_command": "pytest tests/auth/"
 }
 ```
-
-_(Note: `status: "pass"` indicates that planning phase criteria and internal readiness self-check have been satisfied; it does not indicate implementation or test completion)._
 
 ---
 

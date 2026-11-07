@@ -80,6 +80,7 @@ Select an appropriate verification strategy based on the nature of the change. D
   - **No Speculative Abstractions:** Do not introduce generic frameworks, unnecessary design patterns, speculative configuration options, or unused utility helpers.
   - **No Avoidable Overhead:** In compiled or performance-critical code, avoid unnecessary allocations, defensive copies, or redundant computations.
   - **Preserve Existing Conventions:** Match the repository's existing syntax, idioms, naming patterns, and error handling style.
+  - **Operational Rule Diagnostics:** Apply [Operational Rule Diagnostics](../../references/operations.md#operational-rule-diagnostics) — match each applicable rule's trigger and observable tell to the actual task intent and apply only the scoped repair, letting the canonical reference own the rule tiers.
 
 ### Step 3: Targeted Refactoring (Refactor Phase)
 
@@ -114,128 +115,63 @@ When the orchestrator delegates tasks across multiple subagents:
 
 ## 4. Output Contract
 
-Every completion of `daw-build` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable BEFORE advancing to the next stage (e.g., `daw-review` or `daw-verify`) per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, authorized workflow artifact, or an explicit inline fallback). Direct-user responses default to concise natural language rather than raw JSON. Rich build facts, test strategies, and clean cutover status are preserved under `details`.
+Return a complete, observable JSON handoff before any transition using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. Direct-user reports remain concise prose. `status: "pass"` proposes only build-stage completion, not independent review, full verification, or parent acceptance. Supply current-revision observations under `evidence` and preserve these build facts under `details`: `modified_files`, `test_strategy` (selected strategy, red cause or surface-smoke rationale, and tautology check), `clean_cutover`, `coupling_self_check` (status, affected interfaces and dependencies, and boundary notes), `suggested_verification_command`, and `open_blockers`.
 **Handoff Selection:** Choose `handoff_to` from the active route only; the handoff is advisory metadata for the parent orchestrator and `daw-build` never invokes another module directly.
 
 - **`patch` route:** `daw-build` precedes `daw-verify`. On `status: "pass"`, recommend `daw-verify`.
 - **`feature` / `bugfix` routes:** The active route places `daw-review` before `daw-verify`. On `status: "pass"`, recommend `daw-review` — never skip review to reach verification.
 - **Halted (`status: "fail"` or `"blocked"`):** Return `handoff_to: null`. A stopped or failed build stage never advances the pipeline.
 
+Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
+
 ```json
 {
-  "objective": "Implement JWT token rotation and persist token_version in session serializer.",
-  "input_paths": ["src/auth/serializer.py"],
-  "output_paths": [
-    "src/auth/serializer.py",
-    "tests/auth/test_session_serializer.py"
-  ],
-  "acceptance_criteria": [
+  "route": "feature",
+  "modified_files": [
     {
-      "criterion": "Restored token_version field in SessionSerializer export dict",
-      "status": "pass"
+      "path": "src/auth/serializer.py",
+      "change_type": "MODIFIED",
+      "summary": "Restored token_version to serializer export dictionary"
     },
     {
-      "criterion": "Regression test verified failing red before fix and green after",
-      "status": "pass"
+      "path": "tests/auth/test_session_serializer.py",
+      "change_type": "MODIFIED",
+      "summary": "Added test_session_serialization_token_version_roundtrip regression test"
     }
   ],
-  "evidence": [
-    {
-      "reference": "tests/auth/test_session_serializer.py",
-      "summary": "Non-tautological test verified serialization round-trip with token_version"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-review",
-  "details": {
-    "route": "feature",
-    "modified_files": [
-      {
-        "path": "src/auth/serializer.py",
-        "change_type": "MODIFIED",
-        "summary": "Restored token_version to serializer export dictionary"
-      },
-      {
-        "path": "tests/auth/test_session_serializer.py",
-        "change_type": "MODIFIED",
-        "summary": "Added test_session_serialization_token_version_roundtrip regression test"
-      }
-    ],
-    "test_strategy": {
-      "type": "RED_GREEN_REGRESSION",
-      "red_phase_verified": true,
-      "red_failure_reason": "AssertionError: KeyError: 'token_version' missing in deserialized session",
-      "surface_smoke_rationale": null,
-      "tautology_check": "PASSED - test executes full serialization and deserialization cycle against real dict"
-    },
-    "clean_cutover": {
-      "deprecated_code_removed": true,
-      "obsolete_shims_retained": false,
-      "unrelated_files_touched": false
-    },
-    "coupling_self_check": {
-      "status": "clean",
-      "affected_interfaces": [
-        "src/auth/serializer.py:SessionSerializer.export"
-      ],
-      "affected_dependencies": ["src/auth/middleware.py"],
-      "notes": "Minimal diff preserved existing interface; no accidental coupling or wrappers introduced."
-    },
-    "suggested_verification_command": "pytest tests/auth/test_session_serializer.py",
-    "open_blockers": []
-  }
+  "test_strategy": {
+    "type": "RED_GREEN_REGRESSION",
+    "red_phase_verified": true,
+    "red_failure_reason": "KeyError: 'token_version' missing in deserialized session",
+    "surface_smoke_rationale": null,
+    "tautology_check": "PASSED - test executes full serialization and deserialization cycle against real dict"
+  },
+  "clean_cutover": {
+    "deprecated_code_removed": true,
+    "obsolete_shims_retained": false,
+    "unrelated_files_touched": false
+  },
+  "coupling_self_check": {
+    "status": "clean",
+    "affected_interfaces": ["src/auth/serializer.py:SessionSerializer.export"],
+    "affected_dependencies": ["src/auth/middleware.py"],
+    "notes": "Minimal diff preserved existing interface; no accidental coupling or wrappers introduced."
+  },
+  "suggested_verification_command": "pytest tests/auth/test_session_serializer.py",
+  "open_blockers": []
 }
 ```
-
-_(Note: `status: "pass"` indicates that the build phase construction criteria have been satisfied; it does not indicate independent review pass or full verification sign-off)._
 
 ### Blocked Execution Example (High-Risk or Missing Preflight)
 
-When direct invocation attempts high-risk modifications (such as production auth config, destructive migrations, or security policy changes) without explicit operator authorization or required preflights, `daw-build` immediately returns `status: "blocked"` with zero files modified:
-
-```json
-{
-  "objective": "Update production OAuth authentication configuration and rotation policy.",
-  "input_paths": ["config/auth.production.json"],
-  "output_paths": [],
-  "acceptance_criteria": [
-    {
-      "criterion": "High-risk authorization preflight verified prior to mutating configuration",
-      "status": "blocked"
-    }
-  ],
-  "evidence": [],
-  "status": "blocked",
-  "handoff_to": null,
-  "details": {
-    "blocker_reason": "High-risk operational preflight check failed: target file modifies production authentication policy without interactive operator approval. Halting before state mutation per operations.md §2.",
-    "modified_files": [],
-    "test_strategy": {
-      "type": "SURFACE_SMOKE",
-      "red_phase_verified": false,
-      "red_failure_reason": null,
-      "surface_smoke_rationale": "Execution blocked at preflight prior to code modification.",
-      "tautology_check": "SKIPPED - blocked before execution"
-    },
-    "clean_cutover": {
-      "deprecated_code_removed": false,
-      "obsolete_shims_retained": false,
-      "unrelated_files_touched": false
-    },
-    "suggested_verification_command": null,
-    "open_blockers": [
-      "Explicit interactive operator approval required for production auth configuration changes."
-    ]
-  }
-}
-```
+For high-risk modifications without exact interactive authorization or required preflights, return outer `status: "blocked"`, `handoff_to: null`, and `output_paths: []` before modifying files. Use the canonical envelope and transport, with `details.blocker_reason`, `modified_files: []`, and `open_blockers` identifying the missing approval or preflight. Mark the test strategy unexercised (`red_phase_verified: false`, `red_failure_reason: null`, `tautology_check: "SKIPPED - blocked before execution"`); never present unperformed construction, cutover, or checks as successful.
 
 ---
 
 ## 5. Exit Criteria & Quality Invariants
 
 1. Target files and implementation meet all specified acceptance criteria and contract specifications.
-2. **Prebuild Readiness Verified (Contract §F):** Upstream task plan passed readiness self-check and independent read-only conformity review (or direct fallback) was accepted before code modification.
+2. **Prebuild Readiness Verified (Contract §F):** For spec-dependent tasks, the upstream task plan passed its readiness self-check and the parent accepted an independent read-only conformity review (or explicit direct fallback with documented evidence limits) on current spec/plan revisions before code modification. Routine settled patches do not acquire an extra prebuild review requirement.
 3. Behavioral test strategy appropriate to the change type was executed and documented.
 4. Code changes represent minimal-viable diffs without dead code, speculative features, or unrelated file changes (Contract §G).
 5. Exported interfaces, callers, and dependencies remain consistent with repository conventions.

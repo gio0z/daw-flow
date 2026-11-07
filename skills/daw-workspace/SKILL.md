@@ -15,7 +15,7 @@ Workspace safety is the first line of defense against data loss. Generative reas
 > - **Never** silently switch branches in the user's active working directory.
 > - Worktrees isolate files and git references; they do **NOT** isolate shared system resources (ports, local databases, background daemons, or shared secrets).
 
-- Worktree directories located inside the repository tree must be gitignored before creation. Use `git rev-parse --git-path info/exclude` to resolve the actual exclude file (especially inside linked worktrees where `.git` is a file). Do **not** modify global git configurations (`~/.gitconfig` or global ignore) silently. Sibling directories outside the repository tree do not require gitignore entries.
+> - In-repo worktree directories must be ignored before creation; sibling paths outside the repository need no ignore entry. [Procedure B](#procedure-b-authorized-isolated-worktree-setup) owns the setup commands and linked-worktree exclude resolution. Never edit global git configuration or global ignores as part of workspace setup.
 
 > - Deliverables remain uncommitted and unmerged until explicitly directed.
 
@@ -86,47 +86,11 @@ Identify:
 
 ### Principle 3: Worktree Isolation Rules
 
-When an isolated worktree is authorized:
-
-1. **Choose Directory Location & Ignore Policy:**
-   - **Sibling Directory (Outside Repo Tree):** E.g., `../<repo>-<branch-name>`. Safe by default; does not pollute the target repository tree and does not require gitignore modifications.
-   - **In-Repo Directory:** E.g., `.worktrees/<branch-name>`. MUST be verified as ignored before creation:
-     ```bash
-     # Check if already ignored
-     git check-ignore -q .worktrees/
-     ```
-     If not ignored and local exclude modification is authorized:
-     ```bash
-     # Resolve the actual exclude path (handles both standard git dirs and linked worktree git files)
-     EXCLUDE_FILE=$(git rev-parse --git-path info/exclude)
-     # Inspect and update exclude file if verified not ignored
-     test -f "$EXCLUDE_FILE" && grep -qxF ".worktrees/" "$EXCLUDE_FILE" || echo ".worktrees/" >> "$EXCLUDE_FILE"
-     # Verify it is now recognized as ignored
-     git check-ignore -q .worktrees/
-     ```
-     Do NOT modify global git configurations (`~/.gitconfig` or global ignores) or repository `.gitignore` without explicit instruction.
-2. **Unique Branch Naming:**
-   - Use deterministic, collision-resistant branch names (e.g., `daw/<task-id>-<short-description>`).
-   - Ensure the branch does not already exist:
-     ```bash
-     git branch --list "daw/<task-id>-*"
-     ```
-3. **Shared Resource Awareness:**
-   - Remember: Worktrees share local TCP ports (e.g., `localhost:3000`, `5432`), SQLite/Postgres databases, file locks, and environment variable secrets.
-   - Adjust local test port configuration or test DB names if running concurrent instances.
+Isolation requires explicit user or task-policy authorization, not merely high risk. Use a unique, non-colliding branch and a safe path; in-repo paths must be ignored before creation, and exclude changes require authorization. Worktrees still share ports, databases, locks, daemons, and secrets. [Procedure B](#procedure-b-authorized-isolated-worktree-setup) is the sole operational setup procedure.
 
 ### Principle 4: Baseline Smoke Verification
 
-Upon creating and entering an isolated worktree, verify baseline integrity before introducing changes:
-
-```bash
-# Check branch and clean commit baseline
-git status --short
-git log -1 --oneline
-```
-
-Run the applicable baseline smoke test or build step using supplied evidence/scripts (e.g., executing the project test runner or CLI check).
-**Ground Truth Rule:** If the task addresses a user-reported failure or bug, **NEVER** rerun the failing check solely to confirm what the user already observed and reported.
+An authorized isolated worktree needs baseline integrity evidence before changes. Perform the branch/commit inspection and applicable smoke/build check in Procedure B. User-reported failures are ground truth: never rerun their failing check solely to confirm the report.
 
 ---
 
@@ -142,17 +106,31 @@ For standard tasks running in the active working tree:
 
 ### Procedure B: Authorized Isolated Worktree Setup
 
-1. Verify explicit authorization for isolated worktree.
-2. Determine target path:
-   - If inside repository (e.g., `.worktrees/<name>`), verify it is ignored using `git check-ignore -q .worktrees/`. If not ignored and authorized, add `.worktrees/` to `$(git rev-parse --git-path info/exclude)` and re-verify without error.
-   - If outside repository (e.g., `../<repo>-<name>`), ignore check is not needed.
-3. Create worktree off the current commit:
+1. Verify explicit user or task-policy authorization for isolation and satisfy the governance/preflight rules in §2. Reuse Principle 1's workspace inventory; preserve all dirty user work and do not switch the active worktree's branch.
+2. Select a deterministic branch name (e.g., `daw/<task-id>-<short-description>`) and check for collisions with `git branch --list "daw/<task-id>-*"` and the inventoried `git worktree list`. Choose a non-colliding name before creation.
+3. Select and prepare the target path:
+   - A sibling outside the repository (e.g., `../<repo>-<branch-name>`) requires no ignore entry.
+   - For an in-repo parent (e.g., `.worktrees/`), check the directory pattern with its trailing slash before creation:
+     ```bash
+     git check-ignore -q .worktrees/
+     ```
+   - If not ignored, require authorization for the local exclude change and resolve the actual file, including when the current worktree's `.git` is a file:
+     ```bash
+     EXCLUDE_FILE=$(git rev-parse --git-path info/exclude)
+     ```
+     Inspect that resolved file and add `.worktrees/` only if absent, using a bounded file edit. Re-run `git check-ignore -q .worktrees/`; do not create the worktree unless it succeeds. Use the actual chosen in-repo parent pattern consistently if different. Never modify global git configuration/global ignores; repository `.gitignore` changes require explicit instruction.
+4. Create the worktree from the current commit using the selected branch and path. Example for an authorized, ignored in-repo path:
    ```bash
    git worktree add -b daw/feature-name .worktrees/feature-name HEAD
    ```
-4. Navigate into the worktree directory.
-5. Perform baseline smoke check (running applicable build/smoke test; never rerunning user-reported errors solely to confirm).
-6. Notify orchestrator of active working path.
+   Enter the new worktree without switching the user's original worktree branch.
+5. Inspect the branch/commit baseline before introducing changes:
+   ```bash
+   git status --short
+   git log -1 --oneline
+   ```
+   Identify shared port, database, file-lock, daemon, and secret risks. Remap concurrent test ports or DB names where needed; unresolved collisions block affected execution. Run the applicable authorized baseline smoke/build check using supplied evidence/scripts. Never rerun a user-reported failing check solely to confirm it; retain that report as provided evidence.
+6. Return the active path, branch, baseline evidence, and shared-resource limitations to the orchestrator.
 
 ### Procedure C: Worktree Wrap-Up & Teardown
 
@@ -165,7 +143,7 @@ When work in an isolated worktree is finished:
    git diff --stat
    ```
 3. If orchestrator or user requests worktree removal:
-   - Ensure all changes are committed, stashed, or merged as authorized.
+   - Preserve all changes; any commit, stash, or merge used to make removal safe needs its own authorization. A removal request does not authorize discarding dirty work or forcing removal.
    - Return to main worktree.
    - Remove worktree cleanly:
      ```bash
@@ -176,47 +154,24 @@ When work in an isolated worktree is finished:
 
 ## 5. Output Contract
 
-Every completion of `daw-workspace` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. Full canonical JSON MUST be delivered and inspectable before downstream stage transition per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return, harness checkpoint, or an explicit inline fallback). Direct-user responses default to concise natural language. Rich workspace state, branch configuration, and resource risks are preserved under `details`:
+Use the complete outer envelope and transport defined in [routing §5](../../references/routing.md#5-canonical-module-handoff-contract). Deliver inspectable JSON to the parent before transition; default user reports remain concise natural language, with the canonical explicit-format/inline-fallback exceptions. Preserve workspace evidence and these required `details` fields:
 
 ```json
 {
-  "objective": "Inspect git working tree state and configure in-place workspace mode.",
-  "input_paths": [],
-  "output_paths": [],
-  "acceptance_criteria": [
-    {
-      "criterion": "Capture branch, commit SHA, and uncommitted modifications without state loss",
-      "status": "pass"
-    },
-    {
-      "criterion": "Confirm no unauthorized branch switching, discarding, stashing, or deletion",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "git status --porcelain",
-      "summary": "Verified working tree state: 0 untracked files, 0 conflicts"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-plan",
-  "details": {
-    "workspace_mode": "in-place",
-    "active_path": "/home/user/projects/example-repo",
-    "branch": "main",
-    "base_commit": "a1b2c3d4e5f6",
-    "dirty_files_count": 0,
-    "dirty_files": [],
-    "shared_resource_risks": [],
-    "limitations": [
-      "Operating in-place on existing working tree; pre-existing user modifications preserved."
-    ]
-  }
+  "workspace_mode": "in-place",
+  "active_path": "/home/user/projects/example-repo",
+  "branch": "main",
+  "base_commit": "a1b2c3d4e5f6",
+  "dirty_files_count": 0,
+  "dirty_files": [],
+  "shared_resource_risks": [],
+  "limitations": [
+    "Operating in-place on the existing working tree; pre-existing user modifications preserved."
+  ]
 }
 ```
 
-_(Note: `status: "pass"` indicates that workspace setup or inspection criteria have been satisfied; it does not indicate implementation completion)._
+This is an illustrative `details` payload, not observed workspace evidence. Outer acceptance criteria cover the branch/commit/dirty-file inventory, state preservation, and absence of unauthorized branch switching, discarding, stashing, or deletion. Record actual inspection/setup paths and evidence; read-only inspection has no output files. A proposed `status: "pass"` covers workspace inspection/setup only, not parent acceptance, implementation completion, or runtime readiness. `fail` and `blocked` retain routing §5 semantics; `handoff_to` recommends the next module without dispatching it.
 
 ---
 
@@ -224,7 +179,7 @@ _(Note: `status: "pass"` indicates that workspace setup or inspection criteria h
 
 1. Active workspace state is fully inventoried (branch, commit, uncommitted files).
 2. Existing user dirty state is fully preserved intact.
-3. If isolated mode was chosen, worktree exists at a safe, gitignored path with a unique non-colliding branch.
+3. If isolated mode was chosen, the worktree exists at a safe path with a unique non-colliding branch; an in-repo path is verified ignored.
 4. Shared resource limitations (ports, databases) are documented in the output contract.
 5. No unasked branch switching, discarding, stashing, or deleting occurred.
 

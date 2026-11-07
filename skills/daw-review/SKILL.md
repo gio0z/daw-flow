@@ -110,6 +110,9 @@ _Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity 
    - In compiled or hot execution paths, check for avoidable memory allocations, deep object copies, and redundant loops.
    - Check for potential memory leaks, unclosed file descriptors, orphaned sockets, or database connection pool leaks.
    - Identify unindexed database queries or N+1 query patterns.
+
+- When the diff changes animated UI or an animation audit was explicitly requested, apply [Animation Performance Reference](../../references/animation-performance.md) proportionally in §3 above (bounded inventory, static cost checklist, reduced-motion and cleanup wiring); reviewer records findings only and never implements fixes. Otherwise record animation-performance N/A inline.
+
 4. **Maintainability & Boring Design:**
    - Prefer boring, clear, readable design over clever or needless abstractions.
    - Delete dead weight: ensure deprecated shims, obsolete comments, and unused functions were removed (clean cutover).
@@ -124,6 +127,7 @@ _Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity 
 6. **Concrete Evidence vs. Subjective Taste:**
    - Every flagged issue must cite specific file paths, line numbers, and an objective technical reason or static code proof.
    - Reject subjective stylistic preferences that do not impact correctness, maintainability, or established project conventions.
+   - **Operational Rule Diagnostics:** Apply [Operational Rule Diagnostics](../../references/operations.md#operational-rule-diagnostics) when framing findings: every material finding must cite an observable location, its concrete consequence, and a scoped repair; reject stylistic dislike without an accepted-contract or requirement basis, keep the reviewer read-only, and let the parent disposition findings under the existing pass/fail/blocked states.
 
 ### Prebuild Cross-Artifact Conformity Review (Readiness Checkpoint Mode)
 
@@ -188,66 +192,41 @@ To ensure review loops remain deterministic and avoid both premature halts and e
 
 ## 5. Output Contract
 
-Every completion of `daw-review` delivers a structured handoff payload adhering to the canonical suite envelope as an internal module-to-orchestrator handoff. The canonical handoff payload MUST be delivered and observable BEFORE advancing to the next stage (`daw-verify`) per [User-Facing Reports & Handoff Transport](../../references/routing.md#user-facing-reports--handoff-transport) (via structured tool/subagent return or an explicit inline checkpoint fallback; read-only modules never create unasked files). Direct-user responses default to concise natural language rather than raw JSON. Rich audit findings, conformity status, and stage-gate verdicts are preserved under `details`.
+Return a complete, observable JSON handoff before any transition using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. This read-only module never creates unasked transport files; direct-user reports remain concise prose. `status: "pass"` proposes only the current review mode's criteria, not deployment, runtime verification, or parent acceptance. Ground findings and separate stage verdicts in current-revision evidence under `details`; no competing top-level verdict exists outside the canonical outer `status`.
 
 - **Separate Stage 1 & Stage 2 Requirements:** `details` MUST contain explicit and separate verdicts and evidence for Stage 1 (`stage_1_conformity`) and Stage 2 (`stage_2_technical_audit`). Conflating both stages into a single unseparated verdict is invalid.
 - **Review Mode Support:** `details.review_mode` explicitly distinguishes `"postbuild_code_review"` (default, evaluating implemented code diffs) from `"prebuild_readiness"` (evaluating proposed specifications, architecture, and task manifests for spec-dependent features). In `prebuild_readiness` mode, `review_verdict` evaluates cross-artifact readiness (`stage_1_conformity` reports requirements/story/task coverage and `stage_2_technical_audit` reports dependency/parallel safety). The orchestrator uses this checkpoint to gate build dispatch; postbuild code review (where required by the active route, e.g. feature and bugfix routes) and runtime verification remain strictly required after build completion.
+- **Verdict & Loop State:** Record `details.review_verdict` as `PASSED`, `CHANGES_REQUESTED`, `CONTRADICTION_HALT`, or `REPLAN_REQUIRED`, with `review_loop_state` tracking recurrence and remaining blockers and an actionable `recommendation_for_orchestrator`. Stage 1 failure requires outer `status: "fail"` and Stage 2 `SKIPPED` or `LIMITED_SECURITY_TRIAGE`, never a full technical pass.
+
+Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
 
 ```json
 {
-  "objective": "Perform two-stage code review of authentication session version rotation.",
-  "input_paths": [
-    "src/auth/serializer.py",
-    "src/auth/session.py",
-    "tests/auth/test_session_serializer.py"
-  ],
-  "output_paths": [],
-  "acceptance_criteria": [
-    {
-      "criterion": "Stage 1: All authoritative requirements satisfied without omissions or unrequested creep",
-      "status": "pass"
-    },
-    {
-      "criterion": "Stage 2: Code passes technical audit for correctness, security, performance, and maintainability",
-      "status": "pass"
-    }
-  ],
-  "evidence": [
-    {
-      "reference": "pytest tests/auth/test_session_serializer.py",
-      "summary": "pytest tests/auth/test_session_serializer.py exited 0 (2 passed)"
-    }
-  ],
-  "status": "pass",
-  "handoff_to": "daw-verify",
-  "details": {
-    "review_verdict": "PASSED",
-    "stage_1_conformity": {
-      "status": "PASSED",
-      "requirements_checked": [
-        {
-          "requirement": "Add JWT token rotation with token_version tracking",
-          "status": "SATISFIED",
-          "evidence_file": "src/auth/serializer.py:42"
-        }
-      ],
-      "omissions_or_creep": []
-    },
-    "stage_2_technical_audit": {
-      "status": "PASSED",
-      "findings": []
-    },
-    "review_loop_state": {
-      "iteration_count": 1,
-      "recurrence_detected": false,
-      "remaining_blockers": 0
-    },
-    "recommendation_for_orchestrator": "Proceed to integration verification."
-  }
+  "review_mode": "postbuild_code_review",
+  "review_verdict": "PASSED",
+  "stage_1_conformity": {
+    "status": "PASSED",
+    "requirements_checked": [
+      {
+        "requirement": "Add JWT token rotation with token_version tracking",
+        "status": "SATISFIED",
+        "evidence_file": "src/auth/serializer.py:42"
+      }
+    ],
+    "omissions_or_creep": []
+  },
+  "stage_2_technical_audit": {
+    "status": "PASSED",
+    "findings": []
+  },
+  "review_loop_state": {
+    "iteration_count": 1,
+    "recurrence_detected": false,
+    "remaining_blockers": 0
+  },
+  "recommendation_for_orchestrator": "Proceed to integration verification."
 }
 ```
-
-_(Note: `status: "pass"` indicates that the review phase evaluation criteria have been satisfied; it does not indicate deployment or runtime verification). No competing top-level verdict exists outside `details`._
 
 ---
 
