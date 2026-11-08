@@ -20,7 +20,7 @@ Acceptance-criteria authoring (EARS patterns, observable response/oracle, normal
 - **Ownership seam:** Blueprint owns boundaries, components, flows, and domain invariants and links the ERD; the ERD owns persistent entities/relationships; FRD retains behavior plus payload schema types/validation and links the ERD for persistent identity/relationships; techstack references the ERD for the storage model. Detailed relationships reference the separate ERD — no invented schema, migration authorization, or duplicated data authority.
 - **Rubric:** An ERD is judged on DQ-01..05 plus erd-01 (entities/identity and sourced attributes), erd-02 (relationships, cardinality, optionality and ownership), and erd-03 (integrity/lifecycle/traceability and applicable physical design).
 
-Proportionality rule: artifacts must be no larger than the work warrants. Trivial settled patches stay inline; do not expand tiny fixes into multi-document ceremony.
+Proportionality rule: artifacts must be no larger than the work warrants. Trivial settled patches stay inline; do not expand tiny fixes into multi-document ceremony. "Tiny" has one deterministic definition, in root `SKILL.md` §1 rule 3 (one file plus its own test, no new user-visible behavior, no schema/migration/public interface/UI screen/config contract/dependency change); everything else is multi-step and gets a saved plan before source edits without the user asking for one.
 
 ---
 

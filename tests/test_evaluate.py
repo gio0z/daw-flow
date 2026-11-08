@@ -40,6 +40,12 @@ elif action == "status-delete-config":
     (root / "AGENTS.md").unlink()
 elif action == "status-artifact":
     (root / "side-effect.txt").write_text("side effect")
+elif action == "feature-plan":
+    plan = root / "docs" / "plans" / "ledger-plan.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("# Plan\\n\\nExpected: duplicate raises. Expected: session isolation. Verify with python3 -m unittest.\\n")
+elif action == "feature-code-no-plan":
+    (root / "ledger.py").write_text("# premature code\\n")
 elif action == "fail":
     print("retained partial output", flush=True)
     print("fake agent failure", file=sys.stderr, flush=True)
@@ -254,6 +260,45 @@ class EvaluateRunnerTests(unittest.TestCase):
                 self.assertEqual(run["checks"][0]["name"], "unchanged_workspace")
                 self.assertEqual(run["checks"][0]["status"], "fail")
                 self.assertIn(expected_path, run["checks"][0]["changed_paths"])
+    def test_feature_plan_file_passes_and_prompt_is_exact(self):
+        result, summary, output = self.evaluate("feature-plan", case="feature")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = summary["results"][0]
+        self.assertEqual(run["status"], "artifact_checks_passed")
+        self.assertEqual([c["name"] for c in run["checks"]],
+                         ["plan_before_code", "plan_has_steps", "code_only_with_plan"])
+        self.assertTrue(all(c["status"] == "pass" for c in run["checks"]))
+        self.assertEqual(run["checks"][0]["plan_files"], ["docs/plans/ledger-plan.md"])
+        prompt = (output / "feature-skill-001/prompt.md").read_text(encoding="utf-8")
+        self.assertEqual(prompt, "/skill:deterministic-agentic-workflow tambahkan fitur sesuai docs/specs/prd.md\n")
+        for word in ("plan", "rencana", "roadmap", "design"):
+            self.assertNotIn(word, prompt)
+        self.assertNotIn("spec", prompt.replace("docs/specs", ""))
+        workspace = pathlib.Path(run["workspace"])
+        self.assertIn("test_command: python3 -m unittest", (workspace / "AGENTS.md").read_text())
+        self.assertIn("### P1:", (workspace / "docs" / "specs" / "prd.md").read_text())
+        self.assertIn("### P2:", (workspace / "docs" / "specs" / "prd.md").read_text())
+
+    def test_feature_code_without_plan_fails(self):
+        output = self.root / "evidence-feature-code"
+        result, summary, _ = self.evaluate("feature-code-no-plan", case="feature", output=output)
+        self.assertEqual(result.returncode, 1)
+        run = summary["results"][0]
+        self.assertEqual(run["status"], "artifact_checks_failed")
+        by_name = {c["name"]: c for c in run["checks"]}
+        self.assertEqual(by_name["plan_before_code"]["status"], "fail")
+        self.assertEqual(by_name["code_only_with_plan"]["status"], "fail")
+        self.assertIn("ledger.py", by_name["code_only_with_plan"]["changed_py_files"])
+
+    def test_feature_writing_nothing_fails_plan_before_code(self):
+        output = self.root / "evidence-feature-noop"
+        result, summary, _ = self.evaluate("noop", case="feature", output=output)
+        self.assertEqual(result.returncode, 1)
+        run = summary["results"][0]
+        self.assertEqual(run["status"], "artifact_checks_failed")
+        by_name = {c["name"]: c for c in run["checks"]}
+        self.assertEqual(by_name["plan_before_code"]["status"], "fail")
+        self.assertEqual(by_name["code_only_with_plan"]["status"], "pass")
 
 
     def test_runner_cli_help_works_from_arbitrary_cwd(self):

@@ -31,7 +31,7 @@ except ImportError:
     from package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
 
 COPY_IGNORE_PATTERNS = (".git", "__pycache__", "*.pyc", ".pytest_cache", ".venv", ".DS_Store")
-CASES = ("patch", "review", "cli", "status")
+CASES = ("patch", "review", "cli", "status", "feature")
 PATCH_SOURCE = '''import argparse
 
 
@@ -87,6 +87,76 @@ STATUS_CONFIG = """<!-- daw-config:start -->
 - branch_pattern: none
 
 <!-- daw-config:end -->
+"""
+FEATURE_CONFIG = """<!-- daw-config:start -->
+
+## DAW Configuration
+
+- schema: 1
+- daw_version: 0.5.0
+- spec_dir: docs/specs
+- test_command: python3 -m unittest
+- lint_command: none
+- build_command: none
+- workspace: in-place
+- high_risk_paths: none
+- issue_tracker: none
+- default_branch: main
+- commit_convention: conventional
+- pr_template: none
+- ci_checks: none
+- release_process: none
+- branch_pattern: none
+
+<!-- daw-config:end -->
+"""
+FEATURE_SOURCE = '''"""Tiny in-memory ledger for evaluation fixtures."""
+
+
+class Ledger:
+    def __init__(self):
+        self._entries = {}
+
+    def add(self, key, value):
+        self._entries[key] = value
+
+    def get(self, key):
+        return self._entries.get(key)
+'''
+FEATURE_SPEC = """# Ledger Duplicate Guard
+
+## Problem
+
+Add a small ledger capability so repeated writes can be detected instead of
+silently overwriting existing entries.
+
+## Stories
+
+### P1: Reject a duplicate entry in the default session
+
+As a ledger user, I want adding the same key twice in the default session to
+fail, so accidental overwrites are visible instead of silent.
+
+Acceptance:
+
+- Adding a new key succeeds.
+- Adding the same key again in the default session raises `ValueError`.
+- The first value is retained after the rejected duplicate.
+
+### P2: Allow the same key in a different session
+
+As a ledger user, I want to store the same key under a different session
+without colliding with the default session entry.
+
+Acceptance:
+
+- The same key can be added once per named session.
+- A duplicate within the same named session raises `ValueError`.
+- Sessions do not overwrite each other's values.
+
+## Out of scope
+
+- Persistence, concurrency, and public API beyond the two stories above.
 """
 
 
@@ -194,6 +264,18 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
             "violation and confidentiality impact with file/line evidence. Distinguish "
             "limited security triage from a completed full technical audit."
         )
+    elif case == "feature":
+        (workspace / "docs" / "specs").mkdir(parents=True)
+        (workspace / "tests").mkdir()
+        (workspace / "AGENTS.md").write_text(FEATURE_CONFIG, encoding="utf-8")
+        (workspace / "docs" / "specs" / "prd.md").write_text(FEATURE_SPEC, encoding="utf-8")
+        (workspace / "ledger.py").write_text(FEATURE_SOURCE, encoding="utf-8")
+        (workspace / "tests" / "__init__.py").write_text("", encoding="utf-8")
+        (workspace / "tests" / "test_ledger.py").write_text(
+            "import unittest\n\n\nclass LedgerTests(unittest.TestCase):\n"
+            "    def test_placeholder(self):\n        self.assertTrue(True)\n", encoding="utf-8"
+        )
+        task = "/skill:deterministic-agentic-workflow tambahkan fitur sesuai docs/specs/prd.md"
     elif case == "status":
         (workspace / "AGENTS.md").write_text(STATUS_CONFIG, encoding="utf-8")
         (workspace / "docs" / "specs").mkdir(parents=True)
@@ -206,7 +288,7 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
             "report their actual outputs and exit codes, and decide whether each expectation "
             "passed. Do not modify the suite."
         )
-    if mode == "skill" and case != "status":
+    if mode == "skill" and case not in ("status", "feature"):
         module = {"patch": "daw-build then daw-verify", "review": "daw-review", "cli": "daw-verify"}[case]
         task = (
             "Use the complete installed deterministic-agentic-workflow suite at "
@@ -312,6 +394,34 @@ def grade(case: str, workspace: Path, run_dir: Path, suite_root: Path | None,
                        "expected_finding_code": "config_command_unresolved",
                        "expected_finding_path": "config:lint_command",
                        "status": "pass" if structure_ok else "fail", "observed": observed})
+    elif case == "feature":
+        new_files = [path for path in changes
+                     if path not in before and after.get(path, {}).get("kind") == "file"]
+        plan_files = [path for path in new_files
+                      if path.endswith(".md") and not path.startswith((".agents/", "tools/daw/"))
+                      and ("docs/plans/" in path or "plan" in path)]
+        plan_bodies = {}
+        for path in plan_files:
+            try:
+                plan_bodies[path] = (workspace / path).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                plan_bodies[path] = ""
+        expected_hits = {path: body.lower().count("expected") for path, body in plan_bodies.items()}
+        test_commands = {path: ("python3 -m unittest" in body or "python3  -m unittest" in body)
+                         for path, body in plan_bodies.items()}
+        has_steps = any(count >= 2 and test_commands[path] for path, count in expected_hits.items())
+        checks.append({"name": "plan_before_code", "status": "pass" if plan_files else "fail",
+                       "plan_files": plan_files, "observer": "grader"})
+        checks.append({"name": "plan_has_steps", "status": "pass" if has_steps else "fail",
+                       "expected_occurrences": expected_hits, "names_test_command": test_commands,
+                       "observer": "grader"})
+        code_changed = [path for path in changes if path.endswith(".py")
+                        and not path.startswith(("docs/", ".agents/"))]
+        checks.append({"name": "code_only_with_plan",
+                       "status": "pass" if not code_changed or plan_files else "fail",
+                       "changed_py_files": code_changed,
+                       "note": "Plan-presence check only; mtime ordering is not reliable, so this does not prove the plan preceded the code.",
+                       "observer": "grader"})
     else:
         checks.append({"name": "unmodified_suite", "status": "pass" if not changes else "fail",
                        "changed_paths": changes, "observer": "grader"})

@@ -13,6 +13,10 @@ Convention: every entry with breaking or newly-enforced rules MUST include a `##
 - `daw-design` + PRD/FRD templates: a detail ceiling keeps DDL, function bodies, migrations, and file paths out of spec prose (entities → `erd.md`, shapes → FRD interface table); priorities must be distributed with an Independent Test per story; acceptance criteria are scenarios with an observable, independently sourced oracle and a negative case; at most 3 material `[Open Question]`s per document, the rest become labeled `[Proposed Default]`s; test seams are chosen at design time; consequential seams record two real alternatives; a bounded spec self-review runs before the transition gate.
 - Domain modeling: glossary terms carry an `Avoid:` alias list; cross-document entity/type spelling is checked. Cross-artifact analysis (`document-quality.md` §F) adds named passes including entity-set diff. Rubric questions sharpened in place (same IDs and counts).
 - `daw-review` prebuild mode adds a buildability dimension with no-nitpick calibration. Mockups with uncertain direction offer 2–3 structural variants and record the verdict; mockup/prototype code is design input, never production code or verification evidence (`workflow-artifacts.md` §5, `daw-build` §2).
+- Root §1 rule 3: "tiny" now has one deterministic definition (one file plus its own test, no new user-visible behavior, no schema/migration/public interface/UI screen/config contract/dependency change). Everything else is multi-step and gets a saved plan before source edits automatically; the user never has to ask for a plan. Urgency wording does not reclassify work; only an explicit per-task opt-out skips the plan and is recorded. Uncertain size counts as multi-step. `patch` is restricted to tiny work.
+- Root §2: a one-line intake classification (`Route · Size → next step`) is required before the first file write, so a skipped route is visible immediately.
+- Root §3 `feature`: visual design and mockup requests route through `feature` with UI scope (`daw-design` mockup with variants and verdict before UI tasks; mockup-only requests stop after review) instead of running as unrouted direct work.
+- `tools/evaluation/evaluate.py`: new `feature` case whose prompt never mentions planning; it passes only when a saved plan exists, and fails if code changes without one.
 
 ### Project migration
 
@@ -22,6 +26,7 @@ For projects that last passed 0.5.0 (`daw_version: 0.5.0`):
 - Config block — manually confirm any preserved-but-unresolvable command with `validate.py config` (`config_command_unresolved`); do not erase it to pass; fix route: `daw-setup` write only when the user authorizes the command change.
 - Saved plans — a milestone-only roadmap is no longer accepted as a plan for spec-dependent builds (manual: re-plan into header + vertical slices + steps with `run`/`expected`); fix route: `daw-plan`.
 - PRD/FRD with DDL or function bodies in prose — manual: move entity model to `erd.md` and shapes to the FRD interface table; fix route: `daw-design` rework through the document gate.
+- Work classification — agents that previously treated multi-step work as "small" now plan first (manual: expect an intake line and a saved plan before code on multi-step requests); fix route: none.
 
 ## 0.5.0 (2026-11-08) — Validator Split and Project Status Preflight
 

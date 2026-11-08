@@ -105,6 +105,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-WF-17` | Invalid Completed Task Yields Verify | Task invocation, completed contract invalid at complete | Contract at `complete` with errors | Status Preflight | summary.tasks.complete_invalid >= 1; recommended_route `verify`; spec-mutating routes blocked until resolved. |
 | `SCN-WF-18` | Read-Only Routes Never Blocked by Status | Task invocation, status ends with error findings | Status with config invalid | Status Preflight | ask/review/untangle and setup proceed; only feature/bugfix/refactor/maintain blocked. |
 | `SCN-WF-19` | Explicit Status-Only Request Preserves Malformed Config | Status prompt on repo whose established lint executable is absent locally | Config with unresolved `lint_command` token | Status Preflight | Workspace byte-unchanged; reports `invalid`/`setup` + unresolved lint token; does not normalize config to `none`, swap tool, or write setup diff without authorization. |
+| `SCN-WF-20` | Multi-step request triggers plan without the user asking | Feature prompt naming no planning step, spec with two stories | stdlib-Python ledger + approved `docs/specs/prd.md` | `Feature` | New markdown plan under `docs/plans/` with ≥2 `expected` markers + test command; any `.py` change implies plan presence (structural only; no implementation required). |
 
 ## Operational Rule Diagnostics Scenarios (Manual)
 
@@ -2251,6 +2252,24 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 - **Content Invariants & Verification:**
   - Workspace bytes, modes, mtimes, links, and directory entries remain unchanged (snapshot equality); 0 files written, 0 config values normalized.
   - The reported summary, route, and finding match the validator envelope exactly; the absent-executable environment finding stays distinct from an unknown-command setup correction.
+
+### SCN-WF-20: Multi-step request triggers plan without the user asking
+
+- **Target Workspace Fixture:** Go-free, stdlib-Python-only project: a DAW config block in `AGENTS.md` (`test_command: python3 -m unittest`), an approved short `docs/specs/prd.md` describing two stories (P1 duplicate-entry rejection in the default session, P2 same key allowed in a different session) across a new ledger module plus its tests, and one existing source file (`ledger.py` with a plain `Ledger` in-memory store). Minimal scaffolding (`tests/__init__.py`, a placeholder test) is present; no plan file exists yet.
+- **Prompt / Intake Invocation:**
+  ```text
+  "/skill:deterministic-agentic-workflow tambahkan fitur sesuai docs/specs/prd.md"
+  ```
+  Neither the prompt nor the skill wrapper names any planning step, so a planning artifact can only be triggered by the multi-step nature of the work itself.
+- **Execution & Cognitive Behavior:**
+  1. The agent classifies the request as `Feature`, reads `docs/specs/prd.md` and the DAW configuration from the workspace, and writes a markdown plan (e.g. under `docs/plans/`) before any implementation. The plan covers both stories, keeps the module/test slice proportional, names the `python3 -m unittest` verification command, and marks at least two steps with the literal word `expected`.
+  2. The agent may either stop after the plan for review or continue and implement. Both are acceptable outcomes; the graded invariants below hold either way. If it implements, every `.py` change happens with a plan file present.
+  3. The grader is structural only: it diffs the before/after snapshots and never requires the agent to implement code, run its own tests, or prove mtime ordering.
+- **Content Invariants & Verification:**
+  - `plan_before_code`: a new markdown file under `docs/plans/` (or any new file whose path contains `plan`) exists in the after snapshot; failing when nothing is written.
+  - `plan_has_steps`: that plan contains at least 2 occurrences of `expected` (case-insensitive) and names a test command (`python3 -m unittest`).
+  - `code_only_with_plan`: if any `.py` file outside `docs/` and `.agents/` changed, a plan file must exist. This is plan-presence, not ordering: mtime ordering is unreliable, so the grader does not claim the plan temporally preceded the code.
+  - The automated counterpart is the `feature` case in `tools/evaluation/evaluate.py`; plumbing coverage lives in `tests/test_evaluate.py` (fake adapter writes a plan file → passes; writes code with no plan → fails; writes nothing → fails `plan_before_code`). Manual acceptance of this scenario additionally requires human review of whether stopping after the plan or continuing was the right call — a pass on the structural checks is not an efficacy claim.
 
 ## Post-Release Feedback & Incident Closure Scenarios (Manual)
 
