@@ -161,6 +161,7 @@ When requested by the parent orchestrator prior to build dispatch, `daw-review` 
    - Verify that all touchpoints cite currently verified repository paths and commit revisions, not stale assumptions or deprecated conventions.
 5. **Requirements-Quality Evaluation:**
    - Audit requirements prose against the reviewer-owned quality rubric for ambiguity, untestable adjectives ("fast", "intuitive", "robust"), missing negative/edge scenarios, and ungrounded KPI claims.
+   - **Buildability dimension (prebuild readiness):** Could an implementer follow each task without getting stuck — exact paths, steps, commands, expected output, consistent names? Flag only findings that would block planning or execution; wording/style preferences are not findings.
 6. **Structured Findings Format:**
    - Report findings using compact Markdown in the worker's proposed priority order, each with:
      - `Finding ID`: Stable identifier (e.g., `PRE-01`).

@@ -11,15 +11,15 @@
     },
     {
       "id": "DQ-03",
-      "question": "Does the document use coherent domain terminology and canonical cross-links without conflicting duplicates across specifications?"
+      "question": "Does the document use coherent domain terminology and canonical cross-links without conflicting duplicates across specifications, with every entity/type name consistent across spec, ERD, and plan?"
     },
     {
       "id": "DQ-04",
-      "question": "Are actionable acceptance criteria, failure modes, boundaries, and dependencies explicitly bounded and proportional to the document scope?"
+      "question": "Are actionable acceptance criteria, failure modes, boundaries, and dependencies explicitly bounded and proportional to the document scope, with every verification gate naming an exact command and its expected observable?"
     },
     {
       "id": "DQ-05",
-      "question": "Are document scope boundaries, open decisions, and recorded revision context clearly identified?"
+      "question": "Are document scope boundaries, open decisions, and recorded revision context clearly identified, with at most 3 material open questions and every other assumption labeled a proposed default?"
     }
   ],
   "kinds": {
@@ -58,11 +58,11 @@
       },
       {
         "id": "prd-02",
-        "question": "Are product capabilities, user or system interaction flows, and usage priorities mapped directly to target outcomes?"
+        "question": "Are product capabilities, user or system interaction flows, and usage priorities mapped directly to target outcomes, with distributed priorities (not everything P1/Must), each story carrying Why-this-priority and an Independent Test, and P1 alone a viable demoable slice?"
       },
       {
         "id": "prd-03",
-        "question": "Are functional and experiential success conditions, feature-level acceptance criteria, and explicit out-of-scope boundaries defined?"
+        "question": "Are functional and experiential success conditions (each measurable and technology-agnostic), feature-level acceptance criteria (each stating its independent oracle source with a negative case), and explicit out-of-scope boundaries defined?"
       }
     ],
     "erd": [
@@ -82,7 +82,7 @@
     "frd": [
       {
         "id": "frd-01",
-        "question": "Are behavioral payload schemas, field types, and validation constraints defined, linking the separate ERD for persistent entity identity and relationships?"
+        "question": "Are behavioral payload schemas, field types, and validation constraints defined with an independent oracle source per acceptance criterion, linking the separate ERD for persistent entity identity and relationships (detail ceiling observed; no DDL or function bodies in prose)?"
       },
       {
         "id": "frd-02",
@@ -90,7 +90,7 @@
       },
       {
         "id": "frd-03",
-        "question": "Are edge cases, error handling contracts, and input boundary conditions specified with observable behavior?"
+        "question": "Are edge cases, error handling contracts, and input boundary conditions specified with observable behavior, and does every entity/type name match the ERD spelling exactly?"
       }
     ],
     "techstack": [
@@ -216,7 +216,7 @@
       },
       {
         "id": "roadmap-03",
-        "question": "Are phase completion gates, release acceptance criteria, and go/no-go decision rules defined with observable signals?"
+        "question": "Are phase completion gates, release acceptance criteria, and go/no-go decision rules defined with observable signals, where every verification gate names an exact command and its expected observable (no prose-only gates such as 'tests pass')?"
       }
     ]
   }

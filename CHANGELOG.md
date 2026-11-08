@@ -2,12 +2,17 @@
 
 Convention: every entry with breaking or newly-enforced rules MUST include a `### Project migration` subsection (artifact, finding code or `manual`, fix route).
 
-## Unreleased — Status Advisory and Setup Command Preservation
+## Unreleased — Executable Specs & Plans, Status Advisory, Setup Command Preservation
 
 ### Changed
 
 - Root §2/§3: `status` `recommended_route` is advisory only; an explicit status-only request is read-only and terminal, while an ordinary task continues on its own authorized route with no extra consent gate for already-authorized mutations.
 - `daw-setup`: preserves existing configured commands verbatim (including locally unresolved ones, reported as `config_command_unresolved`), defaults only absent fields to `none`, treats format-only normalization as lossless, and shows every semantic delta in the confirmed setup diff. `valid` config means structural/resolvability only, not readiness.
+- `daw-plan` + `templates/roadmap.md`: plans are now executable. Every multi-step plan opens with a header (Goal, Architecture, Tech Stack, verbatim Global Constraints, File Map) fixed before tasks; work is cut into vertical story slices (P1 first, each with What to build, Out of scope, and a P1 checkpoint) instead of horizontal phases; each task carries ordered single-action `steps` (`action`, `file`, `run`, `expected`) starting from a baseline step, a bounded `change_preview` for contract-bearing surfaces, verbatim `constraints_quoted`, and `autonomy: hitl|afk`. Layer-only tasks and standalone "write tests" tasks are forbidden. Wide mechanical refactors use expand → migrate → contract.
+- `daw-plan` readiness self-check adds a placeholder scan, entity/type name consistency, gate concreteness (exact command + expected observable), and an autonomy check. A spec-dependent build without a persisted plan (header, slices, steps, commands) is `blocked`; a milestone roadmap is not a plan.
+- `daw-design` + PRD/FRD templates: a detail ceiling keeps DDL, function bodies, migrations, and file paths out of spec prose (entities → `erd.md`, shapes → FRD interface table); priorities must be distributed with an Independent Test per story; acceptance criteria are scenarios with an observable, independently sourced oracle and a negative case; at most 3 material `[Open Question]`s per document, the rest become labeled `[Proposed Default]`s; test seams are chosen at design time; consequential seams record two real alternatives; a bounded spec self-review runs before the transition gate.
+- Domain modeling: glossary terms carry an `Avoid:` alias list; cross-document entity/type spelling is checked. Cross-artifact analysis (`document-quality.md` §F) adds named passes including entity-set diff. Rubric questions sharpened in place (same IDs and counts).
+- `daw-review` prebuild mode adds a buildability dimension with no-nitpick calibration. Mockups with uncertain direction offer 2–3 structural variants and record the verdict; mockup/prototype code is design input, never production code or verification evidence (`workflow-artifacts.md` §5, `daw-build` §2).
 
 ### Project migration
 
@@ -15,6 +20,8 @@ For projects that last passed 0.5.0 (`daw_version: 0.5.0`):
 
 - Status callers — treat `recommended_route` as advisory; explicit status-only requests report and stop with no dispatched route (manual: adopt advisory-only handling); fix route: none.
 - Config block — manually confirm any preserved-but-unresolvable command with `validate.py config` (`config_command_unresolved`); do not erase it to pass; fix route: `daw-setup` write only when the user authorizes the command change.
+- Saved plans — a milestone-only roadmap is no longer accepted as a plan for spec-dependent builds (manual: re-plan into header + vertical slices + steps with `run`/`expected`); fix route: `daw-plan`.
+- PRD/FRD with DDL or function bodies in prose — manual: move entity model to `erd.md` and shapes to the FRD interface table; fix route: `daw-design` rework through the document gate.
 
 ## 0.5.0 (2026-11-08) — Validator Split and Project Status Preflight
 

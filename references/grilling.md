@@ -71,7 +71,7 @@ This reference is the **canonical native interactive clarification transport** f
    - Never report core path as clear (`deferred`) while foundational upstream choices or exclusions remain unresolved.
    - If a material architectural blocker, contradictory constraint, or missing foundational input prevents the current stage from completing, exit with `status: "blocked"`.
    - Stage-scoped evaluation applies: an advisory module (`daw-ask`) can pass its stage (`status: "pass"`) while tracking a material downstream implementation blocker under `details.decision_state: "blocked"` and `details.downstream_blocker`.
-   - Non-blocking unknowns are recorded under `details.open_questions` (or in an `## Open Questions` section of generated documents) with owner and resolution trigger.
+   - Non-blocking unknowns are recorded under `details.open_questions` (or in an `## Open Questions` section of generated documents) with owner and resolution trigger. Ambiguity budget: at most 3 material unresolved decisions per document remain as `[Open Question]` with owner/trigger; everything else is a labeled `[Proposed Default]` assumption in an Assumptions subsection of the provenance ledger.
 
 ---
 

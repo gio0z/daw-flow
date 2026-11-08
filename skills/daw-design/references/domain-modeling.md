@@ -18,6 +18,7 @@ _Reference Links:_
    - Ground existing domain vocabulary in observable codebase facts (source code, schemas, existing documentation).
    - Do NOT fabricate pre-existing consensus or claim an observed source for newly minted terms.
    - Agents MAY legitimately propose new domain concepts or entities required by the design; clearly mark them as `[Agent Recommendation]` or `[Human Decision]` once accepted, distinguishing them from `[Observed Fact]`.
+   - Canonical term entries carry an `Avoid:` list of rejected aliases; during authoring, challenge conflicting/fuzzy terms that map to the same concept. The glossary holds no implementation details (no DDL, function bodies, or file paths). This entry check is the home for the cross-document entity/type name diff (every entity/type named in one spec exists with identical spelling in the others or the ERD).
 
 2. **Inspect Existing Conventions First:**
    - Inspect repository patterns before creating files (e.g., `docs/adr/`, `doc/decisions/`, `docs/specs/`, `architecture/`, or embedded sections in `blueprint.md`).

@@ -24,45 +24,77 @@
 > **Assumptions:** [Team availability, platform stability, upstream component releases]
 > **Reader & Core Task:** [Engineering Lead / Delivery Coordinator / Implementation Agent] — Sequence delivery phases, verify dependency ordering and bounded milestone outcomes, and monitor stop/replan triggers without relying on invented calendar release dates.
 > **Quality Reference:** Canonical rubric and transition gate criteria in [references/document-quality.md](../references/document-quality.md) (common `DQ-01`..`DQ-05`, `roadmap-01`..`03`, and [#feature-delivery-contract](../references/document-quality.md#feature-delivery-contract)).
+> **Goal:** [One-sentence delivery goal]
+> **Architecture:** [2-3 sentences: key shape, layering, non-obvious decisions]
+> **Tech Stack:** [Language, runtime, framework, test runner]
+> **Global Constraints (verbatim from spec/config):** [Configured test command, e.g. `pytest tests/auth/ — 0 exit code required`; integer-money rule, etc. — one line each, copied verbatim]
+> **File Map:** [`src/...` (create/modify) — one-line responsibility; `tests/...` — corresponding tests]
 
 ---
 
-## 1. Milestone Sequencing & Phasing
+## 1. Foundation & Vertical Story Slices
 
-_Base phases strictly on milestone completion, technical dependencies, and concrete exit criteria. Adapt milestones to actual domain._
+_Structure is foundation → vertical story slices (P1 first) → release-readiness. Do NOT use horizontal layer phases (spec/foundation/implementation/verification) — a milestone-only roadmap without task IDs, steps, and commands is not a plan. Tiny settled patches stay inline without slices._
 
-### Phase 1: Specifications & Preflight Contracts
+### Foundation / Prefactor (only with infrastructure justification)
 
-- **Focus:** Complete blueprint routing, resolve material open questions, baseline acceptance criteria.
-- **Prerequisites:** Approved PRD/FRD or equivalent baseline contracts.
-- **Exit Criteria:** Material design questions resolved; preflight verification gates established.
+- **Justification:** [Why downstream slices depend on this; N/A if none — foundation tasks are forbidden without it]
+- **Goal:** [Shared capability the slices consume]
+- **Independent Test:** [Observable check, e.g. exact command + expected output]
+- **Tasks:** TASK-00 [exact file paths; ordered steps with run+expected]
 
-### Phase 2: Core Foundation & Tooling
+### Slice P1: [Story title]
 
-- **Focus:** [Initial structural changes, core domain models, internal interfaces, or verified tooling]
-- **Prerequisites:** Phase 1 contract sign-off.
-- **Exit Criteria:** [Unit test baseline green, foundational contracts passing in local/sandbox]
+- **What to build:** [End-to-end behavior, not a layer list]
+- **Out of scope:** [Explicit non-goals for this slice]
+- **Goal:** [Narrow behavior this slice delivers]
+- **Independent Test:** [Observable oracle; e.g. `pytest tests/test_slice.py` → all pass]
+- **Checkpoint:** P1 alone is demoable: [independent test]
+- **Autonomy:** [hitl|afk — hitl needs a live human decision; only afk is delegable unsteered]
+- **Tasks:** TASK-01, TASK-02 [each with target files, depends_on, ordered steps `action/file/run/expected`, contract preview, constraints quoted]
 
-### Phase 3: Implementation & Integration
+### Slice P2: [Story title]
 
-- **Focus:** [Feature logic, integration points, user or API surface implementation]
-- **Prerequisites:** Phase 2 foundation in place.
-- **Exit Criteria:** End-to-end integration tests passing across all supported paths.
+- **What to build:** [End-to-end behavior not covered by P1]
+- **Out of scope:** [Explicit non-goals]
+- **Goal:** [Behavior delivered]
+- **Independent Test:** [Observable oracle]
+- **Checkpoint:** P2 alone is demoable: [independent test]
+- **Autonomy:** [hitl|afk]
+- **Tasks:** [TASK-03, ... with ordered steps run+expected]
 
-### Phase 4: Semantic Verification & Pre-Release Readiness
+### Release-readiness
 
-- **Focus:** Full acceptance test matrix, security negative verification, performance validation.
-- **Prerequisites:** Phase 3 implementation complete.
-- **Exit Criteria:** QA verification matrix signed off with evidence logs; operational readiness verified.
+- **Scope:** [Full-suite gate, security negative verification, operational checks]
+- **Exit Criteria:** [Exact suite command + expected observable; QA matrix signed off with evidence logs]
 
 ## 2. Task Traceability & Work Breakdown Matrix (Contract §D)
 
 _Compact traceability mapping linking every requirement and acceptance criterion to discrete implementation tasks, target files, dependencies, verification commands, and observed evidence. Mark N/A only with explicit reasoned justification for non-buildable or out-of-scope criteria._
 
-| Task ID     | Story / Req / AC Ref | Source Ref + Revision    | Prerequisite Justification (Infra)   | Target File Paths       | Dependencies | [P]?       | Verification / Expected Outcome          | Status      | Observed Evidence Ref | Parent Decision    |
-| :---------- | :------------------- | :----------------------- | :----------------------------------- | :---------------------- | :----------- | :--------- | :--------------------------------------- | :---------- | :-------------------- | :----------------- |
-| `[TASK-01]` | `[REQ-01 / AC-01]`   | `[docs/specs/... @ rev]` | `[Justification if infra; else N/A]` | `[exact/path/file.py]`  | `[]`         | `[Yes/No]` | `[pytest tests/test_task01.py (exit 0)]` | `[Pending]` | `[Unexercised]`       | `[Pending parent]` |
-| `[TASK-02]` | `[REQ-02 / AC-02]`   | `[docs/specs/... @ rev]` | `[N/A]`                              | `[exact/path/file2.py]` | `[TASK-01]`  | `[No]`     | `[pytest tests/test_task02.py (exit 0)]` | `[Pending]` | `[Unexercised]`       | `[Pending parent]` |
+| Task ID     | Slice  | Story / Req / AC Ref | Source Ref + Revision    | Prerequisite Justification (Infra)   | Target File Paths       | Dependencies | [P]?       | Autonomy | Verification / Expected Outcome          | Status      | Observed Evidence Ref | Parent Decision    |
+| :---------- | :----- | :------------------- | :----------------------- | :----------------------------------- | :---------------------- | :----------- | :--------- | :------- | :--------------------------------------- | :---------- | :-------------------- | :----------------- |
+| `[TASK-01]` | `[P1]` | `[REQ-01 / AC-01]`   | `[docs/specs/... @ rev]` | `[Justification if infra; else N/A]` | `[exact/path/file.py]`  | `[]`         | `[Yes/No]` | `[afk]`  | `[pytest tests/test_task01.py (exit 0)]` | `[Pending]` | `[Unexercised]`       | `[Pending parent]` |
+| `[TASK-02]` | `[P1]` | `[REQ-02 / AC-02]`   | `[docs/specs/... @ rev]` | `[N/A]`                              | `[exact/path/file2.py]` | `[TASK-01]`  | `[No]`     | `[afk]`  | `[pytest tests/test_task02.py (exit 0)]` | `[Pending]` | `[Unexercised]`       | `[Pending parent]` |
+
+> **Execution Steps (per task; do not compress to a single command):** each task lists ordered single-action steps — write failing test → run, expect fail with named reason → minimal change → run, expect pass → suite. Each step names its file and an exact `run` + `expected` observable. Baseline step first (current revision, suite green before edits). Steps are plan text; evidence stays null until executed. Contract-bearing tasks carry the exact intended contract text (`change_preview`) and verbatim data-model constraints (`constraints_quoted`); non-contract tasks set `change_preview: null` with reason. No layer-only tasks ("create all tables", "all endpoints") and no standalone "write tests for X" tasks — tests land inside the slice introducing the behavior.
+
+_Task block shape (illustrative; replace every value with real paths, names and commands from the spec and config):_
+
+```markdown
+#### TASK-01 — Reject a duplicate for the same key (Slice P1, AC-01, afk)
+
+- Files: modify `src/store.py`; test `tests/test_store.py`
+- Contract preview: `class DuplicateError(Exception)`; `Store.add(item) -> None` raises `DuplicateError`
+- Constraints quoted: "quantity is an integer; no float conversion" (spec §4)
+
+1. Baseline — run `pytest tests/` → expected: all existing tests pass
+2. Write failing test `test_add_rejects_duplicate` in `tests/test_store.py` (add once, add again, assert `DuplicateError` and stored count stays 1)
+3. Run `pytest tests/test_store.py::test_add_rejects_duplicate` → expected: FAIL, `DuplicateError` not defined
+4. Minimal change in `src/store.py`: define `DuplicateError`, raise it on a repeated key
+5. Run `pytest tests/test_store.py::test_add_rejects_duplicate` → expected: PASS
+6. Run `pytest tests/` → expected: all tests pass, exit 0
+```
 
 > **Matrix Invariants:**
 >
@@ -123,3 +155,8 @@ _Verify against canonical [Document Quality Rubric](../references/document-quali
 - [ ] **prebuild-readiness (Contract §F):** Is plan readiness self-check complete and parent-directed prebuild review recorded for spec-dependent features?
 - [ ] **convergence-integrity (Contract §G):** Are existing task IDs and history preserved during replanning, with genuine gaps appended inside accepted scope?
 - [ ] **saved-plan-check:** Is the saved plan + progress ref current, native todos complementary (no separate tracker), UI mockup refs matched or UI scope blocked, and ranked queue current?
+- [ ] **placeholder-scan:** No TBD/TODO/"add appropriate error handling"/"handle edge cases"/"write tests for the above"/"similar to TASK-n" and no prose-only gate like "tests pass" without a command.
+- [ ] **name-consistency:** Every entity, field, type, and function named in any task exists in the cited spec/ERD or is produced by an earlier task with the same spelling.
+- [ ] **gate-concreteness:** Every verification names an exact command and its expected observable, including every step's `run` + `expected`.
+- [ ] **autonomy-check:** Every task carries `autonomy: hitl|afk`; no `afk` task depends on an open human decision.
+- [ ] **slice-scope-check:** Each slice states What to build (end-to-end behavior) and an explicit Out of scope line; no layer-only or standalone-test tasks.
