@@ -145,9 +145,9 @@ class TestValidateCLI(unittest.TestCase):
         scripts_dir = pkg_root / "scripts"
         scripts_dir.mkdir(exist_ok=True)
         if VALIDATOR_SCRIPT.exists():
-            (scripts_dir / "validate.py").write_text(
-                VALIDATOR_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8"
-            )
+            for module in VALIDATOR_SCRIPT.parent.glob("*.py"):
+                if module.name == "validate.py" or module.name.startswith(("daw_common", "check_")):
+                    (scripts_dir / module.name).write_text(module.read_text(encoding="utf-8"), encoding="utf-8")
         else:
             (scripts_dir / "validate.py").write_text(
                 "# Validator script placeholder\n", encoding="utf-8"
@@ -190,6 +190,7 @@ class TestValidateCLI(unittest.TestCase):
         acceptance_criteria: list[dict[str, str]] | None = None,
         approval: dict | None = None,
         evidence: list[dict] | None = None,
+        result: dict | None = None,
     ) -> dict:
         if baseline_files is None:
             baseline_files = []
@@ -221,6 +222,8 @@ class TestValidateCLI(unittest.TestCase):
             contract["approval"] = approval
         if evidence is not None:
             contract["evidence"] = evidence
+        if result is not None:
+            contract["result"] = result
         return contract
 
     # -------------------------------------------------------------------------
@@ -744,28 +747,31 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "test-evidence.log"
             ev_file.write_text("All tests pass\n", encoding="utf-8")
-
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
             acs = [
                 {"id": "AC-1", "criterion": "Passes unit tests"},
                 {"id": "AC-2", "criterion": "Passes integration tests"},
             ]
-
             incomplete_evidence = [
                 {
                     "criterion_id": "AC-1",
                     "status": "passed",
                     "reference": "test-evidence.log",
                     "summary": "Unit tests executed successfully",
+                    "sha256": ev_sha,
+                    "revision": result_revision,
                 }
             ]
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
                 acceptance_criteria=acs,
                 evidence=incomplete_evidence,
+                result=result_obj,
             )
             contract_file = proj_dir / "contract.json"
             contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
-
             res_incomplete = self.run_cli([
                 "contract", str(contract_file),
                 "--project-root", str(proj_dir),
@@ -774,24 +780,26 @@ class TestValidateCLI(unittest.TestCase):
             ])
             self.assertEqual(res_incomplete.returncode, 1)
             self.assertFalse(json.loads(res_incomplete.stdout).get("valid"))
-
             complete_evidence = [
                 {
                     "criterion_id": "AC-1",
                     "status": "passed",
                     "reference": "test-evidence.log",
                     "summary": "Unit tests passed",
+                    "sha256": ev_sha,
+                    "revision": result_revision,
                 },
                 {
                     "criterion_id": "AC-2",
                     "status": "passed",
                     "reference": "test-evidence.log",
                     "summary": "Integration tests passed",
+                    "sha256": ev_sha,
+                    "revision": result_revision,
                 },
             ]
             contract_data["evidence"] = complete_evidence
             contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
-
             res_complete = self.run_cli([
                 "contract", str(contract_file),
                 "--project-root", str(proj_dir),
@@ -806,6 +814,9 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "test-evidence.log"
             ev_file.write_text("Evidence\n", encoding="utf-8")
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
 
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
@@ -815,14 +826,19 @@ class TestValidateCLI(unittest.TestCase):
                         "status": "passed",
                         "reference": "test-evidence.log",
                         "summary": "Run 1",
+                        "sha256": ev_sha,
+                        "revision": result_revision,
                     },
                     {
                         "criterion_id": "AC-1",
                         "status": "passed",
                         "reference": "test-evidence.log",
                         "summary": "Run 2 duplicate",
+                        "sha256": ev_sha,
+                        "revision": result_revision,
                     },
                 ],
+                result=result_obj,
             )
             contract_file = proj_dir / "contract.json"
             contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
@@ -841,6 +857,9 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "report.txt"
             ev_file.write_text("Report\n", encoding="utf-8")
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
 
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
@@ -849,10 +868,15 @@ class TestValidateCLI(unittest.TestCase):
                     "status": "passed",
                     "reference": "report.txt",
                     "summary": "Unknown ref",
+                    "sha256": ev_sha,
+                    "revision": result_revision,
                 }],
+                result=result_obj,
             )
             contract_file = proj_dir / "contract.json"
-            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            # plan forbids result; run at plan without result, still rejects unknown AC
+            contract_data_plan = {k: v for k, v in contract_data.items() if k != "result"}
+            contract_file.write_text(json.dumps(contract_data_plan), encoding="utf-8")
 
             res = self.run_cli([
                 "contract", str(contract_file),
@@ -866,10 +890,13 @@ class TestValidateCLI(unittest.TestCase):
     def test_contract_evidence_scalar_or_bool_rejected_without_traceback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
             for bad_evidence in (42, True):
                 contract_data = self.create_contract_dict(
                     baseline_files=baseline,
                     evidence=bad_evidence,
+                    result=result_obj,
                 )
                 contract_file = proj_dir / "contract.json"
                 contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
@@ -893,6 +920,9 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "smoke.log"
             ev_file.write_text("observed output\n", encoding="utf-8")
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
             for bad_id in (["AC-1"], {"id": "AC-1"}):
                 contract_data = self.create_contract_dict(
                     baseline_files=baseline,
@@ -901,7 +931,10 @@ class TestValidateCLI(unittest.TestCase):
                         "status": "passed",
                         "reference": "smoke.log",
                         "summary": "observed",
+                        "sha256": ev_sha,
+                        "revision": result_revision,
                     }],
+                    result=result_obj,
                 )
                 contract_file = proj_dir / "contract.json"
                 contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
@@ -919,6 +952,118 @@ class TestValidateCLI(unittest.TestCase):
                 error_codes = [f.get("code") for f in payload.get("findings", [])]
                 self.assertIn("invalid_evidence_criterion_id", error_codes)
                 self.assertIn("incomplete_evidence_coverage", error_codes)
+
+    def _valid_complete_contract(self, proj_dir: pathlib.Path, baseline: list[dict[str, str]]) -> tuple[dict, pathlib.Path]:
+        ev_file = proj_dir / "evidence.txt"
+        ev_file.write_text("pass\n", encoding="utf-8")
+        ev_sha = _sha256(ev_file.read_bytes())
+        result_revision = "rev-002"
+        result_files = [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]
+        result_obj = {"revision": result_revision, "files": result_files}
+        evidence = [{
+            "criterion_id": "AC-1",
+            "status": "passed",
+            "reference": "evidence.txt",
+            "summary": "pass",
+            "sha256": ev_sha,
+            "revision": result_revision,
+        }]
+        contract_data = self.create_contract_dict(baseline_files=baseline, evidence=evidence, result=result_obj)
+        contract_file = proj_dir / "contract.json"
+        contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+        return contract_data, contract_file
+
+    def _run_complete(self, proj_dir: pathlib.Path, contract_file: pathlib.Path) -> "subprocess.CompletedProcess[str]":
+        return self.run_cli([
+            "contract", str(contract_file),
+            "--project-root", str(proj_dir),
+            "--stage", "complete",
+            "--format", "json",
+        ])
+
+    def _codes(self, res: "subprocess.CompletedProcess[str]") -> list[str]:
+        payload = json.loads(res.stdout)
+        return [f.get("code") for f in payload.get("findings", []) if f.get("severity") == "error"]
+
+    def test_contract_tmp_evidence_rejected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            contract_data, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            contract_data["evidence"][0]["reference"] = "tmp/evidence.txt"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("evidence_not_durable", self._codes(res))
+
+    def test_contract_evidence_hash_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            contract_data, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            (proj_dir / "evidence.txt").write_text("tampered\n", encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("evidence_hash_mismatch", self._codes(res))
+
+    def test_contract_missing_result(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            contract_data, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            del contract_data["result"]
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("missing_result", self._codes(res))
+
+    def test_contract_result_changed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            _c, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            (proj_dir / "src/app.py").write_text("edited after verify\n", encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("result_changed", self._codes(res))
+
+    def test_contract_evidence_revision_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            contract_data, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            contract_data["evidence"][0]["revision"] = "rev-999"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("evidence_revision_mismatch", self._codes(res))
+
+    def test_contract_result_not_allowed_at_plan(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            _c, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            res = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "plan",
+                "--format", "json",
+            ])
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("result_not_allowed", self._codes(res))
+
+    def test_contract_result_revision_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            contract_data, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            contract_data["result"]["revision"] = "rev-001"
+            contract_data["evidence"][0]["revision"] = "rev-001"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("result_revision_unchanged", self._codes(res))
+
+    def test_contract_fully_valid_complete_passes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            _c, contract_file = self._valid_complete_contract(proj_dir, baseline)
+            res = self._run_complete(proj_dir, contract_file)
+            self.assertEqual(res.returncode, 0, msg=f"valid complete failed: {res.stdout}")
+            self.assertTrue(json.loads(res.stdout).get("valid"))
     # -------------------------------------------------------------------------
     # Schema integrity, types, duplicate keys, and bounds checks
     # -------------------------------------------------------------------------
@@ -1724,6 +1869,7 @@ class TestValidateCLI(unittest.TestCase):
             edited_path.write_text("modified content after baseline\n", encoding="utf-8")
             deleted_path.unlink()
 
+            result_revision = "rev-002"
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
                 acceptance_criteria=[{"id": "AC-1", "criterion": "Passes tests"}],
@@ -1732,7 +1878,10 @@ class TestValidateCLI(unittest.TestCase):
                     "status": "passed",
                     "reference": "test-evidence.log",
                     "summary": "Verified post-mutation behavior",
+                    "sha256": _sha256(ev_file.read_bytes()),
+                    "revision": result_revision,
                 }],
+                result={"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]},
             )
             contract_file = proj_dir / "contract.json"
             contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
@@ -1767,11 +1916,16 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "test-evidence.log"
             ev_file.write_text("pass\n", encoding="utf-8")
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
             valid_ev = [{
                 "criterion_id": "AC-1",
                 "status": "passed",
                 "reference": "test-evidence.log",
                 "summary": "pass",
+                "sha256": ev_sha,
+                "revision": result_revision,
             }]
 
             cases = [
@@ -1787,6 +1941,7 @@ class TestValidateCLI(unittest.TestCase):
                     contract_data = self.create_contract_dict(
                         baseline_files=test_baseline,
                         evidence=valid_ev,
+                        result=result_obj,
                     )
                     contract_file = proj_dir / f"contract_{label}.json"
                     contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
@@ -1892,7 +2047,9 @@ class TestValidateCLI(unittest.TestCase):
             proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
             ev_file = proj_dir / "evidence.txt"
             ev_file.write_text("Evidence note\n", encoding="utf-8")
-
+            ev_sha = _sha256(ev_file.read_bytes())
+            result_revision = "rev-002"
+            result_obj = {"revision": result_revision, "files": [{"path": "src/app.py", "sha256": _sha256((proj_dir / "src/app.py").read_bytes())}]}
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
                 acceptance_criteria=[{"id": "AC-1", "criterion": "Passes"}],
@@ -1901,6 +2058,8 @@ class TestValidateCLI(unittest.TestCase):
                     "status": "unexercised",
                     "reference": "evidence.txt",
                     "summary": "Pending verification in subsequent run",
+                    "sha256": ev_sha,
+                    "revision": result_revision,
                 }],
             )
             contract_file = proj_dir / "contract.json"
@@ -1915,6 +2074,10 @@ class TestValidateCLI(unittest.TestCase):
             ])
             self.assertEqual(res_plan.returncode, 0, msg=f"Plan should accept unexercised evidence: {res_plan.stdout}")
             self.assertTrue(json.loads(res_plan.stdout).get("valid"))
+
+            # Re-write with result for execute/complete lifecycle (plan forbids result)
+            contract_data["result"] = result_obj
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
 
             # Allowed in execute
             res_exec = self.run_cli([

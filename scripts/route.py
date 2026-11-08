@@ -16,7 +16,7 @@ from typing import Any, Tuple
 
 # Bundled helper imports must not modify the installed suite.
 sys.dont_write_bytecode = True
-import validate
+import daw_common
 
 SCHEMA_VERSION = 1
 MAX_INPUT_BYTES = 1024 * 1024  # 1 MiB bounded input limit
@@ -161,7 +161,7 @@ def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) 
             "message": f"Module {expected_name} path must match canonical pattern 'skills/{expected_name}/SKILL.md'",
         }]
 
-    resolved, err = validate.resolve_bounded_path(root, rel_path)
+    resolved, err = daw_common.resolve_bounded_path(root, rel_path)
     if err or resolved is None:
         return [{
             "code": "MODULE_ROOT_ESCAPE",
@@ -188,7 +188,7 @@ def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) 
             "message": f"Error reading module {expected_name} file.",
         }]
 
-    frontmatter, fm_errors = validate.parse_frontmatter(content)
+    frontmatter, fm_errors = daw_common.parse_frontmatter(content)
     if fm_errors or frontmatter is None:
         return [{
             "code": "MODULE_FRONTMATTER_INVALID",
@@ -306,7 +306,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
 def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[str, str]]]:
     """Load and strictly validate references/suite-manifest.json."""
     manifest_rel = "references/suite-manifest.json"
-    manifest_path, err = validate.resolve_bounded_path(root, manifest_rel)
+    manifest_path, err = daw_common.resolve_bounded_path(root, manifest_rel)
     if err or manifest_path is None:
         return None, [{"code": "MANIFEST_ESCAPE", "message": "Suite manifest path escapes root or contains unsafe traversal."}]
 

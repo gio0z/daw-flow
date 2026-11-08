@@ -19,7 +19,7 @@ This specification and its accompanying machine registry (`references/document-q
 
 - The gate governs document lifecycle state transitions through five explicit directed edges:
   `intake-authoring`, `authoring-review`, `review-ready`, `review-rework`, and `rework-review`.
-- It enforces a portable, read-only Python stdlib gate (`scripts/doc_quality.py` invoked via `python3 scripts/validate.py docs`).
+- It enforces a portable, read-only Python stdlib gate (`scripts/check_docs.py` invoked via `python3 scripts/validate.py docs`).
 - It avoids global process supervisors, shell hooks, daemon listeners, or runtime monkeypatching.
 - It verifies **structural transition eligibility**, not internal semantic truth or actual human comprehension.
 - Passing the transition gate proves that a transition record and its cited artifacts satisfy structural requirements; the validator persists no state and cannot authenticate callers, reviewers, or actual lifecycle history. The parent orchestrator holds actual workflow state.
@@ -126,14 +126,16 @@ The CLI parameter `--transition <edge>` and the record's `transition: {"from": "
 3. **`review-ready` (`review` -> `ready`):**
    - **Purpose:** Downstream implementation release gate. Verifies that an independent reviewer or parent agent has evaluated all 8 criteria and accepted them.
    - **File State:** Document file must exist, with exact matching SHA-256.
-   - **Top Fields:** `schema_version`, `transition`, `objective`, `scope`, `reviewer` (mandatory non-empty string), `documents`.
+   - **Top Fields:** `schema_version`, `transition`, `objective`, `scope`, `reviewer` (mandatory object `{id, kind, author_id}` with `kind` = `human`|`agent`; formal specs want `kind: human`), `documents`.
    - **Checks:** Every check MUST include `decision: "accepted"`.
    - **Status Restrictions:** Every check status MUST be `"pass"` or `"not_applicable"`. Any check with status `"blocked"` or decision `"not_accepted"` causes immediate transition rejection.
+   - **Reviewer Independence:** `reviewer.id == reviewer.author_id` (after strip, casefold) is rejected as `reviewer_not_independent`; `kind: "agent"` on `review-ready` passes with a `reviewer_agent_attestation` warning. The validator still never authenticates identity.
+   - **Durable Evidence:** Any `sources[].path` or `checks[].evidence[].path` whose path is not durable (first segment `tmp`/`temp`/`.tmp`/`scratch`/`.cache`, any `__pycache__` segment, or any dot segment except `.github`) is rejected as `evidence_not_durable`. The path-segment denylist cannot detect gitignored paths; see [Validator Reference](validation.md).
 
 4. **`review-rework` (`review` -> `rework`):**
    - **Purpose:** Rejection / corrective feedback gate. Records reviewer objections and required remediation scope.
    - **File State:** Document file must exist, with exact matching SHA-256.
-   - **Top Fields:** `schema_version`, `transition`, `objective`, `scope`, `reviewer` (mandatory non-empty string), `documents`.
+   - **Top Fields:** `schema_version`, `transition`, `objective`, `scope`, `reviewer` (mandatory object `{id, kind, author_id}` as in `review-ready`), `documents`.
    - **Checks:** Every check carries `decision: "accepted"` or `decision: "not_accepted"`.
    - **Rejection Requirement:** At least one check MUST carry `decision: "not_accepted"`. A review that accepts everything cannot transition to rework.
 
@@ -190,7 +192,7 @@ Every source cited in `sources` and every evidence quote in `checks` must adhere
 }
 ```
 
-- `path`: Strict project-relative path to a regular UTF-8 file inside the project root.
+- `path`: Strict project-relative path to a durable regular UTF-8 file inside the project root (see §4.1 durable-evidence rule; gitignored paths are undetectable by the segment denylist).
 - `sha256`: 64-character lowercase hex string matching `hashlib.sha256(file_bytes).hexdigest()`.
 - `start_line` / `end_line`: 1-based positive integers, with `end_line >= start_line`.
 - `quote`: Exact string resulting from `"\n".join(lines[start_line - 1 : end_line])`.
@@ -204,9 +206,9 @@ The DAW document transition gate enforces strict operational boundaries:
 1. **Structural Transition Eligibility vs. Semantic Truth:**
    The validator evaluates whether the record complies with schema rules, whether cited lines exist in regular files, and whether hashes match disk bytes. It does **not** certify that the document's design is bug-free, that the architecture is optimal, or that requirements are completely understood. Passing the gate proves **eligibility for the declared transition**, not semantic truth.
 2. **Read-Only Stateless Execution:**
-   The validator never writes to the filesystem, executes child processes, makes network requests, or persists transition state. The parent orchestrator holds the actual lifecycle state.
+   The validator never writes to the filesystem, executes child processes, makes network requests, or persists transition state. The persisted state is the project-owned `ledger.json` (validated read-only via `validate.py ledger`); the parent orchestrator holds actual workflow state.
 3. **No Caller or Reviewer Authentication:**
-   The `reviewer` string is opaque. The validator cannot verify the physical identity, cryptographic signature, or organizational independence of the reviewer. Parent workflows must independently verify reviewer competence.
+   The `reviewer` object `{id, kind, author_id}` is opaque and self-declared. The validator checks independence (`reviewer_not_independent`) and only warns on `kind: "agent"`; it cannot verify the physical identity, cryptographic signature, or organizational independence of the reviewer. Parent workflows must independently verify reviewer competence.
 4. **Human Comprehension Remains Unexercised:**
    In the absence of empirical human reading studies with real human participants, human comprehension **MUST BE EXPLICITLY REPORTED AS UNEXERCISED**. Substituting LLM self-evaluation or synthetic prompt completions as "human readability validation" is prohibited.
 

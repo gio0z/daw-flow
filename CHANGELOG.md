@@ -1,5 +1,79 @@
 # Suite Change History & Architecture Log
 
+Convention: every entry with breaking or newly-enforced rules MUST include a `### Project migration` subsection (artifact, finding code or `manual`, fix route).
+
+## 0.5.0 (2026-11-08) — Validator Split and Project Status Preflight
+
+### Added
+
+- `validate.py status --project-root ROOT`: one read-only preflight that composes `config`, `ledger`, and `contract --stage complete` (for task contracts at `docs/evidence/<task-id>/contract.json` that carry a `result`), returns a summary (`config`, `ledger`, `tasks`) and a `recommended_route` (`setup`, `upgrade-recheck`, `design-rework`, `verify`, or `none`). New warnings `status_ledger_missing` and `status_task_in_progress`.
+- Router: a bare invocation in a repo with DAW artifacts runs `status` first and proposes its recommended route before Adopt; a task invocation runs `status` as preflight, and error findings block spec-dependent mutating routes until resolved. Read-only routes and setup are never blocked.
+
+### Changed
+
+- `scripts/validate.py` is now CLI only. Checks live in flat modules: `daw_common.py` (shared parsing, paths, hashing, findings, output), `check_package.py`, `check_contract.py` (split per contract section), `check_docs.py` (was `doc_quality.py`), `check_ledger.py` and `check_config.py` (were `ledger_config.py`), and `check_status.py`. No check module imports `validate.py`; the former circular import is gone. Subcommand behavior, exit codes, finding codes, and output are unchanged.
+- `VERSION` and root `SKILL.md` `metadata.version` bumped to `0.5.0`.
+
+### Project migration
+
+For projects that last passed 0.4.0 (`daw_version: 0.4.0`):
+
+- Task contracts — store them at `docs/evidence/<task-id>/contract.json` so `status` can discover them; contracts elsewhere are not checked by `status` (manual: move or keep checking with `validate.py contract`); fix route: `daw-verify`.
+- Code importing DAW internals — replace `scripts.doc_quality` with `scripts.check_docs` and `scripts.ledger_config` with `scripts.check_ledger` / `scripts.check_config` (manual; the CLI is unchanged).
+- Config block — bump `daw_version` to `0.5.0` after `validate.py status` reports no errors; fix route: `daw-setup` Upgrade Re-check.
+
+## 0.4.0 (2026-11-08) — Completion Claims Bound to Durable, Revision-Pinned Evidence
+
+Closes early "done" claims that `validate.py contract --stage complete` still accepted: stale logs from an earlier revision, evidence in ephemeral paths, and code edited after verification.
+
+### Added
+
+- Task contract `result` object (`revision`, `files[]` with `sha256`): the post-change snapshot recorded after verification. Forbidden at `plan`, optional at `execute`, required at `complete`.
+- Evidence entries gain `sha256` and `revision`, both required at `complete`.
+
+### Changed
+
+- Breaking: `complete` now fails with `missing_result`, `result_changed` (result file edited after recording), `result_revision_unchanged` (result revision equals baseline), `missing_evidence_sha256`, `evidence_hash_mismatch`, `missing_evidence_revision`, `evidence_revision_mismatch` (evidence not produced for `result.revision`), and `evidence_not_durable` (evidence under `tmp/`, scratch, or dot-directories; applies on every stage).
+- `VERSION` and root `SKILL.md` `metadata.version` bumped to `0.4.0`.
+- Unchanged limitation: the validator never evaluates the semantic truth of evidence contents; the parent still opens the evidence before accepting.
+
+### Project migration
+
+For projects that last passed 0.3.0 (`daw_version: 0.3.0`):
+
+- Task contracts already at `complete` — add `result` and evidence `sha256`/`revision`, regenerating evidence against the current revision where the old log no longer matches (`missing_result`, `missing_evidence_sha256`, `missing_evidence_revision`, `evidence_revision_mismatch`); fix route: `daw-verify`.
+- Task contracts with evidence under `tmp/` or other ephemeral paths — move evidence into committed paths such as `docs/evidence/<task-id>/` (`evidence_not_durable`); fix route: `daw-verify`.
+- In-flight contracts at `plan`/`execute` — no change required until `complete`; remove any `result` from `plan`-stage contracts (`result_not_allowed`).
+- Config block — bump `daw_version` to `0.4.0` only after the re-check above is clean; fix route: `daw-setup` Upgrade Re-check.
+
+## 0.3.0 (2026-11-08) — Persisted Workflow State & Gate Hardening
+
+Motivated by a downstream audit (kud-business) where every transition record failed revalidation: specs drifted after `review-ready`, evidence pointed at an uncommitted `tmp/` file, an agent persona signed as reviewer, the `daw-config` block was free-form with unresolvable commands, and plan/review/verify left no repo evidence across commits.
+
+### Added
+
+- `validate.py ledger`: validates `<spec_dir>/ledger.json`, the persisted per-document workflow state (current state, hash, current transition record, superseded history). Detects spec drift, record/state mismatch, and revalidates `ready` records.
+- `validate.py config`: validates the `daw-config` block (exact key set, values, existing paths, resolvable commands; commands are never executed).
+- `daw_version` key (semver X.Y.Z) in the `daw-config` block, placed right after `schema`, recording the last version the project passed re-check against; `validate.py config` compares it read-only against the installed `VERSION` (`config_daw_version_stale` warning, `config_daw_version_ahead` error, `config_daw_version_unverified` warning, non-semver `config_line_invalid`).
+- `daw-setup` Upgrade Re-check (read-only diagnosis) triggered by `config_daw_version_stale` or a suite update: collects `### Project migration` items between versions, runs `config`/`ledger`/`docs` validators, lists manual checks, reports findings by artifact with fix route, and bumps `daw_version` only after errors resolve and the user confirms.
+
+### Changed
+
+- Doc gate rejects non-durable evidence paths (`tmp/`, scratch, dot-directories) with `evidence_not_durable`; gitignored paths remain undetectable without Git.
+- Breaking: `reviewer` on `review-ready`/`review-rework` is now `{id, kind: human|agent, author_id}`; self-review fails with `reviewer_not_independent`; agent review on `review-ready` emits warning `reviewer_agent_attestation`. Identity is still never authenticated.
+- Workflow rules: spec-dependent plan/build require a passing ledger with dependent specs `ready`; multi-session or multi-commit work persists the task contract and verify evidence under `docs/evidence/<task-id>/` before commit; `daw-setup` runs `validate.py config` after writing the block.
+- `VERSION` and root `SKILL.md` `metadata.version` bumped to `0.3.0`; text output of `validate.py` now lists findings for every check, not only `docs`.
+
+### Project migration
+
+For projects that last passed 0.2.0 or earlier (no `daw_version` recorded), run the `daw-setup` Upgrade Re-check before spec-dependent work:
+
+- Config block (`AGENTS.md`/`CLAUDE.md`) — add `daw_version` right after `schema` and convert the block to the exact key format (`config_key_missing`/`config_line_invalid`); fix route: `daw-setup` write.
+- Transition records — convert `reviewer` strings to `{id, kind, author_id}` and re-record review exits (`invalid_reviewer`); fix route: `daw-design` rework.
+- Evidence paths — move evidence out of `tmp/` etc. into committed paths (`evidence_not_durable`); fix route: `daw-design` rework.
+- Spec index — create `<spec_dir>/ledger.json` (`validate.py ledger`); fix route: `daw-design` rework.
+- Manual check (no validator): ERD needed when persisted entities exist (since 0.1.2); persist the task contract plus verify evidence under `docs/evidence/<task-id>/` for multi-commit work; fix route: `daw-design` rework / `daw-plan`.
+
 ## 0.2.0 (2026-11-08) — Professional Developer Lifecycle
 
 ### Added

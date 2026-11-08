@@ -91,6 +91,19 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-WF-03` | Fresh-Session Resume With Scoped Revisions | Resume request from saved progress record | Durable progress record + current revisions | Resume Checkpoint | Only pending stage resumes from current evidence; scoped revision invalidates affected scope only. |
 | `SCN-WF-04` | Rendered Mockup vs Text/Block/NoUI Reuse | UI-affecting work, settled domain/flow | Existing design source, no mockup yet | Visual / Authoring | Text/ASCII/wireframe-only rejected as mockup; material missing capability blocks UI scope only; noUI → scoped N/A. |
 | `SCN-WF-05` | Every Worker Output Ranked, Dedup/Stale/Unsupported Order | Multiple workers return findings + done worker | Results at mixed revisions with overlaps | Ranked Result Triage | Parent dedups, rejects stale/unsupported with record, ranks safety first then urgency/dependency; worker pass never auto-deploys. |
+| `SCN-WF-06` | Spec Drift Blocks Build Until Ledger Ready | Spec hash drifts after review-ready, build requested | Ready spec, mutated hash, stale ledger | Ledger Gate / Blocked | `validate.py ledger` reports drift; build blocks; rework re-entry restores ready. |
+| `SCN-WF-07` | Tmp Evidence Rejected as Not Durable | Transition record cites tmp/ evidence paths | Record with tmp/ sources/evidence | Doc Gate | `evidence_not_durable` rejection; only committed project files accepted. |
+| `SCN-WF-08` | Self-Review Rejected as Not Independent | Reviewer id equals author id | Review record with self-review | Doc Gate | `reviewer_not_independent` rejection; independent reviewer required. |
+| `SCN-WF-09` | Config With Unresolved Command Rejected | Setup writes unresolvable test_command | Config block with unknown command | Setup Gate | `validate.py config` reports `config_command_unresolved`; setup sets `none` instead. |
+| `SCN-WF-10` | Stale daw_version Triggers Read-Only Upgrade Re-check | Config `daw_version` older than installed VERSION | Config with stale `daw_version` | Setup / Upgrade Re-check | `config_daw_version_stale` warning; Upgrade Re-check diagnoses without mutation; 0 files written. |
+| `SCN-WF-11` | daw_version Bumped Only After Clean Re-check | Upgrade Re-check errors resolved and user confirms | Diagnosis findings resolved | Setup / Upgrade Re-check | `daw_version` bumped to installed VERSION only after clean re-check; `validate.py config` rerun. |
+| `SCN-WF-12` | Code Edited After Verify Blocks Complete | Contract complete claimed after code edit post-result | Contract with recorded result, edited file | Contract Gate | `result_changed` blocks complete; re-verify required. |
+| `SCN-WF-13` | Stale Log From Earlier Revision Rejected | Evidence produced against earlier revision cited at complete | Evidence with old revision, current result | Contract Gate | `evidence_revision_mismatch` rejects stale log. |
+| `SCN-WF-14` | Tmp Evidence Rejected at Contract Complete | Contract evidence reference under tmp/ at complete | Contract with tmp/ evidence reference | Contract Gate | `evidence_not_durable` rejects tmp evidence on every stage. |
+| `SCN-WF-15` | Bare Invocation on Configured Repo Runs Status First | Bare invocation, repo with daw-config block | Configured repo, no task named | Status Preflight | `validate.py status --project-root .` runs first; summary + recommended_route reported and proposed before Adopt. |
+| `SCN-WF-16` | Stale Config Yields Upgrade-Re-check | Bare invocation, `daw_version` older than installed VERSION | Config with stale `daw_version` | Status Preflight | summary.config `stale` (`config_daw_version_stale` warning); recommended_route `upgrade-recheck`; no mutation. |
+| `SCN-WF-17` | Invalid Completed Task Yields Verify | Task invocation, completed contract invalid at complete | Contract at `complete` with errors | Status Preflight | summary.tasks.complete_invalid >= 1; recommended_route `verify`; spec-mutating routes blocked until resolved. |
+| `SCN-WF-18` | Read-Only Routes Never Blocked by Status | Task invocation, status ends with error findings | Status with config invalid | Status Preflight | ask/review/untangle and setup proceed; only feature/bugfix/refactor/maintain blocked. |
 
 ## Operational Rule Diagnostics Scenarios (Manual)
 
@@ -2029,6 +2042,200 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 - **Content Invariants & Verification:**
   - Every returned result has one recorded disposition; 0 silently dropped findings.
   - The queue records dedup, stale/unsupported rejections, and dependency-ordered dispatch; 0 automatic apply/deploy from worker pass.
+
+### SCN-WF-06: Spec Drift Blocks Build Until Ledger Ready
+
+- **Target Workspace Fixture:** A spec previously `ready` on hash H; the spec file is then mutated so its current hash is H', while `<spec_dir>/ledger.json` still records `ready` at H.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Build the feature per the ready spec."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The orchestrator runs `python3 scripts/validate.py ledger <spec_dir>/ledger.json --project-root <ROOT>`; it reports drift (`ledger_doc_drift` or `ledger_record_mismatch`) because the ledger hash no longer equals the current document hash.
+  2. Build blocks: no code is written from the drifted spec; the route re-enters via rework (`review-rework` -> `rework-review` -> `review-ready`) and the ledger is updated, then revalidated.
+  3. Only after a passing ledger validation with dependent specs `ready` on their current hash does planning/build proceed.
+- **Content Invariants & Verification:**
+  - 0 code edits from a drifted spec; the drift finding is named verbatim in the block report.
+  - The ledger records the CURRENT transition record path (and prior history) matching the fresh `review-ready` state.
+
+### SCN-WF-07: Tmp Evidence Rejected as Not Durable
+
+- **Target Workspace Fixture:** A transition record whose `sources[].path` or `checks[].evidence[].path` first segment is `tmp/` (e.g. `tmp/citation.txt`), with otherwise valid hashes/quotes.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Validate this review-ready transition record against the project."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The validator rejects the record with `evidence_not_durable` for the `tmp/` path; the position is reported with a segment-denylist rationale (it cannot detect gitignored paths).
+  2. The author replaces the ephemeral file with a committed project file (e.g. under `docs/`), recomputes SHA-256 and quotes, and resubmits.
+  3. The resubmitted record passes only if all cited paths are durable committed files.
+- **Content Invariants & Verification:**
+  - 0 transitions advance on `tmp/`-rooted sources/evidence; no ephemeral capture is treated as durable proof.
+  - The rejection names the exact offending path and the durable replacement.
+
+### SCN-WF-08: Self-Review Rejected as Not Independent
+
+- **Target Workspace Fixture:** A `review-ready` record whose `reviewer` object has `id` equal to `author_id` (case-insensitive match after strip), e.g. both `alice`, with otherwise accepted criteria.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Approve this spec as its author."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The validator rejects the record with `reviewer_not_independent`; the old plain-string reviewer form is also rejected.
+  2. A different reviewer submits the `review-ready` record as `{id, kind, author_id}` with `id` distinct from `author_id`; `kind: "agent"` passes only with a `reviewer_agent_attestation` warning, and formal specs want `kind: "human"`.
+  3. Only the independent reviewer's accepted record advances the spec to `ready` and updates the ledger.
+- **Content Invariants & Verification:**
+  - 0 self-approved `review-ready` transitions; independence is structural (id vs. author_id), not an attested claim.
+  - The validator's non-authentication of identity is disclosed in the outcome (it checks the ids, not the person).
+
+### SCN-WF-09: Config With Unresolved Command Rejected
+
+- **Target Workspace Fixture:** An `AGENTS.md` DAW configuration block whose `test_command` first token is an unknown word (not an existing project-relative file and not resolvable via `shutil.which`), e.g. `nosuchtool test`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Set up DAW for this repository."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. `daw-setup` writes the block, then runs `python3 scripts/validate.py config AGENTS.md --project-root .` and reports findings verbatim.
+  2. The validator reports `config_command_unresolved` for `test_command`; setup corrects the value to `none` (never writes a command that fails resolution) and reruns validation until clean.
+  3. A fully resolvable config (existing files or `none`) passes with zero `config_*` findings.
+- **Content Invariants & Verification:**
+  - 0 written commands whose first token fails resolution; unknown commands are `none`, never guessed.
+  - The config validation output is shown to the operator, not summarized away.
+
+### SCN-WF-10: Stale daw_version Triggers Read-Only Upgrade Re-check Diagnosis Without Mutation
+
+- **Target Workspace Fixture:** An `AGENTS.md` DAW configuration block whose `daw_version` predates the installed suite `VERSION` (e.g. project `0.2.0`, installed `0.3.0`). No other project files were changed for the upgrade.
+- **Prompt / Intake Invocation:**
+  ```text
+  "DAW was updated in this repo. Check what needs fixing."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The `daw-setup` Upgrade Re-check runs read-only: it reads the CHANGELOG entries between recorded `daw_version` and installed `VERSION` and collects their `### Project migration` items.
+  2. It runs `python3 scripts/validate.py config AGENTS.md --project-root .`, `validate.py ledger <spec_dir>/ledger.json` when that ledger exists (absence of a ledger with formal specs present is reported as a finding), and `validate.py docs` on each ledger `record` with its state's transition.
+  3. Manual checks named in `### Project migration` with no validator are listed as manual findings; findings are grouped by artifact with fix routes (spec drift/schema → `daw-design` rework; unfinished code work → `daw-plan`; config → `daw-setup` write).
+  4. Zero project files are mutated during diagnosis; `daw_version` is not bumped while any error remains.
+- **Content Invariants & Verification:**
+  - 0 writes during diagnosis; the stale warning (`config_daw_version_stale`) names the stale version and the installed version.
+  - The report distinguishes validator findings from manual findings and states the fix route per artifact.
+
+### SCN-WF-11: daw_version Bumped Only After Clean Re-check and User Confirmation
+
+- **Target Workspace Fixture:** The project from SCN-WF-10 after its Upgrade Re-check findings were fixed through the routed fix path (specs via `daw-design` rework, unfinished work via `daw-plan`, config via `daw-setup` write). Validators now report no error findings.
+- **Prompt / Intake Invocation:**
+  ```text
+  "The findings are fixed. Confirm the upgrade re-check."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. With all errors resolved, `daw-setup` presents the `daw_version` bump (to the installed `VERSION`) as a config-block diff and awaits explicit user confirmation; without confirmation there is no write.
+  2. On confirmation, it writes only the `daw_version` line in the existing config block, then reruns `python3 scripts/validate.py config AGENTS.md --project-root .` and reports findings verbatim (no `config_daw_version_stale` remains).
+  3. A project ahead of the installed suite (`config_daw_version_ahead`) is never bumped downward; it routes to updating the installed suite instead.
+- **Content Invariants & Verification:**
+  - 0 `daw_version` bumps before all errors are resolved and the user confirms; `daw_version` means "last version this project passed re-check against".
+  - The post-bump config validation is shown to the operator, not summarized away.
+
+### SCN-WF-12: Code Edited After Verify Blocks Complete
+
+- **Target Workspace Fixture:** A task contract at `complete` whose `result` snapshot (post-change revision `r1`, changed-file hashes) was recorded after verify; one changed file (`src/x.py`) was then edited so its current SHA-256 no longer matches the recorded value. `baseline` (pre-change snapshot) is otherwise intact.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Claim this task complete."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent runs `python3 scripts/validate.py contract task-contract.json --project-root . --stage complete --format json`; the validator reports `result_changed` for `result.files[i]` because the current on-disk SHA-256 differs from the recorded hash. (`baseline` = pre-change snapshot; `result` = post-change snapshot recorded after verify.)
+  2. Any edit after recording `result` invalidates completion: the claim is blocked, and the parent requires fresh verification against the new code state (record a new `result` snapshot after re-verify) before any complete claim.
+  3. Only after re-verify and a fresh `result` whose hashes match current disk content does `contract --stage complete` pass.
+- **Content Invariants & Verification:**
+  - 0 completion claims pass while a `result` file diverges from disk; `result_changed` names the diverging file.
+  - Evidence from the pre-edit verify run is never carried forward across the edit without re-inspection.
+
+### SCN-WF-13: Stale Log From Earlier Revision Rejected
+
+- **Target Workspace Fixture:** A task contract at `complete` whose `result.revision` is `r1`, but whose evidence entry cites a log file produced against earlier revision `r0` (evidence `revision` = `r0`, with otherwise valid `sha256` and durable path).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Accept this completion with the attached earlier test log."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. `python3 scripts/validate.py contract task-contract.json --project-root . --stage complete --format json` reports `evidence_revision_mismatch` at `evidence[i].revision` because `r0` does not equal `result.revision` `r1`. Verify evidence must be produced against `result.revision`.
+  2. The parent records the stale log as superseded: it cannot support the current result, and the disposition stays `not accepted` until fresh evidence is produced against `r1` and recorded with `revision: r1` (plus its current `sha256`; missing hash at complete would be `missing_evidence_sha256`, mismatched hash `evidence_hash_mismatch`).
+  3. The resubmitted contract with evidence bound to `r1` passes only if the new log's hash matches and the claim otherwise holds.
+- **Content Invariants & Verification:**
+  - 0 stale-revision logs support a completion claim; the mismatch names the evidence entry and both revisions.
+  - No earlier-revision pass is treated as proof for the current `result` revision.
+
+### SCN-WF-14: Tmp Evidence Rejected at Contract Complete
+
+- **Target Workspace Fixture:** A task contract whose `evidence[].reference` points under `tmp/` (e.g. `tmp/pytest.log`) at `complete` stage, with otherwise valid `sha256` and `revision` bindings. (Contrast SCN-WF-07, which covers the `docs` transition record form.)
+- **Prompt / Intake Invocation:**
+  ```text
+  "Claim this task complete with the ephemeral log as evidence."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. `python3 scripts/validate.py contract task-contract.json --project-root . --stage complete --format json` rejects the entry with `evidence_not_durable` at `evidence[i].reference`. The same code fires on every stage (`plan`, `execute`, `complete`); durability is not a complete-only check.
+  2. The author replaces the ephemeral file with a committed project file (e.g. under `docs/evidence/<task-id>/`), recomputes its `sha256`, binds `revision` to `result.revision`, and resubmits.
+  3. The resubmitted contract passes only if all evidence references are durable committed files.
+- **Content Invariants & Verification:**
+  - 0 ephemeral `tmp/` evidence supports a completion claim on any stage; no ephemeral capture is treated as durable proof.
+  - The rejection names the exact offending path and the durable replacement.
+
+
+### SCN-WF-15: Bare Invocation on Configured Repo Runs Status First
+
+- **Target Workspace Fixture:** A repo whose agent file carries a valid `<!-- daw-config:start -->` block (current `daw_version`, resolvable commands) plus a spec dir with a valid `ledger.json`. The invocation names no task.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Use deterministic-agentic-workflow"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. Before choosing Adopt, the agent runs `python3 scripts/validate.py status --project-root .` (read-only; no files written) and reports `summary.config: "ok"`, `summary.ledger: "ok"`, task counts, and `recommended_route: "none"`.
+  2. With `recommended_route: "none"`, the agent proposes Adopt normally; the status output is not treated as workflow state.
+- **Content Invariants & Verification:**
+  - Status runs before Adopt on any configured repo; 0 bare invocations skip preflight when a daw-config block or DAW artifact exists.
+  - The reported summary and recommended_route match the envelope exactly.
+
+### SCN-WF-16: Stale Config Yields Upgrade-Re-check
+
+- **Target Workspace Fixture:** An agent file whose `daw_version` predates the installed suite `VERSION` (cf. SCN-WF-10); everything else is valid.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Use deterministic-agentic-workflow to add the export feature."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The `status` preflight yields `summary.config: "stale"` with the propagated warning `config_daw_version_stale` (path prefixed `config:`) and `recommended_route: "upgrade-recheck"`.
+  2. The feature route stays unstarted; the agent proposes the `daw-setup` Upgrade Re-check (read-only diagnosis) first. Upgrade Re-check itself writes 0 files; the version bump happens only per SCN-WF-11.
+- **Content Invariants & Verification:**
+  - 0 spec-dependent mutations occur against a stale config; the stale warning keeps `valid: true` (exit 0) yet still routes to `upgrade-recheck`.
+  - Precedence holds: `upgrade-recheck` wins over ledger/task findings (cf. §10).
+
+### SCN-WF-17: Invalid Completed Task Yields Verify
+
+- **Target Workspace Fixture:** A task contract at `docs/evidence/<task-id>/contract.json` carrying a `result` key whose `validate.py contract --stage complete` reports error findings (e.g. `result_changed` from SCN-WF-12); config and ledger are `ok`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Use deterministic-agentic-workflow to ship the next fix."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The `status` preflight reports `summary.tasks.complete_invalid: 1` with findings propagated as `contract[docs/evidence/<task-id>/contract.json]:<original path>` and `recommended_route: "verify"`.
+  2. Spec-dependent mutating routes (feature, bugfix, refactor, maintain) stay blocked until the contract is fixed and re-validated; an `in_progress` contract (no `result` key) only warns `status_task_in_progress` and does not set `verify`.
+- **Content Invariants & Verification:**
+  - Any `complete_invalid` task forces `recommended_route: "verify"` (after setup/upgrade-recheck/design-rework precedence); malformed contract JSON counts as `complete_invalid`.
+  - No mutating route starts while error findings remain; the fix path is the recommended route, not an unrequested new workflow.
+
+### SCN-WF-18: Read-Only Routes Never Blocked by Status
+
+- **Target Workspace Fixture:** A repo whose status ends with error findings (e.g. `summary.config: "invalid"` and a `config_command_unresolved`), setup-level, not code-level, damage.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Use deterministic-agentic-workflow to review PR #12."
+  "Use deterministic-agentic-workflow — where does the retry live?"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The `status` preflight is still run and reported, but `review`/`ask`/`untangle` proceed read-only against the actual code; the config damage does not block them and is never "repaired" as a side effect.
+  2. `setup` is likewise never status-blocked: it runs and repairs the config. Only spec-dependent mutating routes (feature, bugfix, refactor, maintain) gate on status error findings.
+- **Content Invariants & Verification:**
+  - 0 read-only routes blocked by status error findings; 0 read-only runs write files.
+  - The status report remains visible in the output even when it fails to block the request.
 
 ## Post-Release Feedback & Incident Closure Scenarios (Manual)
 

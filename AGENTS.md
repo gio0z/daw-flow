@@ -20,11 +20,18 @@
 - **Route Engine & Policy:**
   - [`scripts/route.py`](scripts/route.py): Read-only, zero-dependency suite routing engine and `--check-suite` structural validator.
   - [`references/suite-manifest.json`](references/suite-manifest.json): Declarative routing policy table and module mapping schema.
-- **Validator CLI & Engine:** [`scripts/validate.py`](scripts/validate.py)
+- **Validator CLI & Engine:** [`scripts/validate.py`](scripts/validate.py) (CLI dispatch only: argparse, dispatch, exit codes)
   - Runtime: Python 3.10+ standard library only (`argparse`, `hashlib`, `json`, `os`, `pathlib`, `re`, `sys`, `urllib.parse`).
   - Dependencies: Zero third-party runtime dependencies; strictly read-only filesystem access; no network, no Git CLI execution, no subshell spawning.
-  - Subcommands: `package` (package integrity & link resolution) and `contract` (JSON task contract lifecycle validation).
-- **Installer & Packaging:** [`scripts/install.py`](scripts/install.py) is a separate, explicitly mutating stdlib CLI for complete-bundle installation, ownership-checked updates, status, and removal. [`scripts/package_layout.py`](scripts/package_layout.py) defines the shared standard library operational bundle payload.
+  - Subcommands: `package` (package integrity & link resolution), `contract` (JSON task contract lifecycle validation), `docs`, `ledger`, `config`, `status` (read-only aggregate preflight; see `references/validation.md` §10).
+  - Flat module layout in `scripts/` (no subpackages):
+    - `scripts/daw_common.py`: shared helpers (strict JSON, frontmatter, bounded paths, SHA-256, finding helpers, `output_result`).
+    - `scripts/check_package.py`: package integrity and link resolution (`validate_package`).
+    - `scripts/check_contract.py`: task-contract lifecycle validation.
+    - `scripts/check_docs.py`: documentation workflow transition validation (`docs`).
+    - `scripts/check_ledger.py`: spec-ledger validation (`ledger`).
+    - `scripts/check_config.py`: DAW configuration block validation (`config`), including `daw_version`.
+    - `scripts/check_status.py`: aggregate `status` preflight composition (owns no rules of its own).
 - **Behavioral Evaluations & Benchmarks (Developer Tooling):** [`tools/evaluation/evaluate.py`](tools/evaluation/evaluate.py), [`tools/evaluation/wizard_bench.py`](tools/evaluation/wizard_bench.py), and evaluation guides in [`docs/evaluation/`](docs/evaluation/) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
 - **Test Suites & Fixtures:**
   - [`tests/test_validate.py`](tests/test_validate.py): Standard library `unittest` verifying package checks, contract schemas, boundary traversal prevention, duplicate-key rejection, and stage transitions.

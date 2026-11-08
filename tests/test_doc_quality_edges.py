@@ -136,7 +136,7 @@ class DocQualityEdgeTests(unittest.TestCase):
         transition: str = "authoring-review",
         doc_kind: Any = "frd",
         checks: list[dict[str, Any]] | None = None,
-        reviewer: str | None = None,
+        reviewer: dict[str, Any] | str | None = None,
         include_decision: bool = False,
         decision_val: str = "accepted",
     ) -> dict[str, Any]:
@@ -179,7 +179,7 @@ class DocQualityEdgeTests(unittest.TestCase):
         if reviewer is not None:
             record["reviewer"] = reviewer
         elif is_review_exit:
-            record["reviewer"] = "test-reviewer@domain.org"
+            record["reviewer"] = {"id": "test-reviewer@domain.org", "kind": "human", "author_id": "doc-author-1"}
 
         return record
 
@@ -794,6 +794,96 @@ class DocQualityEdgeTests(unittest.TestCase):
         self.assertTrue(out["valid"])
         self.assertEqual(out["transition"], "authoring-review")
         self.assertEqual(len(out["findings"]), 0)
+
+    # =========================================================================
+    # 9. C1 durable evidence + C2 reviewer object
+    # =========================================================================
+    def test_tmp_source_path_rejected_as_not_durable(self) -> None:
+        tmp_source = self.proj_root / "tmp" / "ephemeral.txt"
+        tmp_source.parent.mkdir(parents=True, exist_ok=True)
+        tmp_source.write_text("ephemeral source line\n", encoding="utf-8")
+        tmp_sha = _sha256(tmp_source.read_bytes())
+        rec = self._build_base_record(transition="authoring-review")
+        rec["documents"][0]["sources"] = [
+            {"path": "tmp/ephemeral.txt", "sha256": tmp_sha, "start_line": 1, "end_line": 1, "quote": "ephemeral source line"}
+        ]
+        rec_path = self._write_record(rec)
+
+        res = self.run_cli([
+            str(rec_path),
+            "--project-root", str(self.proj_root),
+            "--transition", "authoring-review",
+            "--documents", "docs/frd.md",
+            "--format", "json",
+        ])
+
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(res.returncode, 1)
+        out = json.loads(res.stdout)
+        self.assertFalse(out["valid"])
+        self.assertIn("evidence_not_durable", [f["code"] for f in out["findings"]])
+
+    def test_reviewer_equal_to_author_rejected(self) -> None:
+        rec = self._build_base_record(
+            transition="review-ready",
+            reviewer={"id": "same-id", "kind": "human", "author_id": " Same-Id "},
+        )
+        rec_path = self._write_record(rec)
+
+        res = self.run_cli([
+            str(rec_path),
+            "--project-root", str(self.proj_root),
+            "--transition", "review-ready",
+            "--documents", "docs/frd.md",
+            "--format", "json",
+        ])
+
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(res.returncode, 1)
+        out = json.loads(res.stdout)
+        self.assertFalse(out["valid"])
+        self.assertIn("reviewer_not_independent", [f["code"] for f in out["findings"]])
+
+    def test_agent_reviewer_on_review_ready_warns_but_valid(self) -> None:
+        rec = self._build_base_record(
+            transition="review-ready",
+            reviewer={"id": "agent-reviewer-1", "kind": "agent", "author_id": "doc-author-1"},
+        )
+        rec_path = self._write_record(rec)
+
+        res = self.run_cli([
+            str(rec_path),
+            "--project-root", str(self.proj_root),
+            "--transition", "review-ready",
+            "--documents", "docs/frd.md",
+            "--format", "json",
+        ])
+
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(res.returncode, 0, f"Expected 0 exit, stderr: {res.stderr}, stdout: {res.stdout}")
+        out = json.loads(res.stdout)
+        self.assertTrue(out["valid"])
+        self.assertTrue(out["eligible"])
+        self.assertIn("reviewer_agent_attestation", [f["code"] for f in out["findings"]])
+        self.assertTrue(any(f["severity"] == "warning" for f in out["findings"]))
+
+    def test_string_reviewer_rejected(self) -> None:
+        rec = self._build_base_record(transition="review-ready", reviewer="legacy-string-reviewer")
+        rec_path = self._write_record(rec)
+
+        res = self.run_cli([
+            str(rec_path),
+            "--project-root", str(self.proj_root),
+            "--transition", "review-ready",
+            "--documents", "docs/frd.md",
+            "--format", "json",
+        ])
+
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(res.returncode, 1)
+        out = json.loads(res.stdout)
+        self.assertFalse(out["valid"])
+        self.assertIn("invalid_reviewer", [f["code"] for f in out["findings"]])
 
 
 if __name__ == "__main__":

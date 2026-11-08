@@ -653,7 +653,7 @@ class TestRouteSuite(unittest.TestCase):
     def test_cli_preserves_suite_files_without_bytecode_environment_flags(self):
         scripts_dir = self.suite_root / "scripts"
         scripts_dir.mkdir()
-        for name in ("route.py", "validate.py"):
+        for name in ("route.py", "daw_common.py"):
             (scripts_dir / name).write_bytes((REPO_ROOT / "scripts" / name).read_bytes())
         request_path = self.suite_root / "request.json"
         request_path.write_text(json.dumps(make_request(intent="patch")), encoding="utf-8")

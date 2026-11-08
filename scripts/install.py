@@ -15,8 +15,9 @@ import tempfile
 
 sys.dont_write_bytecode = True
 
+import check_package
+import daw_common
 import route
-import validate
 
 try:
     import package_layout
@@ -178,7 +179,7 @@ def is_valid_historical_suite(root: Path) -> bool:
     if not manifest_path.is_file() or manifest_path.stat().st_size > 1024 * 1024:
         return False
     try:
-        data = validate.parse_strict_json(manifest_path.read_text(encoding="utf-8"))
+        data = daw_common.parse_strict_json(manifest_path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeError, RecursionError):
         return False
     if not isinstance(data, dict) or data.get("schema_version") != 1 or data.get("suite") != SUITE:
@@ -218,7 +219,7 @@ def is_valid_historical_suite(root: Path) -> bool:
 
 def ensure_valid_bundle(root: Path, allow_historical: bool = False) -> None:
     root = Path(root).expanduser().resolve()
-    if not validate.validate_package(root)["valid"]:
+    if not check_package.validate_package(root)["valid"]:
         raise InstallError("Package or suite validation failed; no installation was applied.")
     findings = route.check_suite(root)
     if findings and allow_historical and is_valid_historical_suite(root):
@@ -280,7 +281,7 @@ def inspect_installation(skills_dir: Path) -> dict | None:
     if receipt_file.is_symlink() or not receipt_file.is_file() or receipt_file.stat().st_size > 2 * 1024 * 1024:
         raise InstallError("No valid installer receipt; preserving the existing suite.")
     try:
-        receipt = validate.parse_strict_json(receipt_file.read_text(encoding="utf-8"))
+        receipt = daw_common.parse_strict_json(receipt_file.read_text(encoding="utf-8"))
     except (ValueError, UnicodeError, RecursionError):
         raise InstallError("Invalid installer receipt; preserving the existing suite.") from None
     if (

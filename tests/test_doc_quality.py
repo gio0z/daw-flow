@@ -1,6 +1,6 @@
 """Unit tests for Document Quality workflow transition gate CLI and validation logic.
 
-Verifies `python3 scripts/validate.py docs` subprocess behavior and `scripts.doc_quality`
+Verifies `python3 scripts/validate.py docs` subprocess behavior and `scripts.check_docs`
 against the contract:
 - Five transition edges: intake-authoring, authoring-review, review-ready, review-rework, rework-review
 - Exit codes: 0 (eligible/valid), 1 (rejected/ineligible), 2 (malformed JSON / CLI syntax)
@@ -416,7 +416,7 @@ class TestDocQualityCLIValidScenarios(DocQualityTestBase):
         rec = {
             "schema_version": 1,
             "transition": {"from": "review", "to": "ready"},
-            "reviewer": "Security and Architecture Gate Reviewer",
+            "reviewer": {"id": "sec-arch-reviewer", "kind": "human", "author_id": "doc-author-1"},
             "objective": "Verify architectural readiness.",
             "scope": "System overview.",
             "documents": [
@@ -465,7 +465,7 @@ class TestDocQualityCLIValidScenarios(DocQualityTestBase):
         rec = {
             "schema_version": 1,
             "transition": {"from": "review", "to": "rework"},
-            "reviewer": "Lead QA Engineer",
+            "reviewer": {"id": "qa-lead-reviewer", "kind": "human", "author_id": "doc-author-1"},
             "objective": "Review QA test coverage.",
             "scope": "E2E automated suite.",
             "documents": [

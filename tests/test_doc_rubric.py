@@ -1,6 +1,6 @@
 """Unit tests for Document Quality rubric registry loading and strict structural validation.
 
-Verifies `load_rubric` in `scripts.doc_quality` against canonical registry invariants:
+Verifies `load_rubric` in `scripts.check_docs` against canonical registry invariants:
 - Strict top-level keys: exact `{"schema_version", "common", "kinds"}`
 - `schema_version` must be integer 1
 - `common`: array of exactly 5 criteria objects with exact keys `{"id", "question"}`
@@ -20,7 +20,7 @@ import pathlib
 import tempfile
 import unittest
 
-from scripts.doc_quality import CANONICAL_KINDS, COMMON_CRITERIA_IDS, load_rubric
+from scripts.check_docs import CANONICAL_KINDS, COMMON_CRITERIA_IDS, load_rubric
 
 
 class TestDocRubricRegistry(unittest.TestCase):

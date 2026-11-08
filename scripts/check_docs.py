@@ -13,18 +13,24 @@ import pathlib
 from typing import Any
 
 try:
-    from scripts.validate import (
+    from scripts.daw_common import (
         DuplicateKeyError,
         compute_sha256,
+        is_durable_evidence_path,
         is_safe_relative_path,
+        make_error as _make_error,
+        make_warning as _make_warning,
         parse_strict_json,
         resolve_bounded_path,
     )
 except ImportError:
-    from validate import (  # type: ignore[import-not-found]
+    from daw_common import (  # type: ignore[import-not-found]
         DuplicateKeyError,
         compute_sha256,
+        is_durable_evidence_path,
         is_safe_relative_path,
+        make_error as _make_error,
+        make_warning as _make_warning,
         parse_strict_json,
         resolve_bounded_path,
     )
@@ -63,15 +69,13 @@ DOCS_LIMITATIONS = [
     "Source quote verification checks line-exact presence only at validation time; does not evaluate contextual meaning or prevent TOCTOU modifications.",
     "Reviewer and approval attestations capture opaque references only; independent human comprehension and authorization remain unexercised.",
     "Validator is read-only and does not persist state; parent workflow must verify transition provenance and record actual state changes.",
+    "Durable-evidence check uses a deterministic path-segment denylist (tmp/temp/.tmp/scratch/.cache, __pycache__, and dot-prefixed segments except .github); the validator cannot call git, so it cannot detect gitignored paths that are not on this list.",
+    "Validator never authenticates reviewer identity; reviewer independence is checked only by exact stripped casefold comparison of reviewer id against reviewer author_id, and agent-kind review attestation is flagged rather than certified.",
 ]
 
 
-def _make_error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
-
-
 def _build_result(transition: str, findings: list[dict[str, str]]) -> dict[str, Any]:
-    is_valid = len(findings) == 0
+    is_valid = not any(f.get("severity") == "error" for f in findings)
     return {
         "valid": is_valid,
         "eligible": is_valid,
@@ -449,6 +453,16 @@ def _validate_evidence(
         )
         return
 
+    if not is_durable_evidence_path(p_str):
+        findings.append(
+            _make_error(
+                "evidence_not_durable",
+                f"{ev_path_label}.path",
+                "Evidence path is not durable (ephemeral, cache, or dot-prefixed segment).",
+            )
+        )
+        return
+
     try:
         resolved_path, err = resolve_bounded_path(project_root, p_str)
     except (OSError, RuntimeError):
@@ -709,8 +723,47 @@ def validate_docs(
 
     if is_review_exit:
         reviewer = record.get("reviewer")
-        if not isinstance(reviewer, str) or not reviewer.strip():
-            findings.append(_make_error("invalid_reviewer", "reviewer", "reviewer must be a non-empty string reference for review exit transitions."))
+        if isinstance(reviewer, str) or not isinstance(reviewer, dict):
+            findings.append(
+                _make_error(
+                    "invalid_reviewer",
+                    "reviewer",
+                    "reviewer must be an object with id, kind, and author_id for review exit transitions.",
+                )
+            )
+        else:
+            allowed_reviewer_keys = {"id", "kind", "author_id"}
+            for rk in reviewer:
+                if rk not in allowed_reviewer_keys:
+                    findings.append(_make_error("unexpected_reviewer_field", f"reviewer.{rk}", "Unexpected field in reviewer object."))
+            reviewer_id = reviewer.get("id")
+            reviewer_kind = reviewer.get("kind")
+            reviewer_author_id = reviewer.get("author_id")
+            valid_reviewer_id = isinstance(reviewer_id, str) and bool(reviewer_id.strip())
+            valid_author_id = isinstance(reviewer_author_id, str) and bool(reviewer_author_id.strip())
+            if not valid_reviewer_id:
+                findings.append(_make_error("invalid_reviewer", "reviewer.id", "reviewer.id must be a non-empty string."))
+            if not valid_author_id:
+                findings.append(_make_error("invalid_reviewer", "reviewer.author_id", "reviewer.author_id must be a non-empty string."))
+            if reviewer_kind not in ("human", "agent"):
+                findings.append(_make_error("invalid_reviewer", "reviewer.kind", "reviewer.kind must be 'human' or 'agent'."))
+            if valid_reviewer_id and valid_author_id:
+                if reviewer_id.strip().casefold() == reviewer_author_id.strip().casefold():
+                    findings.append(
+                        _make_error(
+                            "reviewer_not_independent",
+                            "reviewer",
+                            "reviewer.id must differ from reviewer.author_id.",
+                        )
+                    )
+            if reviewer_kind == "agent" and transition == "review-ready":
+                findings.append(
+                    _make_warning(
+                        "reviewer_agent_attestation",
+                        "reviewer",
+                        "reviewer.kind is 'agent' on review-ready; independent human review is recommended.",
+                    )
+                )
 
     norm_expected: set[str] = set()
     resolved_expected_set: set[pathlib.Path] = set()

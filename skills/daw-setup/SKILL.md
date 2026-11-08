@@ -73,15 +73,16 @@ Inspect observable repository facts without executing mutating commands:
 
 Present discovered facts as pre-filled defaults, not questions the repository already answers. Ask only unresolved material config preferences using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): exposed tools only, frontier decisions in rounds of at most 5, cancellation remains unresolved, and clarification never grants mutation or point-of-risk approval. Batch compatible preferences without forcing dependent questions into the same round; the proposed diff still requires explicit confirmation before writing.
 
-1. **spec_dir:** Default `docs/specs/` (or discovered existing path).
-2. **test_command:** Discovered test command or `none`.
-3. **lint_command:** Discovered linter command or `none`.
-4. **build_command:** Discovered build command or `none`.
-5. **workspace:** `in-place` | `isolated` (default `in-place`).
-6. **high_risk_paths:** Identified sensitive paths (e.g. `migrations/`, `deploy/`, `infra/`, `.github/workflows/`) or `none`.
-7. **issue_tracker:** `github` | `gitlab` | `local-markdown` | `none`.
-8. **default_branch:** Detected default branch (`main` or `master`).
-9. **Delivery conventions (ship route):** `commit_convention`, `pr_template`, `ci_checks`, `release_process`, `branch_pattern` — discovered values or `none` (never guessed). Required for `ship` route readiness; `none` means the ship stage works from observed repo behavior with an explicit note.
+1. **schema:** `1`.
+2. **daw_version:** Installed suite `VERSION` (semver X.Y.Z) — "last version this project passed re-check against", never just "last version touched"; updated only by the Upgrade Re-check below.
+3. **test_command:** Discovered test command or `none`.
+4. **lint_command:** Discovered linter command or `none`.
+5. **build_command:** Discovered build command or `none`.
+6. **workspace:** `in-place` | `isolated` (default `in-place`).
+7. **high_risk_paths:** Identified sensitive paths (e.g. `migrations/`, `deploy/`, `infra/`, `.github/workflows/`) or `none`.
+8. **issue_tracker:** `github` | `gitlab` | `local-markdown` | `none`.
+9. **default_branch:** Detected default branch (`main` or `master`).
+10. **Delivery conventions (ship route):** `commit_convention`, `pr_template`, `ci_checks`, `release_process`, `branch_pattern` — discovered values or `none` (never guessed). Required for `ship` route readiness; `none` means the ship stage works from observed repo behavior with an explicit note.
 
 Show the proposed block diff and obtain explicit confirmation.
 
@@ -102,7 +103,7 @@ Exact block format:
 ## DAW Configuration
 
 - schema: 1
-- spec_dir: docs/specs
+- daw_version: 0.3.0
 - test_command: python3 -m unittest discover -s tests
 - lint_command: none
 - build_command: none
@@ -119,9 +120,26 @@ Exact block format:
 <!-- daw-config:end -->
 ```
 
+After writing, `daw-setup` MUST run `python3 scripts/validate.py config AGENTS.md --project-root .` (or the edited `CLAUDE.md` path when applicable) and report findings verbatim. Never write a `test_command`/`lint_command`/`build_command` whose first token fails resolution (not an existing project-relative file and not resolvable via `shutil.which`); set it to `none` instead. See [Validator Reference](../../references/validation.md).
+
 ### Step 4: Record Retrospective Lessons
 
 After a shipped or completed workflow, record durable lessons (recurring verifier findings, convention gaps, recurring CI failures) into this same DAW config block or a `docs/retro/` note and reference it from the block, per [Retrospective & Convention Feedback](../../references/developer-lifecycle.md#11-retrospective--convention-feedback). Update in place; never duplicate the block.
+
+### Step 5: Upgrade Re-check (Read-Only Diagnosis)
+
+Trigger: `config_daw_version_stale` from `validate.py config`, or the user reports the DAW suite was updated. This section is strictly read-only diagnosis; it mutates no project files.
+
+1. Read the CHANGELOG entries between the recorded `daw_version` and the installed `VERSION`; collect every `### Project migration` item (artifact, finding code or `manual`, fix route).
+2. Run read-only validators:
+   - `python3 scripts/validate.py config AGENTS.md --project-root .` (or the edited `CLAUDE.md`);
+   - `python3 scripts/validate.py ledger <spec_dir>/ledger.json --project-root .` when the ledger exists — the absence of a ledger when `<spec_dir>` holds formal specs is itself a finding (report it, do not create the ledger here);
+   - `python3 scripts/validate.py docs` on each ledger `record` with its state's transition.
+3. List manual checks named in `### Project migration` that have no validator (e.g. ERD coverage, evidence persistence path) as manual findings.
+4. Report findings grouped by artifact, each with its fix route: spec drift/schema → `daw-design` rework; unfinished code work → `daw-plan`; config → `daw-setup` write. Do not apply fixes during diagnosis.
+5. Only after all errors are resolved and the user confirms, bump `daw_version` to the installed `VERSION`, then rerun `validate.py config` and report findings verbatim.
+
+`daw_version` means "last version this project passed re-check against", never just "last version touched".
 
 ---
 
@@ -136,6 +154,7 @@ Required `details`: `target_file` and `configuration`, retaining all configurati
   "target_file": "AGENTS.md",
   "configuration": {
     "schema": 1,
+    "daw_version": "0.3.0",
     "spec_dir": "docs/specs",
     "test_command": "npm test",
     "lint_command": "npm run lint",

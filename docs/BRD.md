@@ -44,7 +44,7 @@ The business goal is not financial monetization or SaaS subscription revenue, bu
 ### 6. Scope Boundaries & Non-Goals
 
 - **In Scope:**
-  - **Operational Installed Package:** Suite Router and Specialized Modular Skills package (`SKILL.md`, `LICENSE`, `VERSION`, `skills/daw-*`, operational `references/`, `templates/`, and operational scripts `scripts/{install,route,validate,doc_quality,package_layout}.py`).
+  - **Operational Installed Package:** Suite Router and Specialized Modular Skills package (`SKILL.md`, `LICENSE`, `VERSION`, `skills/daw-*`, operational `references/`, `templates/`, and operational scripts `scripts/{install,route,validate,daw_common,check_package,check_contract,check_docs,check_ledger,check_config,check_status,package_layout}.py`).
   - **Developer & Repository Source:** Full repository checkout including developer test suites (`tests/test_validate.py`, `tests/test_route.py`), developer evaluation tooling (`tools/evaluation/`), repository documentation (`AGENTS.md`, `CHANGELOG.md`, `docs/`), and maintainer fixtures (`tests/fixtures/wizard-bench`).
   - Read-only standard library validation and routing engine (`scripts/validate.py`, `scripts/route.py`).
   - Declarative route policy manifest (`references/suite-manifest.json`).

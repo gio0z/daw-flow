@@ -775,7 +775,7 @@ class InstallTests(unittest.TestCase):
                 shutil.copy2(src, dst)
         scripts_dir = bundle / "scripts"
         scripts_dir.mkdir(exist_ok=True)
-        for s in ("install.py", "route.py", "validate.py", "doc_quality.py", "package_layout.py"):
+        for s in (Path(p).name for p in installer.package_layout.OPERATIONAL_SCRIPTS):
             if (ROOT / "scripts" / s).exists():
                 shutil.copy2(ROOT / "scripts" / s, scripts_dir / s)
         for m in MODULES:

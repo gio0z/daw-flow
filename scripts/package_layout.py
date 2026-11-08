@@ -9,7 +9,13 @@ OPERATIONAL_SCRIPTS = (
     "scripts/install.py",
     "scripts/route.py",
     "scripts/validate.py",
-    "scripts/doc_quality.py",
+    "scripts/daw_common.py",
+    "scripts/check_package.py",
+    "scripts/check_contract.py",
+    "scripts/check_docs.py",
+    "scripts/check_ledger.py",
+    "scripts/check_config.py",
+    "scripts/check_status.py",
     "scripts/package_layout.py",
 )
 

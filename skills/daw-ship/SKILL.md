@@ -46,7 +46,7 @@ Do NOT invoke `daw-ship` for:
    - Risk assessment: risk `unknown` -> `needs-input` before any mutation; risk `high` -> interactive approval before any mutation (see contract).
 2. **Pre-Ship Gate (blocking, checked before any mutation):**
    - Parent stage acceptance record for prior stages on the current revision (see [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint)).
-   - `daw-verify` evidence (`details.pre_ship_evidence`, falling back to `details.checks`, convergence, coverage) whose revision matches the current commit (`git rev-parse HEAD`, `git status --short`). Consume it as-is; do not rerun the suite to re-prove it.
+   - `daw-verify` evidence (`details.pre_ship_evidence`, falling back to `details.checks`, convergence, coverage) whose revision matches the current commit (`git rev-parse HEAD`, `git status --short`). Consume it as-is; do not rerun the suite to re-prove it. For multi-session or multi-commit work the task contract and `daw-verify` evidence MUST be persisted in the repo under `docs/evidence/<task-id>/` (or the contract's evidence paths) before commit; inline-only acceptance is limited to single-session trivial/patch work.
    - If either is missing, stale, or bound to an older revision: halt `blocked` naming the missing item. `daw-ship` never manufactures verification or acceptance.
 3. **Target Workspace Root:**
    - Resolve the active target repository root via `git rev-parse --show-toplevel` (independent of the DAW skill package root).
