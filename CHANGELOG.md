@@ -1,5 +1,9 @@
 # Suite Change History & Architecture Log
 
+## 0.1.2 (2026-11-08)
+
+- Version bump for the 2026-11-08 corrections below: optional Figma/FigCraft-first mockup review, workflow artifact governance, separate conditional ERD kind (14-kind catalog), substantive Blueprint, and post-release feedback/incident closure loop. `VERSION` and `SKILL.md` `metadata.version` updated together.
+
 ## 2026-11-08: ERD and Application Lifecycle Correction (Matrix Docs)
 
 - Catalog is now 14 kinds including conditional `erd.md` (`templates/erd.md`, default project file `erd.md` under spec convention). Baseline remains six (`blueprint`, `prd`, `frd`, `techstack`, `security`, `roadmap`) plus conditional ERD when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model; otherwise ERD is skipped/N/A with a scoped reason. Reuse an adequate separate existing model. Full-suite explicit requests cover all 14. Mockup remains a non-kind artifact.

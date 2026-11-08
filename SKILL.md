@@ -4,7 +4,7 @@ description: "Use to route multi-step engineering tasks, bootstrap greenfield sp
 compatibility: "Python 3.10+ stdlib validator & route engine; core workflow instructions remain fully usable without Python."
 license: MIT
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # Deterministic Agentic Workflow
