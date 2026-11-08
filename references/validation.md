@@ -598,7 +598,7 @@ Exit codes match the shared table in §1 (`0` valid, `1` findings, `2` usage/IO 
 
 ### Output Envelope
 
-Same envelope shape with `"check": "config"`. `limitations` states that the validator never executes commands and only checks lookup resolvability.
+Same envelope shape with `"check": "config"`. `valid: true` certifies structural schema and command-resolvability checks only, never application or toolchain readiness. `limitations` states that the validator never executes commands and only checks lookup resolvability. A `config_command_unresolved` error is reported as-is and never erased: the validator never removes or rewrites a configured command value.
 
 ---
 
@@ -645,6 +645,8 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
 3. `ledger` is `invalid` or `missing` => `design-rework`.
 4. Any `complete_invalid` task => `verify`.
 5. Otherwise => `none`.
+
+`recommended_route` is advisory only: it never authorizes dispatch, enlarges user scope, or grants mutation authority. An explicit status-only request reports this envelope and stops; an ordinary task request continues on its own authorized route, with error findings blocking only the spec-dependent mutating routes named in root §2.
 
 ### Output Envelope
 

@@ -31,7 +31,7 @@ except ImportError:
     from package_layout import REQUIRED_DIRS, REQUIRED_FILES, operational_entries
 
 COPY_IGNORE_PATTERNS = (".git", "__pycache__", "*.pyc", ".pytest_cache", ".venv", ".DS_Store")
-CASES = ("patch", "review", "cli")
+CASES = ("patch", "review", "cli", "status")
 PATCH_SOURCE = '''import argparse
 
 
@@ -66,6 +66,28 @@ for left, right, expected in [(2, 3, 5), (-4, 1, -3), (0, 0, 0), (5, -7, -2)]:
         raise AssertionError(f"add({left}, {right}): expected {expected}, observed {actual}")
 print("4 public add behavior checks passed")
 '''
+STATUS_CONFIG = """<!-- daw-config:start -->
+
+## DAW Configuration
+
+- schema: 1
+- daw_version: 0.5.0
+- spec_dir: docs/specs
+- test_command: python3 -m unittest
+- lint_command: daw-eval-missing-lint run
+- build_command: none
+- workspace: in-place
+- high_risk_paths: none
+- issue_tracker: none
+- default_branch: main
+- commit_convention: conventional
+- pr_template: none
+- ci_checks: none
+- release_process: none
+- branch_pattern: none
+
+<!-- daw-config:end -->
+"""
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -147,7 +169,7 @@ def suite_identity(root: Path) -> dict[str, Any]:
 def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[str, Path | None]:
     workspace.mkdir()
     suite_root: Path | None = None
-    if mode == "skill" or case == "cli":
+    if mode == "skill" or case in ("cli", "status"):
         location = ".agents/skills/deterministic-agentic-workflow" if mode == "skill" else "tools/daw"
         suite_root = workspace / location
         stage_suite(source, suite_root)
@@ -172,6 +194,10 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
             "violation and confidentiality impact with file/line evidence. Distinguish "
             "limited security triage from a completed full technical audit."
         )
+    elif case == "status":
+        (workspace / "AGENTS.md").write_text(STATUS_CONFIG, encoding="utf-8")
+        (workspace / "docs" / "specs").mkdir(parents=True)
+        task = "/skill:deterministic-agentic-workflow cek status dong"
     else:
         task = (
             f"Verify the CLI at {suite_root / 'scripts/route.py'}. Before running checks, "
@@ -180,7 +206,7 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
             "report their actual outputs and exit codes, and decide whether each expectation "
             "passed. Do not modify the suite."
         )
-    if mode == "skill":
+    if mode == "skill" and case != "status":
         module = {"patch": "daw-build then daw-verify", "review": "daw-review", "cli": "daw-verify"}[case]
         task = (
             "Use the complete installed deterministic-agentic-workflow suite at "
@@ -257,6 +283,35 @@ def grade(case: str, workspace: Path, run_dir: Path, suite_root: Path | None,
             "calculator_cli", [sys.executable, "-I", str(workspace / "calculator.py"), "-4", "1"],
             workspace, run_dir, 0, stdout_equals="-3\n",
         ))
+    elif case == "status":
+        checks.append({"name": "unchanged_workspace", "status": "pass" if not changes else "fail",
+                       "changed_paths": changes, "observer": "grader"})
+        script = str(suite_root / "scripts/validate.py")
+        observed = run_process([sys.executable, script, "status", "--project-root", ".", "--format", "json"],
+                               workspace, run_dir / "status_structure", timeout=10)
+        stdout = Path(observed["stdout"]).read_text(encoding="utf-8", errors="replace")
+        try:
+            envelope = json.loads(stdout)
+        except json.JSONDecodeError:
+            envelope = {}
+        findings = envelope.get("findings") if isinstance(envelope, dict) else None
+        structure_ok = (
+            observed["exit_code"] == 1 and not observed["timed_out"] and "error" not in observed
+            and envelope.get("check") == "status"
+            and envelope.get("valid") is False
+            and envelope.get("summary", {}).get("config") == "invalid"
+            and envelope.get("recommended_route") == "setup"
+            and isinstance(findings, list)
+            and len(findings) == 1
+            and findings[0].get("severity") == "error"
+            and findings[0].get("code") == "config_command_unresolved"
+            and findings[0].get("path") == "config:lint_command"
+        )
+        checks.append({"name": "status_structure", "observer": "grader", "expected_exit_code": 1,
+                       "expected_summary_config": "invalid", "expected_recommended_route": "setup",
+                       "expected_finding_code": "config_command_unresolved",
+                       "expected_finding_path": "config:lint_command",
+                       "status": "pass" if structure_ok else "fail", "observed": observed})
     else:
         checks.append({"name": "unmodified_suite", "status": "pass" if not changes else "fail",
                        "changed_paths": changes, "observer": "grader"})

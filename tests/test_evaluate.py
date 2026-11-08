@@ -31,6 +31,15 @@ elif action == "bad-patch":
     (root / "calculator.py").write_text("def add(:\\n")
 elif action == "mutate":
     (root / "unauthorized.txt").write_text("review must not write this")
+elif action == "status-mutate-config":
+    agents = root / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("daw-eval-missing-lint", "flake8"))
+elif action == "status-replace-config":
+    (root / "AGENTS.md").unlink()
+elif action == "status-delete-config":
+    (root / "AGENTS.md").unlink()
+elif action == "status-artifact":
+    (root / "side-effect.txt").write_text("side effect")
 elif action == "fail":
     print("retained partial output", flush=True)
     print("fake agent failure", file=sys.stderr, flush=True)
@@ -206,6 +215,46 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertEqual(check["status"], "pass")
         self.assertEqual(check["observer"], "grader")
         self.assertEqual(run["human_review"]["status"], "ungraded")
+
+    def test_status_unchanged_workspace_passes_and_status_structure_verified(self):
+        result, summary, output = self.evaluate("noop", case="status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = summary["results"][0]
+        self.assertEqual(run["status"], "artifact_checks_passed")
+        self.assertEqual(run["checks"][0]["name"], "unchanged_workspace")
+        self.assertEqual(run["checks"][0]["status"], "pass")
+        self.assertEqual(run["checks"][0]["changed_paths"], [])
+        check = run["checks"][1]
+        self.assertEqual(check["name"], "status_structure")
+        self.assertEqual(check["status"], "pass")
+        self.assertEqual(check["observed"]["exit_code"], 1)
+        envelope = json.loads(pathlib.Path(check["observed"]["stdout"]).read_text())
+        self.assertEqual(envelope["check"], "status")
+        self.assertEqual(envelope["summary"]["config"], "invalid")
+        self.assertEqual(envelope["recommended_route"], "setup")
+        self.assertEqual(len(envelope["findings"]), 1)
+        self.assertEqual(envelope["findings"][0]["severity"], "error")
+        self.assertEqual(envelope["findings"][0]["code"], "config_command_unresolved")
+        self.assertEqual(envelope["findings"][0]["path"], "config:lint_command")
+        prompt = (output / "status-skill-001/prompt.md").read_text(encoding="utf-8")
+        self.assertEqual(prompt, "/skill:deterministic-agentic-workflow cek status dong\n")
+        self.assertEqual(run["human_review"]["status"], "ungraded")
+
+    def test_status_mutations_fail_snapshot_check(self):
+        for action, expected_path in (("status-mutate-config", "AGENTS.md"),
+                                      ("status-replace-config", "AGENTS.md"),
+                                      ("status-delete-config", "AGENTS.md"),
+                                      ("status-artifact", "side-effect.txt")):
+            with self.subTest(action=action):
+                output = self.root / f"evidence-{action}"
+                result, summary, _ = self.evaluate(action, case="status", output=output)
+                self.assertEqual(result.returncode, 1)
+                run = summary["results"][0]
+                self.assertEqual(run["status"], "artifact_checks_failed")
+                self.assertEqual(run["checks"][0]["name"], "unchanged_workspace")
+                self.assertEqual(run["checks"][0]["status"], "fail")
+                self.assertIn(expected_path, run["checks"][0]["changed_paths"])
+
 
     def test_runner_cli_help_works_from_arbitrary_cwd(self):
         res = subprocess.run(

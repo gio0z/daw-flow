@@ -2,6 +2,20 @@
 
 Convention: every entry with breaking or newly-enforced rules MUST include a `### Project migration` subsection (artifact, finding code or `manual`, fix route).
 
+## Unreleased — Status Advisory and Setup Command Preservation
+
+### Changed
+
+- Root §2/§3: `status` `recommended_route` is advisory only; an explicit status-only request is read-only and terminal, while an ordinary task continues on its own authorized route with no extra consent gate for already-authorized mutations.
+- `daw-setup`: preserves existing configured commands verbatim (including locally unresolved ones, reported as `config_command_unresolved`), defaults only absent fields to `none`, treats format-only normalization as lossless, and shows every semantic delta in the confirmed setup diff. `valid` config means structural/resolvability only, not readiness.
+
+### Project migration
+
+For projects that last passed 0.5.0 (`daw_version: 0.5.0`):
+
+- Status callers — treat `recommended_route` as advisory; explicit status-only requests report and stop with no dispatched route (manual: adopt advisory-only handling); fix route: none.
+- Config block — manually confirm any preserved-but-unresolvable command with `validate.py config` (`config_command_unresolved`); do not erase it to pass; fix route: `daw-setup` write only when the user authorizes the command change.
+
 ## 0.5.0 (2026-11-08) — Validator Split and Project Status Preflight
 
 ### Added

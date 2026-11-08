@@ -104,6 +104,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-WF-16` | Stale Config Yields Upgrade-Re-check | Bare invocation, `daw_version` older than installed VERSION | Config with stale `daw_version` | Status Preflight | summary.config `stale` (`config_daw_version_stale` warning); recommended_route `upgrade-recheck`; no mutation. |
 | `SCN-WF-17` | Invalid Completed Task Yields Verify | Task invocation, completed contract invalid at complete | Contract at `complete` with errors | Status Preflight | summary.tasks.complete_invalid >= 1; recommended_route `verify`; spec-mutating routes blocked until resolved. |
 | `SCN-WF-18` | Read-Only Routes Never Blocked by Status | Task invocation, status ends with error findings | Status with config invalid | Status Preflight | ask/review/untangle and setup proceed; only feature/bugfix/refactor/maintain blocked. |
+| `SCN-WF-19` | Explicit Status-Only Request Preserves Malformed Config | Status prompt on repo whose established lint executable is absent locally | Config with unresolved `lint_command` token | Status Preflight | Workspace byte-unchanged; reports `invalid`/`setup` + unresolved lint token; does not normalize config to `none`, swap tool, or write setup diff without authorization. |
 
 ## Operational Rule Diagnostics Scenarios (Manual)
 
@@ -2179,7 +2180,6 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
   - 0 ephemeral `tmp/` evidence supports a completion claim on any stage; no ephemeral capture is treated as durable proof.
   - The rejection names the exact offending path and the durable replacement.
 
-
 ### SCN-WF-15: Bare Invocation on Configured Repo Runs Status First
 
 - **Target Workspace Fixture:** A repo whose agent file carries a valid `<!-- daw-config:start -->` block (current `daw_version`, resolvable commands) plus a spec dir with a valid `ledger.json`. The invocation names no task.
@@ -2236,6 +2236,21 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 - **Content Invariants & Verification:**
   - 0 read-only routes blocked by status error findings; 0 read-only runs write files.
   - The status report remains visible in the output even when it fails to block the request.
+
+### SCN-WF-19: Explicit Status-Only Request Preserves Malformed Config
+
+- **Target Workspace Fixture:** A repo whose `AGENTS.md` carries a valid DAW configuration block except `lint_command` is an established project lint invocation (e.g. `ruff check .` or `daw-eval-missing-lint run`) whose local executable is absent from the host PATH. All other keys resolve; `docs/specs` is empty so `summary.ledger` is `not_applicable`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "/skill:deterministic-agentic-workflow cek status dong"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent runs `python3 scripts/validate.py status --project-root . --format json` (read-only; command resolvability only, never executing `lint_command`) and reports `summary.config: "invalid"`, `recommended_route: "setup"`, and the single error finding `config_command_unresolved` at `config:lint_command` (exit 1).
+  2. The agent distinguishes a locally missing established tool from an unknown command: the token is a known project convention whose executable is absent on this host, so it is reported as an environment finding. It does not rewrite `lint_command` to `none`, swap in another linter, or present a setup diff — a status-only request authorizes no configuration mutation.
+  3. Contrast SCN-WF-09: there, an authorized setup write MUST set an unknown token to `none` after reporting the finding; here, no setup was requested, so the configured value is preserved byte-for-byte.
+- **Content Invariants & Verification:**
+  - Workspace bytes, modes, mtimes, links, and directory entries remain unchanged (snapshot equality); 0 files written, 0 config values normalized.
+  - The reported summary, route, and finding match the validator envelope exactly; the absent-executable environment finding stays distinct from an unknown-command setup correction.
 
 ## Post-Release Feedback & Incident Closure Scenarios (Manual)
 

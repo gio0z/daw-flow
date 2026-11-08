@@ -24,7 +24,7 @@ The setup module initializes or updates Deterministic Agentic Workflow (DAW) con
 
 - **Single Fenced Block Mutation:** Only modifies or inserts the `<!-- daw-config:start -->` block in the target agent file.
 - **Diff Before Write:** Always present the exact proposed block diff and await explicit operator confirmation before writing.
-- **No Command Invention:** Unknown or non-existent test/lint/build commands must be set to `none`, never guessed.
+- **No Command Invention:** A newly discovered command with no authoritative configured value is recorded only when the repository supplies it; otherwise the field is `none`, never guessed. An existing configured value is authoritative and preserved verbatim by default, including when its executable is locally missing, and the resulting `config_command_unresolved` error is reported rather than erased. The sole exception is an explicit operator-authorized semantic replacement or removal shown as a delta in the confirmed diff.
 - **Blank Workspace Handling:** If the workspace is empty/blank, `daw-setup` recommends running `daw-wizard` first, recording `none` for unknown build/test commands.
 - **Issue Tracker Recording Only:** Records issue tracker preference (`github` | `gitlab` | `local-markdown` | `none`); DAW never automatically writes remote tracker issues.
 
@@ -71,20 +71,20 @@ Inspect observable repository facts without executing mutating commands:
 
 ### Step 2: Formulate Findings & Batched Confirmation
 
-Present discovered facts as pre-filled defaults, not questions the repository already answers. Ask only unresolved material config preferences using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): exposed tools only, frontier decisions in rounds of at most 5, cancellation remains unresolved, and clarification never grants mutation or point-of-risk approval. Batch compatible preferences without forcing dependent questions into the same round; the proposed diff still requires explicit confirmation before writing.
+Present discovered facts as pre-filled defaults, not questions the repository already answers. Preserve ALL existing configured values verbatim by default; defaults apply only to absent fields. The sole exception is a semantic replacement or removal explicitly authorized in the confirmed diff. Ask only unresolved material config preferences using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): exposed tools only, frontier decisions in rounds of at most 5, cancellation remains unresolved, and clarification never grants mutation or point-of-risk approval. Batch compatible preferences without forcing dependent questions into the same round; the proposed diff still requires explicit confirmation before writing.
 
 1. **schema:** `1`.
 2. **daw_version:** Installed suite `VERSION` (semver X.Y.Z) — "last version this project passed re-check against", never just "last version touched"; updated only by the Upgrade Re-check below.
-3. **test_command:** Discovered test command or `none`.
-4. **lint_command:** Discovered linter command or `none`.
-5. **build_command:** Discovered build command or `none`.
+3. **test_command:** Existing configured value verbatim, or discovered test command, or `none` only when the field is absent.
+4. **lint_command:** Existing configured value verbatim, or discovered linter command, or `none` only when the field is absent.
+5. **build_command:** Existing configured value verbatim, or discovered build command, or `none` only when the field is absent.
 6. **workspace:** `in-place` | `isolated` (default `in-place`).
 7. **high_risk_paths:** Identified sensitive paths (e.g. `migrations/`, `deploy/`, `infra/`, `.github/workflows/`) or `none`.
 8. **issue_tracker:** `github` | `gitlab` | `local-markdown` | `none`.
 9. **default_branch:** Detected default branch (`main` or `master`).
 10. **Delivery conventions (ship route):** `commit_convention`, `pr_template`, `ci_checks`, `release_process`, `branch_pattern` — discovered values or `none` (never guessed). Required for `ship` route readiness; `none` means the ship stage works from observed repo behavior with an explicit note.
 
-Show the proposed block diff and obtain explicit confirmation.
+Show the proposed block diff, including every semantic delta (each added, removed, or changed field with its old and new values), and obtain explicit confirmation. Format-only normalization (whitespace, quoting, or list rendering that preserves every stored value) is lossless and needs no separate semantic authorization; any change to a stored value is a semantic delta shown in the confirmed diff.
 
 ### Step 3: Write Configuration Block
 
@@ -120,7 +120,7 @@ Exact block format:
 <!-- daw-config:end -->
 ```
 
-After writing, `daw-setup` MUST run `python3 scripts/validate.py config AGENTS.md --project-root .` (or the edited `CLAUDE.md` path when applicable) and report findings verbatim. Never write a `test_command`/`lint_command`/`build_command` whose first token fails resolution (not an existing project-relative file and not resolvable via `shutil.which`); set it to `none` instead. See [Validator Reference](../../references/validation.md).
+After writing, `daw-setup` MUST run `python3 scripts/validate.py config AGENTS.md --project-root .` (or the edited `CLAUDE.md` path when applicable) and report findings verbatim. Preserve every existing configured `test_command`/`lint_command`/`build_command` verbatim by default, including one whose executable is locally missing, and keep any resulting `config_command_unresolved` error in the report — never silently replace the command with `none` or another tool just to pass. A semantic replacement or removal is permitted only when explicitly authorized in the confirmed diff (see Step 2). Only an absent field defaults to `none`. A `valid` config verdict certifies structural/resolvability checks only, not application or toolchain readiness. See [Validator Reference](../../references/validation.md).
 
 ### Step 4: Record Retrospective Lessons
 
