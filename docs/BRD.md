@@ -22,7 +22,7 @@ The business goal is not financial monetization or SaaS subscription revenue, bu
 ### 3. Business Goals & Objectives
 
 - **BG-01: Zero-Dependency Portability:** Deliver a workflow specification, suite router, and verification tool that executes anywhere Python 3.10+ standard library is present, requiring zero external package installation or build steps.
-- **BG-02: Structured Pre-Code Governance:** Mandate structured planning via a 13-document specification matrix, declarative route manifest, and JSON task contracts prior to code modification.
+- **BG-02: Structured Pre-Code Governance:** Mandate structured planning via a 14-document specification matrix (baseline six + conditional ERD), declarative route manifest, and JSON task contracts prior to code modification.
 - **BG-03: Modular Skill Specialization & Deep Boundaries:** Provide an integrated suite router (`SKILL.md`) and specialized modular skills (`skills/daw-*`: design, plan, debug, build, review, verify, workspace, ask, setup, wizard, untangle) with deep operational procedures, avoiding recursive skill sprawl and preventing persona impersonation.
 - **BG-04: Deterministic Fail-Closed Verification:** Provide verifiable CLI validation of package integrity (`validate.py`), suite routing (`route.py --check-suite`), and contract lifecycles with deterministic exit codes (0 for ready/pass, 1 for violations/needs-input, 2 for malformed syntax/invocation).
 - **BG-05: Portable Skill Interoperability:** Conform strictly to portable Agent Skills standards (`SKILL.md` with declarative frontmatter, reference docs, canonical templates, and bundled sibling symlink distribution).
@@ -38,7 +38,7 @@ The business goal is not financial monetization or SaaS subscription revenue, bu
 
 - **Adoption Friction:** Time-to-first-validation under 5 seconds on any environment with Python 3.10+, verified by running `scripts/validate.py package` and `scripts/route.py --check-suite`.
 - **Test Integrity:** 100% test pass rate across all baseline unit tests in `tests/test_validate.py` and `tests/test_route.py` without requiring third-party library installation.
-- **Specification Coverage:** Complete, actionable reference documentation across all 13 document templates, 11 specialized modular skills, and runtime specification documents.
+- **Specification Coverage:** Complete, actionable reference documentation across all 14 document templates (baseline six plus conditional ERD), 11 specialized modular skills, and runtime specification documents.
 - **Zero-Failure Gate Compliance:** Verification that task contracts and routing requests fail closed whenever required fields, valid hashes, or approved boundaries are violated.
 
 ### 6. Scope Boundaries & Non-Goals

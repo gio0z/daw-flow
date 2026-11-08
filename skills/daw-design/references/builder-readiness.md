@@ -55,7 +55,13 @@ For substantive designs, inspect consumer boundaries material to downstream impl
 - **Check:** Are acceptance criteria defined as observable pass/fail checks linked to concrete outputs, paths, or response codes?
 - **EARS Anchor:** Author acceptance criteria per the canonical [EARS Semantic Guidance](../../../references/document-quality.md#acceptance-criteria-ears) (observable condition/response/oracle; Given/When/Then equivalent). Do not invent competing local persistence/format rules.
 
-### 5. Mockup Readiness Seam (UI-Affecting Work Only)
+### 5. Conditional ERD Readiness Seam
+
+- **Check:** Is the ERD selection decision explicit in `details.erd_selection`: a selected ERD (`erd`, default `erd.md`) covering entities/identity, relationships/cardinality/optionality/ownership, and integrity/lifecycle/traceability — with physical PK/FK/index/deletion design only when storage choices warrant it — and linked from Blueprint/FRD/techstack; or a scoped skip/N/A with reason, or reuse of an adequate separate existing model?
+- **Ownership Seam:** Blueprint owns boundaries, components, flows, and domain invariants and links the ERD; the ERD owns persistent entities/relationships; FRD retains behavior plus payload schema types/validation and links the ERD; techstack references the ERD for the storage model. No invented schema, migration authorization, or duplicated data authority.
+- **Scoped Blocking:** An unresolved persistent-model gap blocks only data-dependent handoff. Projects without an applicable persistent model are not forced to produce an ERD; selection adds no new route or stage.
+
+### 6. Mockup Readiness Seam (UI-Affecting Work Only)
 
 For new or changed visual UI, additionally verify per [Workflow Artifacts §5](../../../references/workflow-artifacts.md#5-mockup-timing-proof--na):
 
@@ -64,8 +70,8 @@ For new or changed visual UI, additionally verify per [Workflow Artifacts §5](.
 - **No Text Substitute:** Prose, ASCII, or wireframe-only descriptions do not satisfy the mockup requirement.
 - **Scoped Blocking:** Missing direction or unavailable capability blocks only the affected UI scope; non-UI scopes proceed. Do not halt the whole workflow for a UI-only gap.
 - **Explicit N/A:** Record `N/A` with scoped rationale when there is no UI or small nonvisual fixes reuse existing matching design without a redundant mockup.
-- **Planning vs. Readiness:** Design may plan mockup creation within authoring; readiness then specifically blocks UI implementation absent a reviewed current mockup. This adds no new route and forces no 13-document bundle.
-- **Kind Placement:** The mockup lives as a section/reference inside an existing canonical kind or as the plan's design artifact — never a new mandatory 14th kind.
+- **Planning vs. Readiness:** Design may plan mockup creation within authoring; readiness then specifically blocks UI implementation absent a reviewed current mockup. This adds no new route and forces no full-catalog bundle or mandatory ERD.
+- **Kind Placement:** The mockup remains a non-kind artifact: it lives as a section/reference inside an existing canonical kind or as the plan's design artifact. The ERD is the separate conditional 14th kind; it is not the mockup.
 
 ---
 
@@ -87,13 +93,15 @@ When builder-readiness is evaluated, record an optional summary under `details.b
 ```json
 "builder_readiness": {
   "substantive_design": true,
-  "seams_checked": ["interfaces", "error_handling", "concurrency", "acceptance_criteria", "mockup"],
+  "seams_checked": ["interfaces", "error_handling", "concurrency", "acceptance_criteria", "erd", "mockup"],
+  "erd_selection": {"selected": false, "ref": null, "reason": "no persistent entities or relationships in scope", "reuse_existing": false},
   "blocking_unknowns": [],
   "safe_reversible_choices": [
     "Default HTTP client timeout set to 15 seconds"
   ],
   "mockup_readiness": {"required": false, "status": "na", "ref": null, "req_ac_screen_ids": [], "states_viewports_focus": "no UI in scope", "capability": null, "blocks_ui_only": false},
   "readiness_verdict": "ready_for_planning"
+}
 ```
 
-If material blockers exist, set `readiness_verdict: "blocked"` and `status: "blocked"`, documenting the specific blocking items in `details`. When only the UI-affecting scope is blocked (missing mockup direction/capability), set `mockup_readiness.status: "blocked"` with `blocks_ui_only: true` and keep non-UI readiness separate; do not halt the entire workflow for a UI-only gap.
+If material blockers exist, set `readiness_verdict: "blocked"` and `status: "blocked"`, documenting the specific blocking items in `details`. When only the UI-affecting scope is blocked (missing mockup direction/capability), set `mockup_readiness.status: "blocked"` with `blocks_ui_only: true` and keep non-UI readiness separate; do not halt the entire workflow for a UI-only gap. When only the persistent-model (ERD) scope is blocked, record the gap in `details.erd_selection` and keep other readiness separate; do not halt the entire workflow for a data-only gap. Details-level `details.erd_selection` mirrors this object; `details.builder_readiness.erd_selection` is optional duplication for local readability.

@@ -26,10 +26,12 @@ This specification and its accompanying machine registry (`references/document-q
 
 ### 1.3 Scope & Proportionality
 
-DAW defines **13 canonical document kinds**:
-`blueprint`, `brd`, `prd`, `frd`, `techstack`, `design`, `wireframe`, `ui-ux`, `security`, `qa`, `deployment`, `runbook`, `roadmap`.
+DAW defines **14 canonical document kinds**:
+`blueprint`, `brd`, `prd`, `erd`, `frd`, `techstack`, `design`, `wireframe`, `ui-ux`, `security`, `qa`, `deployment`, `runbook`, `roadmap`.
 
-**There is no mandatory 13-document requirement.** Projects MUST author only the specific documents proportional to their scope, complexity, and active lifecycle stage. If a project requires only an architectural blueprint and an FRD, only those documents are selected, authored, and transitioned. Equivalent project-relative filenames are permitted for each canonical kind (for example, `docs/architecture-blueprint.md` for `blueprint` or `specs/functional-requirements.md` for `frd`).
+The default baseline is six kinds (`blueprint`, `prd`, `frd`, `techstack`, `security`, `roadmap`), plus a conditional ERD selected when persisted entities or relationships are introduced, materially changed, or adopted without an adequate existing model; otherwise the ERD is skipped with a scoped reason. An adequate existing separate model is reused rather than duplicated. Full-suite explicit requests cover all 14 kinds.
+
+**There is no mandatory 14-document requirement.** Projects MUST author only the specific documents proportional to their scope, complexity, and active lifecycle stage. If a project requires only an architectural blueprint and an FRD, only those documents are selected, authored, and transitioned. Equivalent project-relative filenames are permitted for each canonical kind (for example, `docs/architecture-blueprint.md` for `blueprint` or `specs/functional-requirements.md` for `frd`).
 
 ---
 
@@ -54,7 +56,7 @@ The DAW document quality criteria and workflow transition gate are grounded in e
 
 ## 3. Canonical Quality Rubric
 
-The canonical machine-readable rubric is published at `references/document-quality-rubric.json` and serves as the **single authoritative source** for all 44 criterion IDs and text questions. This section summarizes the structure and reader outcomes.
+The canonical machine-readable rubric is published at `references/document-quality-rubric.json` and serves as the **single authoritative source** for all 47 criterion IDs and text questions. This section summarizes the structure and reader outcomes.
 
 ### 3.1 Common Core Criteria (DQ-01 .. DQ-05)
 
@@ -70,19 +72,20 @@ Every document, regardless of kind, is evaluated against these 5 foundational cr
 
 Detailed question texts are maintained canonically in `references/document-quality-rubric.json`:
 
-1. **`blueprint` (`blueprint-01..03`):** High-level system boundaries and core components; document routing map without orphan links; cross-cutting contracts and governance invariants.
+1. **`blueprint` (`blueprint-01..03`):** System context and boundaries, components and responsibilities, primary interaction and data flows, domain invariants, and failure and transaction boundaries, deferring detailed persistent relationships to the separate ERD; document routing map without orphan links; cross-cutting contracts and governance invariants.
 2. **`brd` (`brd-01..03`):** Core business objectives and target outcomes; stakeholder roles and workflow constraints; separation of business constraints from implementation details.
 3. **`prd` (`prd-01..03`):** Primary actors/consuming systems and problem scenarios; product capabilities and flow priorities; functional success conditions and explicit non-goals.
-4. **`frd` (`frd-01..03`):** Domain entities, data models, or payload schemas with types and validation; deterministic state transitions and event triggers; edge cases and error contracts.
-5. **`techstack` (`techstack-01..03`):** Runtimes, frameworks, and storage systems with explicit versions and rationales; architectural trade-offs and decision records; dependencies and licensing boundaries.
-6. **`design` (`design-01..03`):** Design tokens with semantic mappings; visual contrast and accessibility considerations (e.g. WCAG 1.4.3/1.4.11) where applicable; reusable component inventory and responsive layout rules.
-7. **`wireframe` (`wireframe-01..03`):** Viewport layouts and responsive breakpoints; screen container hierarchy and spatial allocation; navigation flows, user cues, and view transitions.
-8. **`ui-ux` (`ui-ux-01..03`):** Interactive component states (default, active, disabled, loading, error); interaction behaviors and progressive disclosure; keyboard navigation, ARIA semantics, Focus Visible (2.4.7), and Focus Not Obscured (2.4.11).
-9. **`security` (`security-01..03`):** Sensitive assets and data boundaries; trust boundaries and threat vectors mapped to security patterns (e.g. OWASP); actionable authentication, authorization, and mitigation controls.
-10. **`qa` (`qa-01..03`):** Test strategy across appropriate levels (unit, integration, system); test environments, fixtures, and isolation proportional to architecture; defect severity and regression gating rules.
-11. **`deployment` (`deployment-01..03`):** Deployment topologies and release artifacts; reproducible release phases, health checks, and cutovers; rollback triggers, procedures, and migration reversibility.
-12. **`runbook` (`runbook-01..03`):** Service operational profile, monitoring indicators, and alert thresholds; incident severity levels, triage paths, and roles; copy-paste executable diagnostic and recovery playbooks.
-13. **`roadmap` (`roadmap-01..03`):** Sequenced, dependency-ordered work phases and milestones; critical path dependencies and integration choke-points; phase completion gates and release acceptance criteria.
+4. **`erd` (`erd-01..03`):** Logical entities, identity, and sourced attributes; relationships with cardinality, optionality, and ownership; integrity, lifecycle, traceability, and applicable physical design only where storage choices warrant it.
+5. **`frd` (`frd-01..03`):** Behavioral payload schemas with types and validation, linking the separate ERD for persistent entity identity and relationships; deterministic state transitions and event triggers; edge cases and error contracts.
+6. **`techstack` (`techstack-01..03`):** Runtimes, frameworks, and storage systems with explicit versions and rationales; architectural trade-offs and decision records; dependencies and licensing boundaries.
+7. **`design` (`design-01..03`):** Design tokens with semantic mappings; visual contrast and accessibility considerations (e.g. WCAG 1.4.3/1.4.11) where applicable; reusable component inventory and responsive layout rules.
+8. **`wireframe` (`wireframe-01..03`):** Viewport layouts and responsive breakpoints; screen container hierarchy and spatial allocation; navigation flows, user cues, and view transitions.
+9. **`ui-ux` (`ui-ux-01..03`):** Interactive component states (default, active, disabled, loading, error); interaction behaviors and progressive disclosure; keyboard navigation, ARIA semantics, Focus Visible (2.4.7), and Focus Not Obscured (2.4.11).
+10. **`security` (`security-01..03`):** Sensitive assets and data boundaries; trust boundaries and threat vectors mapped to security patterns (e.g. OWASP); actionable authentication, authorization, and mitigation controls.
+11. **`qa` (`qa-01..03`):** Test strategy across appropriate levels (unit, integration, system); test environments, fixtures, and isolation proportional to architecture; defect severity and regression gating rules.
+12. **`deployment` (`deployment-01..03`):** Deployment topologies and release artifacts; reproducible release phases, health checks, and cutovers; rollback triggers, procedures, and migration reversibility.
+13. **`runbook` (`runbook-01..03`):** Service operational profile, monitoring indicators, and alert thresholds; incident severity levels, triage paths, and roles; copy-paste executable diagnostic and recovery playbooks.
+14. **`roadmap` (`roadmap-01..03`):** Sequenced, dependency-ordered work phases and milestones; critical path dependencies and integration choke-points; phase completion gates and release acceptance criteria.
 
 ---
 

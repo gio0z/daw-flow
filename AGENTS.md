@@ -33,13 +33,13 @@
 - **Operational & Schema References:**
   - [`references/suite-manifest.json`](references/suite-manifest.json): Authoritative suite manifest, module locations, route definitions, and schema definitions.
   - [`references/validation.md`](references/validation.md): Authoritative validator CLI reference, exit codes, and JSON task-contract schema.
-  - [`references/routing.md`](references/routing.md): 13-document specification matrix, trigger conditions, specialist routing, and handoff protocols.
+  - [`references/routing.md`](references/routing.md): 14-document specification matrix (baseline six + conditional ERD), trigger conditions, specialist routing, and handoff protocols.
   - [`references/operations.md`](references/operations.md): Operational execution invariants, fail-closed boundaries, baseline hashing, rollback evidence, and the harness-native persistent worker graph contract.
   - [`references/installation.md`](references/installation.md): Environment discovery paths, packaging layout, sibling symlink distribution, and skill registration.
   - [`references/task-contract.example.json`](references/task-contract.example.json): Canonical JSON task-contract example envelope.
   - [`references/change-coupling.md`](references/change-coupling.md): Change-coupling taxonomy, dependency tracing heuristics, and boundary unentanglement reference.
   - [`references/route-request.example.json`](references/route-request.example.json): Canonical JSON route request example envelope.
-- - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md).
+- - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md), [`templates/erd.md`](templates/erd.md) (conditional).
 - **Standalone Repository Specifications:**
   - [`CHANGELOG.md`](CHANGELOG.md): Chronological suite change history and architecture decisions log.
   - [`docs/BRD.md`](docs/BRD.md): Business Requirements Document.

@@ -29,6 +29,7 @@ CANONICAL_KINDS = (
     "blueprint",
     "brd",
     "prd",
+    "erd",
     "frd",
     "techstack",
     "design",
@@ -171,6 +172,181 @@ class TestDocQualityCLIValidScenarios(DocQualityTestBase):
         self.assertTrue(data.get("eligible"))
         self.assertEqual(data.get("transition"), "intake-authoring")
         self.assertEqual(len(data.get("findings", [])), 0)
+
+    def test_valid_erd_intake_and_authoring_review(self) -> None:
+        """ERD transitions require DQ-01..05 plus erd-01..03 and remain eligible."""
+        target_rel = "docs/erd.md"
+        rec = {
+            "schema_version": 1,
+            "transition": {"from": "intake", "to": "authoring"},
+            "objective": "Model persisted entities and relationships.",
+            "scope": "Order lifecycle only.",
+            "documents": [
+                {
+                    "path": target_rel,
+                    "kind": "erd",
+                    "audience": "Data architects and backend engineers",
+                    "reader_task": "Review logical data model.",
+                    "sources": [self.create_evidence()],
+                }
+            ],
+        }
+        rec_path = self.proj_root / "erd-intake.json"
+        rec_path.write_text(json.dumps(rec), encoding="utf-8")
+
+        res = self.run_cli([
+            "erd-intake.json",
+            "--project-root",
+            str(self.proj_root),
+            "--transition",
+            "intake-authoring",
+            "--documents",
+            target_rel,
+            "--format",
+            "json",
+        ])
+        self.assertEqual(res.returncode, 0, msg=f"CLI failed: {res.stderr}\n{res.stdout}")
+        self.assertTrue(json.loads(res.stdout).get("eligible"))
+
+        doc_path = self.proj_root / target_rel
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text("# ERD\nLogical entities and relationships.\n", encoding="utf-8")
+        doc_sha = _sha256(doc_path.read_bytes())
+        checks = self.make_checks("erd", status="pass")
+
+        rec = {
+            "schema_version": 1,
+            "transition": {"from": "authoring", "to": "review"},
+            "objective": "Model persisted entities and relationships.",
+            "scope": "Order lifecycle only.",
+            "documents": [
+                {
+                    "path": target_rel,
+                    "kind": "erd",
+                    "audience": "Data architects and backend engineers",
+                    "reader_task": "Review logical data model.",
+                    "sources": [self.create_evidence()],
+                    "sha256": doc_sha,
+                    "checks": checks,
+                }
+            ],
+        }
+        rec_path = self.proj_root / "erd-review.json"
+        rec_path.write_text(json.dumps(rec), encoding="utf-8")
+
+        res = self.run_cli([
+            "erd-review.json",
+            "--project-root",
+            str(self.proj_root),
+            "--transition",
+            "authoring-review",
+            "--documents",
+            target_rel,
+            "--format",
+            "json",
+        ])
+        self.assertEqual(res.returncode, 0, msg=f"CLI failed: {res.stderr}\n{res.stdout}")
+        self.assertTrue(json.loads(res.stdout).get("eligible"))
+
+    def test_foreign_criterion_rejected_for_erd(self) -> None:
+        """Criteria belonging to another kind are rejected on an ERD document."""
+        doc_rel = "docs/erd.md"
+        doc_path = self.proj_root / doc_rel
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text("# ERD\n", encoding="utf-8")
+        doc_sha = _sha256(doc_path.read_bytes())
+
+        checks = self.make_checks("erd", status="pass")
+        checks.append({
+            "id": "frd-01",
+            "status": "pass",
+            "rationale": "Foreign criterion must not substitute for an ERD criterion.",
+            "evidence": [self.create_evidence()],
+        })
+
+        rec = {
+            "schema_version": 1,
+            "transition": {"from": "authoring", "to": "review"},
+            "objective": "Model persisted entities.",
+            "scope": "Order lifecycle only.",
+            "documents": [
+                {
+                    "path": doc_rel,
+                    "kind": "erd",
+                    "audience": "Data architects",
+                    "reader_task": "Review data model.",
+                    "sources": [self.create_evidence()],
+                    "sha256": doc_sha,
+                    "checks": checks,
+                }
+            ],
+        }
+        rec_path = self.proj_root / "erd-foreign.json"
+        rec_path.write_text(json.dumps(rec), encoding="utf-8")
+
+        res = self.run_cli([
+            "erd-foreign.json",
+            "--project-root",
+            str(self.proj_root),
+            "--transition",
+            "authoring-review",
+            "--documents",
+            doc_rel,
+            "--format",
+            "json",
+        ])
+        self.assertEqual(res.returncode, 1)
+        data = json.loads(res.stdout)
+        self.assertFalse(data.get("valid"))
+        codes = [f["code"] for f in data["findings"]]
+        self.assertIn("check_id_unknown", codes)
+
+    def test_erd_missing_criterion_rejected(self) -> None:
+        """An ERD record missing one erd criterion is rejected with missing_checks."""
+        doc_rel = "docs/erd.md"
+        doc_path = self.proj_root / doc_rel
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text("# ERD\n", encoding="utf-8")
+        doc_sha = _sha256(doc_path.read_bytes())
+
+        checks = [c for c in self.make_checks("erd", status="pass") if c["id"] != "erd-03"]
+
+        rec = {
+            "schema_version": 1,
+            "transition": {"from": "authoring", "to": "review"},
+            "objective": "Model persisted entities.",
+            "scope": "Order lifecycle only.",
+            "documents": [
+                {
+                    "path": doc_rel,
+                    "kind": "erd",
+                    "audience": "Data architects",
+                    "reader_task": "Review data model.",
+                    "sources": [self.create_evidence()],
+                    "sha256": doc_sha,
+                    "checks": checks,
+                }
+            ],
+        }
+        rec_path = self.proj_root / "erd-missing.json"
+        rec_path.write_text(json.dumps(rec), encoding="utf-8")
+
+        res = self.run_cli([
+            "erd-missing.json",
+            "--project-root",
+            str(self.proj_root),
+            "--transition",
+            "authoring-review",
+            "--documents",
+            doc_rel,
+            "--format",
+            "json",
+        ])
+        self.assertEqual(res.returncode, 1)
+        data = json.loads(res.stdout)
+        self.assertFalse(data.get("valid"))
+        codes = [f["code"] for f in data["findings"]]
+        self.assertIn("missing_checks", codes)
 
     def test_valid_authoring_to_review_with_blocked_status(self) -> None:
         """Authoring-review transition permits grounded blocked criteria as legitimate coverage."""

@@ -86,6 +86,7 @@ _CRITICAL: Rollback MUST target an explicitly verified, known-good release artif
 - **Primary Operator / On-Call:** `[Primary operator handle / Pager link where on-call rotation applies]`
 - **Secondary / Escalation Lead:** `[Lead engineer / escalation owner handle]`
 - **Security Incident Response:** `[Security team channel / incident contact]`
+- **Post-Release Feedback & Incident Handoff (post-incident):** After containment, stabilization, or rollback, hand off to authorized post-release feedback/incident handling per `references/operations.md#post-release-feedback--incident-closure`: record source, affected release/artifact digest, evidence, impact, and named owner; classify as bug, new requirement, operational incident, or no-change/deferred; and close only with recorded disposition, linked REQ/AC/task where actioned, parent-observed scoped verification, and post-release evidence if actually deployed. Local proof is recorded as local-only and never claims production resolution. This handoff starts no automatic publish or monitoring; operations maintenance remains opt-in.
 
 ## 6. Document Quality & Review Checks
 

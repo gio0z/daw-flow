@@ -15,7 +15,7 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-03`      | Small Scoped Bug Fix / Patch                                 | Natural prompt for isolated bug                           | Repository with bug                                  | `Change`                                    | Zero-doc patch; explicit skip reason documented; no full doc suite.                                                                                                                         |
 | `SCN-04`      | Read-Only Audit & Spec Review                                | Natural review prompt                                     | Project with code & specs                            | `Review`                                    | Zero writes; comparison output only; strict read-only behavior.                                                                                                                             |
 | `SCN-05`      | Bare Invocation on Empty Directory (Missing Brief)           | Natural invocation on empty dir                           | Empty directory                                      | Clarify                                     | 0 files authored; asks exactly one concrete question; never hallucinate product.                                                                                                            |
-| `SCN-06`      | Explicit Request for Full 13-Document Suite                  | Prompt requesting all 13 specs                            | Brief for CLI utility                                | `Bootstrap`                                 | All 13 docs authored into `docs/specs/`; non-UI rationale explicit for headless tools.                                                                                                      |
+| `SCN-06`      | Explicit Request for Full 14-Document Suite                  | Prompt requesting all 14 specs                            | Brief for CLI utility                                | `Bootstrap`                                 | All 14 docs authored into `docs/specs/`; non-UI and no-persistence (`erd.md` N/A) rationale explicit.                                                                                       |
 | `SCN-07`      | Repeated Adoption Idempotency                                | Natural invocation on adopted repo                        | Codebase with full specs                             | `Adopt`                                     | 0 created, N reused; hashes preserved unless material discrepancy found.                                                                                                                    |
 | `SCN-08`      | Stateless / No-Registry Low-Risk Progress                    | Natural prompt for typo / localized fix                   | Complete DAW; no external skills                     | `patch`                                     | Reads, edits, and verifies actual output directly; no registry lookup; no missing-skill pause.                                                                                              |
 | `SCN-09`      | High-Risk Operation Missing Access / Approval Block          | Prompt for prod deploy / DB wipe without approval         | Any fixture                                          | Fail-Closed Block                           | Fails closed strictly due to missing human approval and access; no registry or skill presence helps.                                                                                        |
@@ -326,7 +326,7 @@ These scenarios exercise the practical diagnostic lens in `references/operations
 
 ---
 
-### SCN-06: Explicit Request for Full 13-Document Suite
+### SCN-06: Explicit Request for Full 14-Document Suite
 
 - **Target Workspace Fixture:**
   - Create `/tmp/test-fixture-fullsuite`.
@@ -338,14 +338,15 @@ These scenarios exercise the practical diagnostic lens in `references/operations
     - Boundaries: Python 3.10+ standard library only; read-only; zero network, UI, database, or external dependencies; simple file copy deployment.
 - **Prompt Invocation:**
   ```text
-  Generate all 13 deterministic workflow specification documents for this stock-viewer CLI utility.
+  Generate all 14 deterministic workflow specification documents for this stock-viewer CLI utility.
   ```
 - **Execution & Cognitive Behavior:**
-  1. The agent identifies an explicit request for the full 13-document matrix.
-  2. The agent outputs a planned table listing all 13 canonical document templates:
+  1. The agent identifies an explicit request for the full 14-document matrix.
+  2. The agent outputs a planned table listing all 14 canonical document templates:
      - `blueprint.md`: planned create
      - `prd.md`: planned create
      - `frd.md`: planned create
+     - `erd.md`: planned create (no-persistence N/A rationale)
      - `techstack.md`: planned create
      - `security.md`: planned create
      - `roadmap.md`: planned create
@@ -356,13 +357,13 @@ These scenarios exercise the practical diagnostic lens in `references/operations
      - `qa.md`: planned create
      - `deployment.md`: planned create
      - `runbook.md`: planned create
-  3. For documents that do not apply directly to a headless worker (specifically `ui-ux.md` and `wireframe.md`), the agent authors them containing explicit documented non-applicability and non-UI rationale (e.g. headless background worker without graphical interface; consumer API/event schemas define external interaction surface), fulfilling the contract without silent omission.
-  4. The agent authors all 13 documents into `docs/specs/`.
-  5. The agent outputs a final document action table reflecting all 13 completed actions (`created`, `docs/specs/<doc>.md`, reason).
-  - Exactly 13 specification documents exist in `docs/specs/`.
-  - None of the 13 documents are omitted or silently dropped.
+  3. For documents that do not apply directly to a headless worker (specifically `ui-ux.md` and `wireframe.md`), the agent authors them containing explicit documented non-applicability and non-UI rationale (e.g. headless background worker without graphical interface; consumer API/event schemas define external interaction surface), fulfilling the contract without silent omission. Because the utility reads an input file and persists no entities, `erd.md` records scoped N/A for persistent entities/relationships without inventing a schema; the input JSON shape stays in `frd.md` payload types/validation.
+  4. The agent authors all 14 documents into `docs/specs/`.
+  5. The agent outputs a final document action table reflecting all 14 completed actions (`created`, `docs/specs/<doc>.md`, reason).
+  - Exactly 14 specification documents exist in `docs/specs/`.
+  - None of the 14 documents are omitted or silently dropped.
   - Non-UI documents (`ui-ux.md`, `wireframe.md`) explicitly detail the headless/CLI non-UI rationale: Web WCAG conformance is marked N/A rather than falsely claiming WCAG AA/AAA compliance; platform CLI usability conventions are labeled as proposed author design, never claimed as empirically tested screen-reader compatibility.
-  - Execution & Architecture Consistency: The utility's synchronous execution model (read file, sort, print, exit) must be maintained consistently across all 13 documents without inventing contradictory asynchronous queues, thread pools, or unrequested runtime dependencies.
+  - Execution & Architecture Consistency: The utility's synchronous execution model (read file, sort, print, exit) must be maintained consistently across all 14 documents without inventing contradictory asynchronous queues, thread pools, or unrequested runtime dependencies.
   - No fabricated runtime compatibility claims: documents must accurately target Python 3.10+ standard library copy deployment without inventing unexercised platform support matrices.
 
 ---
@@ -1335,7 +1336,7 @@ These behavioral test scenarios verify agent conformance to the canonical specif
   ```
 - **Execution & Cognitive Behavior:**
   1. The agent discovers existing repository test scripts directly from `package.json` (`npm test`).
-  2. Recognizes this is a small, localized, settled bugfix following the standard `patch` route (`build` -> `verify`); applies proportional workflow without forcing bureaucratic 13-doc matrix creation, prebuild cross-artifact analysis, or extra postbuild `daw-review` ceremony.
+  2. Recognizes this is a small, localized, settled bugfix following the standard `patch` route (`build` -> `verify`); applies proportional workflow without forcing bureaucratic document-matrix creation, prebuild cross-artifact analysis, or extra postbuild `daw-review` ceremony.
   3. Executes the surgical fix in `src/utils/pager.ts`.
   4. Actually runs `npm test` and inspects real process exit code and stdout/stderr; does not hallucinate or simulate test runs.
   5. Generates the default user-facing report in concise natural language covering the 4 presentation sections:
@@ -1992,3 +1993,127 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 - **Content Invariants & Verification:**
   - Every returned result has one recorded disposition; 0 silently dropped findings.
   - The queue records dedup, stale/unsupported rejections, and dependency-ordered dispatch; 0 automatic apply/deploy from worker pass.
+
+## Post-Release Feedback & Incident Closure Scenarios (Manual)
+
+These scenarios exercise the post-release feedback/incident closure loop in `references/operations.md#post-release-feedback--incident-closure`. Each is an unexecuted manual definition; none claims an observed pass. They share the same invariants: intake records source, affected release/digest, evidence, impact, and owner; classification is exactly one of bug, new requirement, operational incident, or no-change/deferred; repair reuses existing routes with approvals intact; closure requires disposition, linked REQ/AC/task where actioned, parent-observed scoped verification, and post-release evidence only if actually deployed; local proof never claims production resolution; no automatic publication or monitoring is introduced (maintenance stays opt-in per §6).
+
+### SCN-M-01: Post-release Bug With Deployed Closure Proof
+
+- **Target Workspace Fixture:** Service with a deployed release whose artifact digest is recorded; a user report against a stable user-reported error where the behavior contradicts an accepted spec (AC) on that release.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Users report checkout totals dropping cents in production release v1.4.2 (digest sha256:…). Triage and fix."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent records intake: source = user report, affected release = v1.4.2 + recorded digest, evidence = reported failure (authoritative ground truth, not rerun), impact = affected orders, owner = named owner.
+  2. The parent classifies the item as `bug` (defect vs. accepted spec); `daw-debug` proposes the causal root and the classification as advice, and `daw-verify` proves the fix on the current revision as scoped evidence — neither closes the incident or claims production recovery.
+  3. Fix routes through the existing bugfix path (plan/build/review/verify) with linked REQ/AC/task; production deployment still requires exact point-of-risk approval.
+  4. After authorized deployment, the parent observes post-release evidence on the deployed surface (log/health observation bound to the new digest and window) and closes only then.
+- **Content Invariants & Verification:**
+  - Intake names source, release/digest, evidence, impact, and owner; 0 synthesized fields.
+  - Closure links REQ/AC/task plus parent-observed scoped verification plus deployed post-release evidence; no production-resolution claim before the deployed observation.
+  - 0 automatic publish or monitoring introduced.
+
+### SCN-M-02: Post-release New Requirement Reusing the Feature Route
+
+- **Target Workspace Fixture:** Released service where post-release feedback asks for a behavior change not covered by any accepted spec (e.g., an export format the original spec never specified).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Post-release feedback: export must include per-tenant totals. Add it."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent records intake (source, release, evidence, impact, owner) and classifies the item as `new requirement` (spec gap), not a bug; no incident containment or rollback is triggered.
+  2. The change re-enters the existing feature route as a spec/plan change first (new REQ/AC), then plan/build/review/verify — existing gates intact, no new route invented.
+  3. Closure requires the linked REQ/AC/task, parent-observed verification, and post-release evidence only once the requirement is actually deployed; before deployment the record shows local proof only.
+- **Content Invariants & Verification:**
+  - Classification is `new requirement` with a linked REQ/AC/task; 0 incident-rollback steps misapplied.
+  - Closure proof distinguishes scoped verification from deployed post-release evidence.
+
+### SCN-M-03: Operational Incident With Containment, Rollback, and Production-Resolution Discipline
+
+- **Target Workspace Fixture:** A running service with a filled `runbook.md` and `deployment.md`; during an observation window the service shows elevated errors on the current release digest (owner-observed log/metric evidence, not a synthetic warning).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Production checkout error rate is breaching the runbook threshold after release v2.0.0. Handle the incident."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent records intake (source = owner-observed telemetry/log query, release = v2.0.0 + digest, impact, owner) and classifies as `operational incident`.
+  2. Containment and any production change (including rollback to the recorded known-good digest) require exact point-of-risk approval; containment actions follow `runbook.md` §3–§4. `daw-debug` may propose a causal mechanism but never dispatches production mutation or claims resolution.
+  3. After stabilization/rollback, the parent hands off to post-release handling: disposition, linked REQ/AC/task where actioned (a forward-fix), parent-observed scoped verification, and post-release evidence on the stabilized surface; only then is the incident closed as production-resolved.
+- **Content Invariants & Verification:**
+  - 0 production changes without point-of-risk approval; 0 monitoring/publish automation claimed.
+  - Production-resolution language appears only with deployed post-release evidence bound to digest/window.
+
+### SCN-M-04: No-Change/Deferred Disposition Is a Valid Closure
+
+- **Target Workspace Fixture:** Post-release feedback that is reproducible but judged out of scope or unsafe to change now (e.g., a cosmetic request contradicting an accepted security invariant, with an explicit deferral reason and revisit trigger).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Post-release feedback: disable the consent check so export is faster. This contradicts the security spec — defer it."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The parent records intake (source, release, evidence, impact, owner) and classifies as `no-change/deferred` with the reason and revisit trigger recorded; no build, deployment, or replan is dispatched.
+  2. The disposition closes the item without a REQ/AC/task and without inventing a fix; an executed failure is never relabeled `deferred` to obtain closure.
+- **Content Invariants & Verification:**
+  - Closure shows the disposition, reason, and revisit trigger; 0 chained or promised future implementation.
+  - Rejected/invalid feedback gets the same explicit disposition, never a silent drop.
+
+### SCN-M-05: Local-Only Proof Cannot Claim Production Resolution
+
+- **Target Workspace Fixture:** A post-release bug fix where the fix is verified on the current local revision (tests and probes pass) but no deployment to production has been authorized or executed.
+- **Prompt / Intake Invocation:**
+  ```text
+  "The checkout fix passes locally. Mark the production incident resolved."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The verifier/parent records the scoped verification result as local proof only, with production resolution explicitly `unexercised` — never as resolved.
+  2. The closure record stays open (or closes as locally verified with production resolution unexercised) until authorized deployment plus post-release evidence on the deployed surface are parent-observed.
+  3. The worker `pass` and the ranked-triage disposition never authorize or imply production deployment.
+- **Content Invariants & Verification:**
+  - 0 production-resolution claims on local/staging/dry-run evidence; the record distinguishes scoped proof from deployed proof verbatim.
+  - Parent acceptance of the scoped fix is not converted into an incident-closure or deployment authorization.
+
+### SCN-M-06: Full-Suite Request With ERD Selected (Persisted Model Introduced)
+
+- **Target Workspace Fixture:** A feature request for a service that introduces persisted entities and their relationships with no adequate existing separate model (e.g., storing accounts, their sessions, and ownership), with an unversioned skill runner.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Design and build a service that persists accounts, sessions, and their ownership. Give me the full document suite."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent announces full-suite coverage as the 14-kind catalog (explicit full-suite request covers all 14, ERD included) rather than the six-document baseline; catalog count and baseline are stated separately.
+  2. Because persisted entities/relationships are introduced without an adequate existing model, ERD is selected as a separate document under repository convention (default `erd.md`): logical entities/identity, relationship cardinality/optionality/ownership, and integrity/lifecycle/traceability, with physical PK/FK/index/deletion only where storage choices warrant; no invented schema or migration authorization.
+  3. Blueprint carries boundaries/components/flows and invariant links to the ERD as a reference; FRD carries behavior plus payload schema types/validation and references the ERD for persistent identity/relationships; techstack references the ERD for the storage model — no duplicated data authority.
+- **Content Invariants & Verification:**
+  - 14 kinds are covered (or ERD is explicitly selected and its reason recorded); the six-document baseline is not mislabeled as the full suite.
+  - ERD is one document with its own authority; no competing entity definitions in Blueprint/FRD.
+
+### SCN-M-07: Full-Suite Request With ERD Skipped/N/A (No Applicable Persistent Model)
+
+- **Target Workspace Fixture:** A full-suite request for a stateless, strictly read-only CLI utility with no database, persistence, or entity ownership (same profile as SCN-01).
+- **Prompt / Intake Invocation:**
+  ```text
+  "Give me the full document suite for this read-only CLI utility."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent covers the full catalog progressively (14 kinds) and records ERD as scoped skip/N/A with the reason "no persisted entities or relationships; no storage model" rather than authoring an empty ERD or forcing one.
+  2. The baseline six documents are authored substantively; ERD skip/N/A does not block the suite, and reusing a separate existing adequate model never arises here because none exists or is needed.
+  3. If a later revision introduces persisted entities or relationships, the ERD selection is revisited and the decision is re-recorded.
+- **Content Invariants & Verification:**
+  - Full-suite coverage is 14 kinds with ERD as scoped skip/N/A (reason stated); 0 phantom ERD with invented entities.
+  - The six-document baseline plus conditional ERD rule is undisturbed for baseline requests; ERD appears only conditionally.
+
+### SCN-M-08: ERD Reuse of an Adequate Existing Model
+
+- **Target Workspace Fixture:** Repository already has an adequate separate persisted model (e.g., an adopted `erd.md` covering current entities), and a change modifies behavior without materially changing entities or relationships.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Change the export behavior per the existing ERD; entities and relationships are unchanged."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent reuses the existing separate model verbatim and records the reuse; no duplicate ERD is created and no concurrent model text is invented.
+  2. Only a material change to entities or relationships would trigger an updated ERD; a behavior-only change leaves the model untouched, and the reuse decision is recorded with the inspected revision.
+- **Content Invariants & Verification:**
+  - 0 duplicated authorities; the existing model revision is cited as the reused artifact.
+  - An adopted-but-inadequate model is not silently reused — it is replaced or updated with the scoped reason recorded.

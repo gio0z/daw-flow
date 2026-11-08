@@ -289,6 +289,36 @@ Every completed worker result goes through parent triage before acceptance or fi
 
 No new Python schema, outer JSON field, or global scheduler is introduced; the queue lives in existing plan/progress artifacts.
 
+### Post-Release Feedback & Incident Closure
+
+Authorized post-release feedback or incident handling re-enters existing routes only
+(bugfix, feature, patch, operational runbook, or maintenance opt-in per §6); it adds
+no new route, publish automation, or monitoring automation. Preflight (§1), fail-closed approvals (§2),
+rollback (§3), and parent acceptance / ranked triage (§§ Parent Acceptance Checkpoint, Ranked Result Triage) apply unchanged.
+
+1. **Intake (parent-owned):** record source (report, log, telemetry query, operator observation), affected release/artifact digest
+   and revision, evidence reference, impact (scope, severity, affected tenants/users), and named owner. Source, release, and
+   evidence are copied from observed artifacts, never synthesized; missing items stay `unexercised` for that element.
+2. **Classify exactly one disposition class per item:** `bug` (defect vs. accepted spec), `new requirement` (spec gap or
+   requested behavior change), `operational incident` (live-service failure or degradation), or `no-change/deferred`
+   (rejected, out of scope, or explicitly deferred with reason). No-change/deferred names the reason and a revisit trigger or
+   expiry; it is a valid closure, not a deferral to an unnamed future.
+3. **Route through existing gates:** `bug` and `new requirement` dispatch through the canonical plan/build/review/verify path
+   with linked REQ/AC/task when actioned; `operational incident` follows `templates/runbook.md` containment/rollback and
+   point-of-risk approval before any production change; `no-change/deferred` requires no build but still records disposition
+   and owner. Triage or intake never authorizes deployment, publication, or production mutation.
+4. **Close only on parent-observed evidence:** closure requires (a) recorded disposition, (b) linked REQ/AC/task where actioned,
+   (c) parent-observed scoped verification on the current revision, and (d) post-release evidence only if the fix was
+   actually deployed to that release surface (log/health observation, digest, and observation window). Local unit tests,
+   dry-runs, or staging proof satisfy (c) for code correctness but never satisfy (d) and MUST be recorded as
+   "local proof only — production resolution unexercised", never as production resolved.
+5. **No automatic publish or monitoring:** intake and closure MUST NOT auto-publish, auto-open remote issues/PRs, or claim
+   active monitoring. Background monitoring, polling, or auto-fix remain strictly opt-in per §6 (explicit human enablement,
+   named owner, kill-switch, audit log); operations maintenance stays opt-in.
+
+Evidence integrity is unchanged: unexercised closure elements block final completion; an executed failure stays `failed`,
+never downgraded to `deferred` to obtain closure.
+
 <a id="checkpoint-boundaries"></a>
 The execution pipeline requires the parent orchestrator to apply three discrete verification checkpoints. Each boundary enforces explicit entry prerequisites, evidence evaluation rules, and parent decision options:
 

@@ -28,6 +28,7 @@ _Reference Links:_
    - **Persistence Rule:** Persist settled domain models or ADRs ONLY if the user's task explicitly authorizes document authoring within an approved scope (e.g., updating `docs/specs/blueprint.md` or an existing ADR path).
    - **Fallback without Authorization:** If document authoring is not explicitly authorized in the task scope, return proposed terms, definitions, and decisions directly to the parent orchestrator in the handoff details without writing files.
    - Waive formal modeling for routine fixes or straightforward extensions.
+   - **Conditional ERD Selection:** When persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model, select a separate ERD (`erd`, default `erd.md` under the spec convention) covering logical entities/identity, relationships/cardinality/optionality/ownership, integrity/lifecycle/traceability, and physical design only when storage choices warrant it. Reuse an adequate separate existing model when one exists; otherwise record scoped skip/N/A with a reason. Selection adds no new route or stage, and domain/flow conditions are settled before physical or UI design choices.
 
 ---
 
@@ -40,7 +41,7 @@ When a domain term carries multiple competing meanings across modules or boundar
    - **Owning Subsystem:** Which module owns and mutates the entity.
    - **Consumer Boundary:** How outside modules interact with it (opaque ID, read-only projection, or domain event).
    - **Invariants:** Core business rules that must remain true in this context.
-3. **Preserve Conflicts until Settled:** If competing interpretations cannot be resolved from existing evidence, preserve the ambiguity as an open question or resolve via the [Shared Grilling Protocol](../../../references/grilling.md); never fabricate an artificial compromise.
+3. **Preserve Conflicts until Settled:** If competing interpretations cannot be resolved from existing evidence, preserve the ambiguity as an open question or resolve via the [Shared Grilling Protocol](../../../references/grilling.md); never fabricate an artificial compromise. When scenarios settle persistent entities/relationships, route the settled model to the conditional ERD (§1): Blueprint retains bounded-context flows and invariants and links the ERD; the ERD owns the persistent entity/relationship detail.
 
 ---
 

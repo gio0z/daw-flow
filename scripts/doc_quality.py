@@ -35,6 +35,7 @@ CANONICAL_KINDS = (
     "blueprint",
     "brd",
     "prd",
+    "erd",
     "frd",
     "techstack",
     "design",

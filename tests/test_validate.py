@@ -25,6 +25,7 @@ CANONICAL_TEMPLATES = (
     "brd.md",
     "deployment.md",
     "design.md",
+    "erd.md",
     "frd.md",
     "prd.md",
     "qa.md",
@@ -308,6 +309,18 @@ class TestValidateCLI(unittest.TestCase):
             self.assertFalse(payload.get("valid"))
             errors = [f for f in payload["findings"] if f.get("severity") == "error"]
             self.assertTrue(any("validate.py" in f.get("path", "") for f in errors))
+    def test_package_missing_erd_template_rejected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
+            (pkg_root / "templates" / "erd.md").unlink()
+
+            res = self.run_cli(["package", "--root", str(pkg_root), "--format", "json"])
+            self.assertEqual(res.returncode, 1)
+            payload = json.loads(res.stdout)
+            self.assertFalse(payload.get("valid"))
+            errors = [f for f in payload["findings"] if f.get("severity") == "error"]
+            self.assertTrue(any("erd.md" in f.get("path", "") for f in errors))
+
     def test_package_unrelated_templates_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             pkg_root = self.create_minimal_package_fixture(pathlib.Path(tmpdir))
@@ -520,6 +533,29 @@ class TestValidateCLI(unittest.TestCase):
             contract_data = self.create_contract_dict(
                 baseline_files=baseline,
                 documents=[{"kind": "design", "path": "specs/design-system.md", "status": "current"}],
+            )
+            contract_file = proj_dir / "contract.json"
+            contract_file.write_text(json.dumps(contract_data), encoding="utf-8")
+
+            res = self.run_cli([
+                "contract", str(contract_file),
+                "--project-root", str(proj_dir),
+                "--stage", "execute",
+                "--format", "json",
+            ])
+            self.assertEqual(res.returncode, 0, msg=f"CLI failed: {res.stderr}\n{res.stdout}")
+            self.assertTrue(json.loads(res.stdout).get("valid"))
+
+    def test_contract_erd_kind_accepted(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_dir, baseline = self.create_minimal_project_fixture(pathlib.Path(tmpdir))
+            doc_path = proj_dir / "docs" / "erd.md"
+            doc_path.parent.mkdir(parents=True, exist_ok=True)
+            doc_path.write_text("# Entity Relationship Diagram\n", encoding="utf-8")
+
+            contract_data = self.create_contract_dict(
+                baseline_files=baseline,
+                documents=[{"kind": "erd", "path": "docs/erd.md", "status": "current"}],
             )
             contract_file = proj_dir / "contract.json"
             contract_file.write_text(json.dumps(contract_data), encoding="utf-8")

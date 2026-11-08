@@ -172,6 +172,7 @@ Upon exit, return the Diagnostic Handoff to the parent orchestrator with advisor
 
 - If causal root is confirmed (`status: "pass"`): recommend `handoff_to: "daw-plan"` — the next stage on the canonical `bugfix` route (`daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`); never skip directly to `daw-build`.
 - If blocked or replanning (`status: "blocked"` / `"fail"`): return `handoff_to: null` and hand off the active Hypothesis Ledger, observed falsifications, and specific boundary questions to the parent orchestrator; a halted debug stage never advances the pipeline.
+- **Post-release feedback / incident intake (when diagnosing a deployed-release failure):** Surface the closure inputs for the parent's intake record per `references/operations.md#post-release-feedback--incident-closure`: affected release/artifact digest, source and evidence reference, observed impact, and a proposed classification (bug vs. operational incident). Report the classification as a proposal only — the parent owns the disposition, owner, and closure. A locally confirmed root cause is diagnostic evidence only and MUST be recorded as local proof, never as production resolution; no remediation claim may assert production recovery without deployed post-release evidence observed by the parent. `daw-debug` starts no automatic publish or monitoring; operations maintenance remains opt-in.
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`

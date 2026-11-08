@@ -18,8 +18,8 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 #### Category: Package Integrity (`PKG`)
 
 - **REQ-PKG-01: Structure & Manifest Verification**
-  - _Description:_ The validator must inspect the skill root and verify the presence of mandatory files: `SKILL.md`, `references/routing.md`, `references/operations.md`, `references/validation.md`, `references/installation.md`, `references/task-contract.example.json`, and all 13 canonical template files in `templates/`.
-  - _AC-PKG-01.1:_ Running `validate.py package` returns exit code 0 when all 19 structural files exist and are readable.
+  - _Description:_ The validator must inspect the skill root and verify the presence of mandatory files: `SKILL.md`, `references/routing.md`, `references/operations.md`, `references/validation.md`, `references/installation.md`, `references/task-contract.example.json`, and all 14 canonical template files in `templates/`.
+  - _AC-PKG-01.1:_ Running `validate.py package` returns exit code 0 when all 20 structural files exist and are readable.
   - _AC-PKG-01.2:_ When any required file is missing, the validator returns exit code 1 with finding code `PKG_FILE_MISSING` indicating the exact missing path.
 - **REQ-PKG-02: Document Link Resolution**
   - _Description:_ The validator must parse markdown links in `SKILL.md` and reference files, resolving local file targets.
@@ -46,10 +46,10 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 
 #### Category: Capability & Document Routing (`RTE`)
 
-- **REQ-RTE-01: 13-Document Matrix Routing**
+- **REQ-RTE-01: 14-Document Matrix Routing**
   - _Description:_ The workflow must provide unambiguous routing rules defining required documents and technical capabilities based on task impact tiers, scaled proportionally to task scope.
   - _AC-RTE-01.1:_ Small scoped fixes (single-line or localized bug fixes, typos) operate in zero-doc patch mode with an explicit documented reason (e.g., localized bug fix, bounded scope) rather than forcing synthetic specification bundles.
-  - _AC-RTE-01.2:_ Full feature additions require a proportional written specification appropriate to the feature scope before code modification begins; the 13-document suite is required only when explicitly requested under REQ-MOD-01.
+  - _AC-RTE-01.2:_ Full feature additions require a proportional written specification appropriate to the feature scope before code modification begins; the 14-document suite is required only when explicitly requested under REQ-MOD-01.
   - _AC-RTE-01.3:_ Required capabilities may be fulfilled directly by the current agent or delegated to a qualified subagent without requiring external skill registry lookups or named external skill dependencies.
 
 #### Category: Lifecycle Invocation & Mode Precedence (`MOD`)
@@ -62,7 +62,9 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - _Description:_ The agent must announce its operating mode, resolve target scope from user context or `cwd`, and output a structured document action table: planned actions (`create`, `update`, `reuse`, `skip`, `blocked` with path and reason) prior to execution, and final completed actions (`created`, `updated`, `reused`, `skipped`, `blocked` with path and reason) upon completion.
   - _AC-MOD-02.1:_ The agent must clearly distinguish planned document actions from final completed actions.
   - _AC-MOD-02.2:_ During adoption of an existing codebase, the agent must inspect actual code, dependencies, and docs, authoring missing baseline specifications from observed facts while preserving existing code and user-authored documents.
-  - _AC-MOD-02.3:_ When an explicit full 13-document suite is requested, the agent must honor all requested documents with substantive scoped content or document explicit blockers/applicability limits, never silently shrinking the suite.
+  - _AC-MOD-02.3:_ When an explicit full 14-document suite is requested, the agent must honor all requested documents with substantive scoped content or document explicit blockers/applicability limits, never silently shrinking the suite.
+  - _AC-MOD-02.4:_ Baseline specs are the six contracts (`blueprint`, `prd`, `frd`, `techstack`, `security`, `roadmap`) plus conditional ERD when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model; otherwise ERD records scoped skip/N/A. Reuse an adequate separate existing model.
+  - _AC-MOD-02.5:_ ERD ownership: Blueprint = boundaries/components/flows/domain invariants linking ERD; ERD = persistent entities/relationships; FRD retains behavior/payload validation linked to ERD; techstack references ERD for the storage model. No invented schema or migration authorization.
 
 #### Category: Workflow Artifacts &amp; Acceptance Quality (`WF`)
 
@@ -155,4 +157,5 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - Runtime credential validation or cryptographic authorization tokens.
   - Standalone unbundled distribution of child modules without the suite root.
   - Git branch, commit, or push orchestration.
-- **Correction scope non-goals (WF):** Stateless validator engines bounded to current files; no new routes, modules, schemas, or templates beyond the existing 13; no runtime daemon, crash recovery, or enforcement daemon; read-only roles do not write. Subagent triage does not transfer parent acceptance and external deployment is not automatic. Source provenance for REQ-WF-01..07: user conversation explicitly authorizing the WT docs stage, mockup, and ranking corrections, plus user-supplied articles [Cara Bikin Requirement Lebih Jelas (EARS patterns)](https://ramadigital.id/blog/acceptance-criteria-ears-pattern-cara-bikin-requirement-lebih-jelas) and [Agentic Tapi Deterministic: Workflow AI Agent](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent); canonical DAW authorities are `references/workflow-artifacts.md`, `references/document-quality.md#acceptance-criteria-ears`, and `references/operations.md#ranked-result-triage`; inherited project guidance citations in `references/document-quality.md` (§2) remain existing guidance and are not claimed as user-supplied WF sources; no external provenance is claimed for runtime behavior.
+- **Correction scope non-goals (WF):** Stateless validator engines bounded to current files; no new routes, modules, schemas, or templates beyond the then-existing 13 (the later LC correction below adds only the conditional ERD kind); no runtime daemon, crash recovery, or enforcement daemon; read-only roles do not write. Subagent triage does not transfer parent acceptance and external deployment is not automatic. Source provenance for REQ-WF-01..07: user conversation explicitly authorizing the WT docs stage, mockup, and ranking corrections, plus user-supplied articles [Cara Bikin Requirement Lebih Jelas (EARS patterns)](https://ramadigital.id/blog/acceptance-criteria-ears-pattern-cara-bikin-requirement-lebih-jelas) and [Agentic Tapi Deterministic: Workflow AI Agent](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent); canonical DAW authorities are `references/workflow-artifacts.md`, `references/document-quality.md#acceptance-criteria-ears`, and `references/operations.md#ranked-result-triage`; inherited project guidance citations in `references/document-quality.md` (§2) remain existing guidance and are not claimed as user-supplied WF sources; no external provenance is claimed for runtime behavior.
+- **Lifecycle correction (LC):** Requirements REQ-LC-01..05 and their acceptance criteria are authoritative in [ERD and Application Lifecycle Correction](erd-lifecycle-workflow.md): substantive Blueprint (LC-01), conditional separate ERD with erd-01..03 and no invented schema or migration authorization (LC-02), 14-kind registry/gate integration (LC-03), post-release feedback/incident closure through existing routes where local proof never means production resolved (LC-04), and consistent propagation (LC-05). No new route, module, monitoring, or publish automation.

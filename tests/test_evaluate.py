@@ -76,7 +76,7 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertTrue((installed / "scripts/route.py").is_file())
         self.assertTrue((installed / "references/suite-manifest.json").is_file())
         self.assertEqual(len(list((installed / "skills").glob("daw-*/SKILL.md"))), MODULE_COUNT)
-        self.assertEqual(len(list((installed / "templates").glob("*.md"))), 13)
+        self.assertEqual(len(list((installed / "templates").glob("*.md"))), 14)
         observed = run["checks"][1]["observed"]
         self.assertIn("4 public add behavior checks passed", pathlib.Path(observed["stdout"]).read_text())
         self.assertTrue((output / "patch-skill-001/before.json").is_file())

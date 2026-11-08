@@ -219,7 +219,7 @@ The internal architecture of the DAW suite follows a modular, pipeline-oriented 
 
 1. **Package Evaluator:**
    - Scans `SKILL.md` for frontmatter fields (`name`, `description`, `compatibility`).
-   - Verifies existence of all 13 canonical template files in `templates/`.
+   - Verifies existence of all 14 canonical template files in `templates/` (baseline six plus conditional `erd.md`).
    - Audits routing tables in `references/routing.md` for mandatory columns and cross-links.
    - Evaluates markdown link targets, resolving URLs and rejecting unescaped host-specific URI schemes outside code fences.
 2. **Contract Evaluator:**

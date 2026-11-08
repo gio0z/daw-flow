@@ -8,11 +8,17 @@ Acceptance-criteria authoring (EARS patterns, observable response/oracle, normal
 
 ## 1. Artifact Set & Proportionality
 
-- **Specification (authoritative what/why/non-goals/AC):** Proportional authoritative specification is persisted before tactical decomposition. Reuse a current adequate spec; do not duplicate. If clear user requirements have no written source, the authorized parent records their faithful bounded what/why/non-goals/AC in the chosen spec before `daw-plan`. The planner cannot invent architecture or business choices. Ambiguity returns to the existing design/clarification route; no new design insertion is created for clear routes. Bootstrap starts from blueprint/domain/flow before UI/data design. Workflow-owned progress/queue metadata is a state record, not a requirements source: do not feed it back into `daw-wizard`/`daw-design` (or adopt-mode re-spec) as if it were authoritative direction; re-derive requirements from user-stated goals plus the bound spec.
+- **Specification (authoritative what/why/non-goals/AC):** Proportional authoritative specification is persisted before tactical decomposition. Reuse a current adequate spec; do not duplicate. If clear user requirements have no written source, the authorized parent records their faithful bounded what/why/non-goals/AC in the chosen spec before `daw-plan`. The planner cannot invent architecture or business choices. Ambiguity returns to the existing design/clarification route; no new design insertion is created for clear routes. Domain/flow settle before physical/UI design: bootstrap starts from blueprint/domain/flow before UI/data design. Conditional ERD selection belongs here (§1A): select a separate ERD (`erd`, default `erd.md` under the spec convention) only when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model; otherwise record a scoped skip/N/A with reason, and reuse an adequate separate existing model when one exists. Workflow-owned progress/queue metadata is a state record, not a requirements source: do not feed it back into `daw-wizard`/`daw-design` (or adopt-mode re-spec) as if it were authoritative direction; re-derive requirements from user-stated goals plus the bound spec.
 - **Plan (how, mapped):** A saved plan maps stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/checks, evidence slots, and separate parent acceptance. Supporting infra tasks require an explicit justified prerequisite dependency.
 - **Progress record (actual state):** A required parent-owned durable project progress document/section, opened at intake, records real progress distinct from planned work (see §3).
 - **Mockup (UI proof):** Visual mockup handoff where required (see §5). No UI → explicit scoped N/A.
 - Single document with separate spec/plan/progress sections is allowed and preferred when lean.
+
+### 1A. Conditional ERD Selection & Ownership Seam
+
+- **Selection:** Select a separate ERD (`erd`, default `erd.md` under the spec convention) only when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model. Otherwise record scoped skip/N/A with a one-line reason; reuse an adequate separate existing model when one exists. Selection needs no new route or stage, and not every project produces an ERD.
+- **Ownership seam:** Blueprint owns boundaries, components, flows, and domain invariants and links the ERD; the ERD owns persistent entities/relationships; FRD retains behavior plus payload schema types/validation and links the ERD for persistent identity/relationships; techstack references the ERD for the storage model. Detailed relationships reference the separate ERD — no invented schema, migration authorization, or duplicated data authority.
+- **Rubric:** An ERD is judged on DQ-01..05 plus erd-01 (entities/identity and sourced attributes), erd-02 (relationships, cardinality, optionality and ownership), and erd-03 (integrity/lifecycle/traceability and applicable physical design).
 
 Proportionality rule: artifacts must be no larger than the work warrants. Trivial settled patches stay inline; do not expand tiny fixes into multi-document ceremony.
 
@@ -135,7 +141,7 @@ Record `N/A` with scoped rationale when there is no UI, or when small nonvisual 
 
 ### Canonical kinds
 
-Preserve the default six baseline docs / 13 canonical kinds in [document-quality](document-quality.md#13-scope--proportionality). Add UI sections where needed; do not create a mandatory 14th kind and do not change the outer handoff schema. The mockup lives as a section/reference inside an existing kind or as the plan's design artifact, not as a new canonical kind.
+Preserve the default six baseline docs (blueprint, prd, frd, techstack, security, roadmap) within the 14-kind catalog in [document-quality](document-quality.md#13-scope--proportionality), plus conditional ERD (§1A) when applicable. Add UI sections where needed; do not change the outer handoff schema. The mockup remains a non-kind artifact — a section/reference inside an existing kind or the plan's design artifact — never a canonical kind. The conditional ERD is the 14th kind, not the mockup.
 
 ---
 

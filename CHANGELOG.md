@@ -1,5 +1,13 @@
 # Suite Change History & Architecture Log
 
+## 2026-11-08: ERD and Application Lifecycle Correction (Matrix Docs)
+
+- Catalog is now 14 kinds including conditional `erd.md` (`templates/erd.md`, default project file `erd.md` under spec convention). Baseline remains six (`blueprint`, `prd`, `frd`, `techstack`, `security`, `roadmap`) plus conditional ERD when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model; otherwise ERD is skipped/N/A with a scoped reason. Reuse an adequate separate existing model. Full-suite explicit requests cover all 14. Mockup remains a non-kind artifact.
+- ERD selection and rubric: erd-01 entities/identity and sourced attributes; erd-02 relationships, cardinality, optionality, and ownership; erd-03 integrity/lifecycle/traceability and applicable physical design (PK/FK/index/deletion only when storage choices warrant them). DQ-01..05 unchanged. No invented schema or migration authorization.
+- Ownership: Blueprint = boundaries/components/flows/domain invariants linking ERD; ERD = persistent entities/relationships; FRD retains behavior and payload validation linked to ERD for identity/relationships; techstack references ERD for the storage model.
+- Maintain loop: authorized post-release feedback/incident intake records source/release/evidence, impact, and owner; classifies bug, new requirement, operational incident, or no-change/deferred via existing routes and approvals. Closure requires disposition, linked REQ/AC/task when actioned, parent-observed scoped verification, and post-release evidence only if actually deployed. Local proof never means production resolved; no auto publish/monitor; opt-in maintenance stays opt-in.
+- Historical changelog and evaluation observations remain historical; this entry records only the dated correction. Truthful status: no runtime or test pass results are claimed by this entry.
+
 ## 2026-11-08: Optional Figma/FigCraft-First Visual Mockup Review
 
 - Align `templates/wireframe.md` mockup record with canonical `references/workflow-artifacts.md` §5: optional existing matching mockup, Figma/FigCraft frame, or renderable local HTML/SVG source when actually accessible; capture file/frame reference, revision/snapshot, visual preview, and actual capability exercised (`unexercised`/`unavailable` when not exercised, never a claimed vendor use).

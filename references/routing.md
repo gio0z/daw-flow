@@ -130,37 +130,38 @@ All fields are mandatory. Unexpected keys or duplicate keys trigger an immediate
 
 ---
 
-## 3. The 13 Document Routing Specifications
+## 3. The 14 Document Routing Specifications
 
 ### Documentation Authoring Contract: Ownership, Provenance & Verification
 
 To prevent document sprawl, speculative filler, and ambiguous responsibilities, all document authoring across the Deterministic Agentic Workflow suite is governed by this single authoritative contract:
 
-> **Applicability Notice:** The 13-document matrix applies strictly to greenfield system creation (`bootstrap`), undocumented codebase onboarding (`adopt`), or when requirements are explicitly missing or requested. Routine bug fixes, isolated tasks, refactors, and settled features with clear requirements do NOT require generating or updating the 13 specification documents.
-> **Artifact persistence:** Where multi-step authorized work requires specs, artifact selection/persistence/state and mockup handoff follow the canonical [Workflow Artifacts](workflow-artifacts.md) contract (proportional spec before tactical decomposition, saved plan before build, parent-owned progress record from intake, rendered mockup before UI build where UI-affecting). The matrix above remains the catalog of canonical kinds; no mandatory full 13-doc generation for settled/tiny/read-only work.
+> **Applicability Notice:** The 14-document matrix applies strictly to greenfield system creation (`bootstrap`), undocumented codebase onboarding (`adopt`), or when requirements are explicitly missing or requested. Routine bug fixes, isolated tasks, refactors, and settled features with clear requirements do NOT require generating or updating the 14 specification documents.
+> **Artifact persistence:** Where multi-step authorized work requires specs, artifact selection/persistence/state and mockup handoff follow the canonical [Workflow Artifacts](workflow-artifacts.md) contract (proportional spec before tactical decomposition, saved plan before build, parent-owned progress record from intake, rendered mockup before UI build where UI-affecting). The matrix above remains the catalog of canonical kinds; no mandatory full 14-doc generation for settled/tiny/read-only work.
 
 #### 1. Accountable Writers & Phase Ownership Matrix
 
-| Document        | Accountable Author                           | Bootstrap Role (`daw-wizard`)                          | System Design / Adoption (`daw-design`)                 | Execution Planning (`daw-plan`)                              | Scope & Core Deliverable                                                                                                                                              |
-| :-------------- | :------------------------------------------- | :----------------------------------------------------- | :------------------------------------------------------ | :----------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `blueprint.md`  | `daw-design`                                 | Drafts initial system brief & core invariants          | Authoritative author; enriches boundaries & seams       | Reads for architectural constraints & seams                  | High-level topology, module boundaries, system invariants                                                                                                             |
-| `brd.md`        | `daw-design`                                 | Drafts commercial & problem scope from brief           | Authoritative author; enriches business scope           | Reads for business boundaries & constraints                  | Business goals, OKRs/KPIs, budget/timeline constraints                                                                                                                |
-| `prd.md`        | `daw-design`                                 | Drafts initial personas, user stories & AC             | Authoritative author; deepens stories & NFRs            | Reads for user stories & acceptance criteria                 | User personas, functional stories with verifiable AC                                                                                                                  |
-| `frd.md`        | `daw-design`                                 | Drafts core functional flows & transitions             | Authoritative author; formalizes state machines         | Reads for validation logic & state transitions               | State transitions, logic rules, validation matrices                                                                                                                   |
-| `techstack.md`  | `daw-design`                                 | Drafts proposed runtimes, stores & frameworks          | Authoritative author; grounds in code & ADRs            | Reads for runner commands, toolchains & versions             | Runtimes, libraries, DBs, toolchains, and ADR trade-offs                                                                                                              |
-| `design.md`     | `daw-design`                                 | Drafts initial design tokens / UI inventory            | Authoritative author; enforces token scales             | Reads for UI component boundaries (if UI)                    | Design tokens, color contrast, component styling                                                                                                                      |
-| `wireframe.md`  | `daw-design`                                 | Drafts structural screen layouts (if UI)               | Authoritative author; responsive layout hierarchy       | Reads for layout structure (if UI)                           | Structural viewports, layout grids, screen blocks (mockup proof itself is the rendered visual per [Workflow Artifacts](workflow-artifacts.md) §5, not wireframe-only) |
-| `ui-ux.md`      | `daw-design`                                 | Drafts core user interaction states (if UI)            | Authoritative author; interaction states & a11y         | Reads for interactive states (if UI)                         | Micro-interactions, keyboard navigation, a11y tree                                                                                                                    |
-| `security.md`   | `daw-design`                                 | Drafts initial threat boundaries & data flow           | Authoritative author; formal threat model & auth        | Reads for security invariants & test requirements            | Threat model, trust boundaries, auth rules, sanitization                                                                                                              |
-| `roadmap.md`    | `daw-design` (strategy) / `daw-plan` (tasks) | Drafts high-level milestone strategy & delivery phases | Authoritative for strategic release phases & milestones | Owns task decomposition & milestone progress when authorized | Strategic milestone phasing vs tactical task breakdown                                                                                                                |
-| `deployment.md` | `daw-design`                                 | Drafts deployment topology & target envs               | Authoritative author; release pipelines & rollback      | Reads for deployment targets & environment variables         | CI/CD pipeline, environments, containerization, rollback                                                                                                              |
-| `qa.md`         | `daw-design`                                 | Drafts test strategy & verification gates              | Authoritative author; coverage gates & test plan        | Reads for test requirements & verification gates             | Test pyramid, automated test suites, quality gates                                                                                                                    |
-| `runbook.md`    | `daw-design`                                 | Drafts initial operational triage & alerts             | Authoritative author; operational procedures & triage   | Reads for operational constraints & commands                 | Service diagnostics, triage trees, incident remediation                                                                                                               |
+| Document        | Accountable Author                           | Bootstrap Role (`daw-wizard`)                              | System Design / Adoption (`daw-design`)                                        | Execution Planning (`daw-plan`)                                                       | Scope & Core Deliverable                                                                                                                                              |
+| :-------------- | :------------------------------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------- | :------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `blueprint.md`  | `daw-design`                                 | Drafts initial system brief & core invariants              | Authoritative author; enriches boundaries & seams                              | Reads for architectural constraints & seams                                           | High-level topology, module boundaries, system invariants                                                                                                             |
+| `brd.md`        | `daw-design`                                 | Drafts commercial & problem scope from brief               | Authoritative author; enriches business scope                                  | Reads for business boundaries & constraints                                           | Business goals, OKRs/KPIs, budget/timeline constraints                                                                                                                |
+| `prd.md`        | `daw-design`                                 | Drafts initial personas, user stories & AC                 | Authoritative author; deepens stories & NFRs                                   | Reads for user stories & acceptance criteria                                          | User personas, functional stories with verifiable AC                                                                                                                  |
+| `frd.md`        | `daw-design`                                 | Drafts core functional flows & transitions                 | Authoritative author; formalizes state machines                                | Reads for validation logic & state transitions                                        | State transitions, logic rules, validation matrices                                                                                                                   |
+| `erd.md`        | `daw-design`                                 | Drafts entity inventory when persisted entities identified | Authoritative author when ERD trigger applies; enriches entities/relationships | Reads for persistent identity/relationships; scoped skip/N/A when no persistent model | Persistent entities, identity, sourced attributes, relationships (cardinality/optionality/ownership), integrity/lifecycle/traceability, applicable physical design    |
+| `techstack.md`  | `daw-design`                                 | Drafts proposed runtimes, stores & frameworks              | Authoritative author; grounds in code & ADRs                                   | Reads for runner commands, toolchains & versions                                      | Runtimes, libraries, DBs, toolchains, and ADR trade-offs                                                                                                              |
+| `design.md`     | `daw-design`                                 | Drafts initial design tokens / UI inventory                | Authoritative author; enforces token scales                                    | Reads for UI component boundaries (if UI)                                             | Design tokens, color contrast, component styling                                                                                                                      |
+| `wireframe.md`  | `daw-design`                                 | Drafts structural screen layouts (if UI)                   | Authoritative author; responsive layout hierarchy                              | Reads for layout structure (if UI)                                                    | Structural viewports, layout grids, screen blocks (mockup proof itself is the rendered visual per [Workflow Artifacts](workflow-artifacts.md) §5, not wireframe-only) |
+| `ui-ux.md`      | `daw-design`                                 | Drafts core user interaction states (if UI)                | Authoritative author; interaction states & a11y                                | Reads for interactive states (if UI)                                                  | Micro-interactions, keyboard navigation, a11y tree                                                                                                                    |
+| `security.md`   | `daw-design`                                 | Drafts initial threat boundaries & data flow               | Authoritative author; formal threat model & auth                               | Reads for security invariants & test requirements                                     | Threat model, trust boundaries, auth rules, sanitization                                                                                                              |
+| `roadmap.md`    | `daw-design` (strategy) / `daw-plan` (tasks) | Drafts high-level milestone strategy & delivery phases     | Authoritative for strategic release phases & milestones                        | Owns task decomposition & milestone progress when authorized                          | Strategic milestone phasing vs tactical task breakdown                                                                                                                |
+| `deployment.md` | `daw-design`                                 | Drafts deployment topology & target envs                   | Authoritative author; release pipelines & rollback                             | Reads for deployment targets & environment variables                                  | CI/CD pipeline, environments, containerization, rollback                                                                                                              |
+| `qa.md`         | `daw-design`                                 | Drafts test strategy & verification gates                  | Authoritative author; coverage gates & test plan                               | Reads for test requirements & verification gates                                      | Test pyramid, automated test suites, quality gates                                                                                                                    |
+| `runbook.md`    | `daw-design`                                 | Drafts initial operational triage & alerts                 | Authoritative author; operational procedures & triage                          | Reads for operational constraints & commands                                          | Service diagnostics, triage trees, incident remediation                                                                                                               |
 
 #### 2. Module Phase Ownership Rules
 
 - **`daw-wizard` (Bootstrap Greenfield Interview):** Conducts interactive elicitation for blank projects. Generates a _proportional bootstrap specification set_ grounded in interview answers and sensible defaults (typically baseline documents: `blueprint.md`, `prd.md`, `frd.md`, `techstack.md`, and high-level `roadmap.md` strategy). Hands off to `daw-design` for enrichment, boundary validation, and builder-readiness inspection.
-- **`daw-design` (Authoritative System Architecture & Adoption):** The primary custodian and authoritative author for specifications across the 13-document matrix. Creates, updates, enriches, and adopts specifications (`adopt` route, or `requirements: "unclear"` `feature` / `bootstrap` design stage; read-only `review` recommends authorized follow-up, never writes). Assesses builder-readiness and verifies consumer seams before downstream handoff. Follows the active parent route; NEVER performs recursive self-invocation (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent).
+- **`daw-design` (Authoritative System Architecture & Adoption):** The primary custodian and authoritative author for specifications across the 14-document matrix. Creates, updates, enriches, and adopts specifications (`adopt` route, or `requirements: "unclear"` `feature` / `bootstrap` design stage; read-only `review` recommends authorized follow-up, never writes). Assesses builder-readiness and verifies consumer seams before downstream handoff. Follows the active parent route; NEVER performs recursive self-invocation (`handoff_to: "daw-design"` is strictly forbidden; handoff proceeds downstream to `daw-plan` or returns to parent).
 - **`daw-plan` (Deterministic Execution Task Decomposition):** Converts design specifications or direct change requests into concrete, ordered implementation tasks with disjoint file ownership, acceptance criteria, and verification commands. For multi-step authorized work the tactical plan is persisted and saved before build dispatch per the canonical [Workflow Artifacts](workflow-artifacts.md) contract (§1–§2): it maps stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/checks, evidence slots, and separate parent acceptance with bound spec revisions (existing roadmap/issue-export/project-doc section when sufficient, otherwise `docs/plans/<workflow-id>.md`; lean single-document spec/plan/progress sections preferred). A chat payload or native todo alone is insufficient; no duplicate task-tracker authority is created (artifact ref in existing handoff `details`, outer schema unchanged). It NEVER forces document sprawl or creates persistent tracking files (`tasks.md`, `tracker.md`) unless requested by the user or required by repository conventions. When an authorized persistent tracking document or `roadmap.md` task-level breakdown is required, `daw-plan` owns tactical task breakdown and milestone progress updates.
 - **Consistency with Finite Routes:** Clear feature routes (`requirements: "clear"`) execute via `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`. `daw-design` is NEVER forcibly inserted when requirements and interfaces are already clear. No new routes or mandatory stages are introduced.
 
@@ -195,9 +196,9 @@ Before authoring or mutating any specification document, the authoring module MU
   - The agent MUST explicitly mark the claim as `[UNVERIFIED]` or record it in an `## Open Questions` section with owner, impact, and resolution trigger.
   - The agent blocks ONLY the impacted downstream commitments or execution paths; unaffected orthogonal paths proceed.
 
-#### 6. Proportionality & Anti-Sprawl (No Forced 13 Documents)
+#### 6. Proportionality & Anti-Sprawl (No Forced 14 Documents)
 
-- The 13-document matrix is an exhaustive reference catalog, NOT a mandatory checklist for every project.
+- The 14-document matrix is an exhaustive reference catalog, NOT a mandatory checklist for every project.
 - Author ONLY the documents justified by the project scope, trigger criteria, and user intent.
 - For small scoped bug fixes, refactorings, or localized patches, zero persistent document churn or minimal updates to existing specs is the standard.
 
@@ -212,7 +213,7 @@ Before authoring or mutating any specification document, the authoring module MU
 All authored documentation must satisfy the quality criteria defined in the canonical reference [Document Quality Standards & Review Rubric](document-quality.md) and machine-readable rubric [document-quality-rubric.json](document-quality-rubric.json).
 
 - **Deterministic Transition Gate (`scripts/validate.py docs`):** Documents advance through an explicit 5-edge state machine (`intake-authoring` -> `authoring-review` -> `review-ready` / `review-rework` -> `rework-review`).
-- **Parent-Owned Scope & State:** The parent orchestrator specifies the exact selected document target set via `--documents` (normalized set equality; no mandatory 13-doc requirement) and persists actual workflow state. The validator is a stateless, read-only CLI check.
+- **Parent-Owned Scope & State:** The parent orchestrator specifies the exact selected document target set via `--documents` (normalized set equality; no mandatory 14-doc requirement) and persists actual workflow state. The validator is a stateless, read-only CLI check.
 - **Evidence Grounding:** Authoring and review transitions require exact line-range quotes and SHA-256 digests matching UTF-8 source files in `--project-root`.
 - **Mutation Invalidation:** Review verdicts (`review-ready`) are pinned to exact document and source file hashes. Any modification of an accepted formal document invalidates prior eligibility, requiring explicit re-entry through the existing five-edge gate (`review-rework` -> `rework-review` -> `review-ready`). Code-only changes invalidate affected runtime verification and postbuild reviews without forcing unchanged documents through doc quality gates. Approvals are invalidated only when their action, target, revision, or scope changes.
 - **Explicit Command Gates:** The validator is invoked explicitly at workflow transition boundaries; it does not install background daemons, supervisors, or runtime pre-tool hooks.
@@ -298,9 +299,24 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 - **Downstream Handoff:** Feeds into `techstack.md`, `qa.md`, and direct implementation.
 - **Stop / Replan Trigger:** Contradictory state transitions or unhandled error recovery paths.
 
+### 5. `erd.md` — Entity-Relationship Document: Persistent Entities, Relationships & Integrity
+
+- **Trigger:** Persisted entities or relationships are introduced, materially changed, or adopted without an adequate existing model. Otherwise ERD is `skipped`/`N/A` with a scoped reason.
+- **Inputs & Prerequisites:** `blueprint.md` (boundaries/components/flows/domain invariants), `frd.md` (behavior/payload types/validation), `techstack.md` if storage choices apply, existing adequate separate model when present.
+- **Required Capability:** Explicit inline orchestrator (domain modeling, entity identity, relationship design).
+- **Conditional Capabilities:**
+  - Database design capability — When choosing storage engines, normalization, indexing, or migration frameworks (physical detail only when storage choices warrant it).
+  - Backend architecture capability — When transactions, concurrency, or distributed workflows constrain persistence.
+  - Codebase memory & graph mapping capability — When adopting an existing model from a complex codebase.
+- **Template Link:** [erd.md](../templates/erd.md)
+- **Output Contract:** Logical entities and identity with sourced attributes; relationships with cardinality, optionality, and ownership; integrity, lifecycle, and traceability; applicable physical design (PK/FK/index/deletion only when storage choices warrant them). Blueprint links ERD for boundaries/components/flows/domain invariants; FRD links ERD for persistent identity/relationships while retaining behavior/payload validation; techstack references ERD for the storage model when applicable.
+- **Exit Criterion:** Entities/identity and sourced attributes are covered, relationships/cardinality/optionality/ownership are explicit, integrity/lifecycle/traceability hold, applicable physical details are grounded. No invented schema or migration authorization.
+- **Downstream Handoff:** Feeds into `techstack.md`, `qa.md`, and direct implementation; preserves blueprint/FRD ownership seams without duplication.
+- **Stop / Replan Trigger:** Unresolvable ownership conflicts, missing sourced attributes, or ungrounded physical/schema claims.
+
 ---
 
-### 5. `techstack.md` — Technology Stack & Infrastructure Specification
+### 6. `techstack.md` — Technology Stack & Infrastructure Specification
 
 - **Trigger:** Selection or standardization of frameworks, databases, libraries, infrastructure runtimes, and external third-party SDKs.
 - **Inputs & Prerequisites:** `blueprint.md`, `frd.md` (or relevant existing equivalents), hosting constraints, existing repository dependency manifests.
@@ -317,7 +333,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 6. `design.md` — Visual Design System & Component Library Specification
+### 7. `design.md` — Visual Design System & Component Library Specification
 
 - **Trigger:** Authoring visual design systems, design tokens (colors, spacing, typography, elevation), shared component libraries, and UI themes. (Note: Low-level software/module design belongs in `blueprint.md`, `frd.md`, and `techstack.md`).
 - **Inputs & Prerequisites:** `prd.md`, `wireframe.md` (or relevant existing equivalents), brand assets, style guidelines. A user-supplied or wizard-drafted root `DESIGN.md` in the open [DESIGN.md format](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) is the normative token source when present; this spec references its tokens instead of redefining them.
@@ -335,7 +351,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 7. `wireframe.md` — Structural UI Wireframes & Layout Hierarchy
+### 8. `wireframe.md` — Structural UI Wireframes & Layout Hierarchy
 
 - **Trigger:** User interface screen layout definition, structural content blocks, information hierarchy, and viewport layout grids.
 - **Inputs & Prerequisites:** `prd.md` (or relevant existing equivalent), user journey maps.
@@ -352,7 +368,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 8. `ui-ux.md` — Interactive Behaviors, Micro-interactions & Accessibility States
+### 9. `ui-ux.md` — Interactive Behaviors, Micro-interactions & Accessibility States
 
 - **Trigger:** Interactive states (hover, active, disabled, focus-visible), micro-interactions, motion curves, keyboard navigation, and full accessibility trees. (Builds on visual tokens in `design.md` without duplicating them).
 - **Inputs & Prerequisites:** `wireframe.md`, `design.md` (or relevant existing equivalents).
@@ -370,7 +386,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 9. `security.md` — Threat Modeling, Vulnerability Mitigation & Security Controls
+### 10. `security.md` — Threat Modeling, Vulnerability Mitigation & Security Controls
 
 - **Trigger:** Data persistence, authentication/authorization implementation, external network ingest, payment flows, or cryptographic handling.
 - **Inputs & Prerequisites:** `blueprint.md`, `techstack.md` (or relevant existing equivalents).
@@ -387,7 +403,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 10. `roadmap.md` — Milestone Planning, Phasing & Work Breakdown
+### 11. `roadmap.md` — Milestone Planning, Phasing & Work Breakdown
 
 - **Trigger:** Multi-phase project delivery, dependencies sequencing, team task breakdown, and sprint milestone definitions.
 - **Inputs & Prerequisites:** `prd.md`, `techstack.md` (or relevant existing equivalents), stakeholder timeline expectations.
@@ -402,7 +418,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 11. `deployment.md` — Infrastructure, Release Pipeline & Environment Configuration
+### 12. `deployment.md` — Infrastructure, Release Pipeline & Environment Configuration
 
 - **Trigger:** Deployment configuration, CI/CD pipeline automation, containerization, hosting topology, and rollback procedures.
 - **Inputs & Prerequisites:** `techstack.md`, `security.md` (or relevant existing equivalents), environment secrets manifests (references and variable names ONLY, never secret values).
@@ -420,7 +436,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 12. `qa.md` — Quality Assurance, Test Strategy & Verification Plan
+### 13. `qa.md` — Quality Assurance, Test Strategy & Verification Plan
 
 - **Trigger:** Test plan definition for feature verification, test pyramid allocation, performance baselines, and release sign-off.
 - **Inputs & Prerequisites:** `prd.md`, `frd.md` (or relevant existing equivalents).
@@ -437,7 +453,7 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
 
 ---
 
-### 13. `runbook.md` — Incident Response, Operational Procedures & Observability
+### 14. `runbook.md` — Incident Response, Operational Procedures & Observability
 
 - **Trigger:** Production readiness, on-call operational handoff, disaster recovery planning, and service maintenance procedures.
 - **Inputs & Prerequisites:** `blueprint.md`, `deployment.md`, `security.md` (or relevant existing equivalents).

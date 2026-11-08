@@ -26,7 +26,7 @@
     "blueprint": [
       {
         "id": "blueprint-01",
-        "question": "Does the executive summary establish high-level system boundaries, core components, and primary architecture proportional to project scope?"
+        "question": "Does the document establish system context and boundaries, components and responsibilities, primary interaction and data flows, domain invariants, and failure and transaction boundaries, with detailed persistent relationships deferred to the separate ERD?"
       },
       {
         "id": "blueprint-02",
@@ -65,10 +65,24 @@
         "question": "Are functional and experiential success conditions, feature-level acceptance criteria, and explicit out-of-scope boundaries defined?"
       }
     ],
+    "erd": [
+      {
+        "id": "erd-01",
+        "question": "Are logical entities, identity, and sourced attributes defined without inventing a physical schema?"
+      },
+      {
+        "id": "erd-02",
+        "question": "Are relationships, cardinality, optionality, and ownership defined between persistent entities?"
+      },
+      {
+        "id": "erd-03",
+        "question": "Are integrity, lifecycle, traceability, and applicable physical design details (PK/FK/index/deletion only where storage choices warrant them) defined?"
+      }
+    ],
     "frd": [
       {
         "id": "frd-01",
-        "question": "Are domain entities, data models, attributes, or payload schemas defined with unambiguous types and validation constraints?"
+        "question": "Are behavioral payload schemas, field types, and validation constraints defined, linking the separate ERD for persistent entity identity and relationships?"
       },
       {
         "id": "frd-02",

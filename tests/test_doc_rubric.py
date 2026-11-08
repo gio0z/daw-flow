@@ -5,7 +5,7 @@ Verifies `load_rubric` in `scripts.doc_quality` against canonical registry invar
 - `schema_version` must be integer 1
 - `common`: array of exactly 5 criteria objects with exact keys `{"id", "question"}`
 - `common` IDs: unique and exactly matching `COMMON_CRITERIA_IDS` (DQ-01..DQ-05)
-- `kinds`: object containing exactly the 13 canonical kind keys
+- `kinds`: object containing exactly the 14 canonical kind keys
 - Each kind: array of exactly 3 criteria objects with exact keys `{"id", "question"}`
 - Kind IDs: unique and exactly matching `{kind}-01`, `{kind}-02`, `{kind}-03`
 - Non-blank questions across all criteria; no semantic wording pinning
@@ -69,7 +69,7 @@ class TestDocRubricRegistry(unittest.TestCase):
         # Verify kinds invariants
         kinds = rubric.get("kinds", {})
         self.assertEqual(set(kinds.keys()), set(CANONICAL_KINDS))
-        self.assertEqual(len(kinds), 13)
+        self.assertEqual(len(kinds), len(CANONICAL_KINDS))
         for k in CANONICAL_KINDS:
             k_items = kinds[k]
             self.assertEqual(len(k_items), 3)

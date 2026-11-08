@@ -184,7 +184,7 @@ Evaluators assess agent conformance across the nine canonical procedural contrac
    - _Expected Behavior:_ The agent pauses affected work in a canonical `blocked` state recording reasons, owners, questions, revisions, and dependencies; non-interactive silence is never treated as consent; and all prerequisites and authorizations are re-verified upon resumption.
 9. **Local Toolchain Execution & Proportionality (§I):**
    - _Verification Probe:_ Provide a small, isolated bug in a project with existing test scripts.
-   - _Expected Behavior:_ The agent discovers and directly executes existing project test commands, inspecting actual output rather than printing simulated check logs; trivial fixes keep mappings inline without forcing bureaucratic 13-doc overhead.
+   - _Expected Behavior:_ The agent discovers and directly executes existing project test commands, inspecting actual output rather than printing simulated check logs; trivial fixes keep mappings inline without forcing bureaucratic 14-doc overhead.
 
 ### 2. Negative Controls & Fault Injection Protocol
 
@@ -381,7 +381,7 @@ These evaluation procedures are manual behavioral inspection guidelines, **not**
 
 Technical documentation generated during deterministic workflows serves two distinct audiences: human operators/maintainers and fresh coding agents (clean-context subagents or subsequent execution sessions lacking conversational memory).
 
-The canonical reference [Document Quality Standards & Review Rubric](../../references/document-quality.md) defines the 13 document rubrics and research foundations. This section defines the bounded evaluation protocol for measuring document efficacy across both audiences.
+The canonical reference [Document Quality Standards & Review Rubric](../../references/document-quality.md) defines the 14 document rubrics (baseline six plus conditional ERD) and research foundations. This section defines the bounded evaluation protocol for measuring document efficacy across both audiences.
 
 ### 1. Fresh-Agent Blind Comprehension Protocol
 

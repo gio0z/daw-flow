@@ -1,6 +1,6 @@
 # Functional Requirements Document (FRD): [Feature / Component]
 
-> **Fill-in Guidance:** Fill this template using existing repository patterns and domain conventions adhering to the canonical shared procedural contract in [Canonical Document Quality & Workflow Transition Guide](../references/document-quality.md#feature-delivery-contract). Equivalent existing technical contracts or schemas may be linked directly. Mark N/A with rationale if not applicable. Do not force generic REST or HTTP API schemas if implementing internal modules, CLI scripts, or data pipelines. Do not invent speculative schemas; expected input shape does not equal enforced schema (record missing validation explicitly). Distinguish user requirements and observed source facts from author-proposed engineering defaults using a concise provenance ledger or explicit labels (`[User Requirement]`, `[Observed Fact]`, `[Proposed Default]`). Record proposed/default vs decided. Unresolved technical questions block only impacted engineering components.
+> **Fill-in Guidance:** Fill this template using existing repository patterns and domain conventions adhering to the canonical shared procedural contract in [Canonical Document Quality & Workflow Transition Guide](../references/document-quality.md#feature-delivery-contract). Equivalent existing technical contracts or schemas may be linked directly. Mark N/A with rationale if not applicable. Do not force generic REST or HTTP API schemas if implementing internal modules, CLI scripts, or data pipelines. Do not invent speculative schemas; expected input shape does not equal enforced schema (record missing validation explicitly). Distinguish user requirements and observed source facts from author-proposed engineering defaults using a concise provenance ledger or explicit labels (`[User Requirement]`, `[Observed Fact]`, `[Proposed Default]`). Record proposed/default vs decided. Unresolved technical questions block only impacted engineering components. Persistent entities and their relationships are owned by the linked ERD; this FRD keeps behavioral payload types, validation, and state transitions, and links to the ERD for persistent identity and relationships — never restate its content here.
 
 > **Status:** Draft (default for new documents; set to Approved only with exact observed human/provider approval evidence)
 > **Owner:** [Supplied/verified owner name or role; otherwise Unassigned — requires owner decision]
@@ -15,9 +15,8 @@
 
 ---
 
-## 1. Domain Entities & State Models
+- **Entities & Types:** [Behavioral payload types, DTOs, interfaces, and value objects using repository naming conventions. Persistent entity identity and relationships: link the ERD document; do not duplicate its authority here]
 
-- **Entities & Types:** [Domain structures, DTOs, interfaces, or tables using repository naming conventions]
 - **Lifecycle & Transitions:** [Valid state progressions, e.g., `Draft -> PendingApproval -> Active -> Archived`]
 - **Forbidden Transitions:** [Transitions explicitly disallowed by business logic]
 
@@ -86,6 +85,6 @@ _Supporting infrastructure tasks (DB migrations, schema baselines, configuration
 
 _Reviewers and authoring agents must verify the document against the canonical [Document Quality Specification](../references/document-quality.md) before workflow transitions:_
 
-- [ ] **frd-01:** Are domain entities, data models, attributes, or payload schemas defined with unambiguous types and validation constraints?
+- [ ] **frd-01:** Are behavioral payload types and validation constraints defined with unambiguous types, with persistent entity identity and relationships linked to the ERD rather than duplicated?
 - [ ] **frd-02:** Are system state transitions, event triggers, preconditions, and postconditions deterministically mapped?
 - [ ] **frd-03:** Are edge cases, error handling contracts, and input boundary conditions specified with observable behavior?

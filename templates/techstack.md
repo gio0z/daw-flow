@@ -20,7 +20,7 @@ _Default Rule: Prefer existing repository conventions and libraries. Do NOT intr
 
 - **Current Runtime & Language:** [e.g., Python 3.11, Node 20 LTS, Go 1.22]
 - **Core Frameworks & Tools:** [Existing libraries currently maintained in repo]
-- **Infrastructure Constraints:** [CPU/RAM limits, serverless timeouts, host environment constraints]
+- **Storage Model:** [Existing storage engine and model conventions; persistent-entity and relationship authority lives in the linked `erd.md` — reference it here, do not duplicate its content]
 
 ## 2. Proposed Technology Additions (if any)
 

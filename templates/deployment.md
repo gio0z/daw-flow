@@ -52,9 +52,15 @@ _Enforce immutable artifacts. Never deploy unpinned mutable tags._
 - **Canary / Telemetry Observation:** [Error rate and latency criteria observed over specified window]
 - **Key Metrics & Dashboard:** `[Dashboard link / metric queries]`
 - **Scoped Log Inspection:** Verification that target service logs within release observation window show expected startup messages and no abnormal error spikes above baseline severity.
+- **Post-Release Feedback & Incident Intake:** Authorized post-release feedback or incident intake (source, affected release/digest, evidence, impact, owner) is classified as bug, new requirement, operational incident, or no-change/deferred per `references/operations.md#post-release-feedback--incident-closure` and routed through existing gates. A released fix closes only with disposition, linked REQ/AC/task where actioned, parent-observed scoped verification, and post-release evidence if actually deployed; local proof is recorded as local-only and never claims production resolution. No automatic publish or monitoring is introduced by this intake; operations maintenance remains opt-in.
 
 ## 5. Rollback Trigger & Execution
 
 - **Rollback Triggers:** Error budget exceeded, unhandled panic in logs, broken operational invariant.
-- **Rollback Target:** Explicit known-good artifact digest: `[exact-known-good-digest]` (NEVER deploy unverified `HEAD~1` or mutable `latest`).
 - **Data Recovery:** Follow `runbook.md` section 4 only if data/state corruption occurred; stateless rollbacks require artifact reversion only.
+
+## 6. Post-Release Feedback & Incident Closure Record
+
+- **Disposition:** `[bug / new requirement / operational incident / no-change-deferred]`
+- **Linked REQ/AC/Task (where actioned):** `[IDs or N/A with reason]`
+- **Post-Release Evidence:** `[Observed log/health evidence + artifact digest + observation window, or "local proof only — production resolution unexercised"]`

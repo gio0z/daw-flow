@@ -83,7 +83,7 @@ python3 "$SKILL_DIR/scripts/validate.py" docs doc-transition.json \
   - `RECORD`: Path to the JSON documentation transition record file. May be specified as a project-root-relative path or an absolute path within `--project-root`.
   - `--project-root DIR`: Required. Absolute or relative path to the target project root. All target document paths and quoted source evidence files are bounded project-relative paths within this root.
   - `--transition intake-authoring|authoring-review|review-ready|review-rework|rework-review`: Required. Explicit workflow transition edge to validate.
-  - `--documents PATH [PATH ...]`: Required. Parent-owned expected target document set (strict project-relative paths). Normalized set equality against the record's declared `documents` is strictly enforced; duplicate targets and alias collisions are rejected. There is no mandatory 13-document requirement; only selected actual documents for the current task.
+  - `--documents PATH [PATH ...]`: Required. Parent-owned expected target document set (strict project-relative paths). Normalized set equality against the record's declared `documents` is strictly enforced; duplicate targets and alias collisions are rejected. There is no mandatory 14-document requirement; only selected actual documents for the current task.
   - `--format text|json`: Output format (`text` or `json`). Defaults to `text`.
 
 ### Exit Codes
@@ -173,8 +173,8 @@ When running `validate.py package`, the following checks are enforced:
    - `references/installation.md`
    - `references/task-contract.example.json`
    - `scripts/validate.py`
-   - `templates/` containing exactly the 13 canonical document templates:
-     `brd.md`, `prd.md`, `frd.md`, `techstack.md`, `blueprint.md`, `design.md`, `ui-ux.md`, `wireframe.md`, `roadmap.md`, `runbook.md`, `deployment.md`, `security.md`, `qa.md`. (Unrecognized extra Markdown files in `templates/` trigger validation errors). Escaping paths or symlinks yield `symlink_escapes_package` (for symlink escapes) or `path_escapes_package` (for non-symlink/traversal boundary escapes).
+   - `templates/` containing exactly the 14 canonical document templates:
+     `brd.md`, `prd.md`, `frd.md`, `techstack.md`, `blueprint.md`, `design.md`, `ui-ux.md`, `wireframe.md`, `roadmap.md`, `runbook.md`, `deployment.md`, `security.md`, `qa.md`, `erd.md`. (Unrecognized extra Markdown files in `templates/` trigger validation errors). Escaping paths or symlinks yield `symlink_escapes_package` (for symlink escapes) or `path_escapes_package` (for non-symlink/traversal boundary escapes).
 2. **Frontmatter Validation:**
    - `name`: Must match the directory name (e.g., `deterministic-agentic-workflow`), non-empty, alphanumeric + hyphens, $\le 64$ characters.
    - `description`: Non-empty string, $\le 1024$ characters.
@@ -186,7 +186,7 @@ When running `validate.py package`, the following checks are enforced:
    - All internal Markdown links (`[label](path)`) must resolve to existing files within the package root. Remote (`http://`, `https://`, `mailto:`) and in-page anchor (`#...`) links are permitted. Links attempting traversal outside the package root are rejected.
    - Markdown code fences (` ``` ` or `~~~`) must be properly balanced.
 5. **Routing Reference Structure:**
-   - `references/routing.md` must contain 13 sections for the 13 document types, each including the mandatory structural labels: `Trigger`, `Inputs & Prerequisites`, `Required Capability`, `Conditional Capabilities`, `Template Link`, `Output Contract`, `Exit Criterion`, `Downstream Handoff`, and `Stop / Replan Trigger`.
+   - `references/routing.md` must contain 14 sections for the 14 document types, each including the mandatory structural labels: `Trigger`, `Inputs & Prerequisites`, `Required Capability`, `Conditional Capabilities`, `Template Link`, `Output Contract`, `Exit Criterion`, `Downstream Handoff`, and `Stop / Replan Trigger`.
 
 6. **Version Consistency:**
    - When `VERSION` exists at the package root, and `SKILL.md` frontmatter defines `metadata.version`, both values must match exactly (`VERSION` stripped; metadata value unquoted). If `VERSION` exists but `metadata.version` is missing or mismatched, a `version_mismatch` error is raised. If `VERSION` is absent, the check is skipped.
@@ -204,7 +204,7 @@ Task contracts represent deterministic boundaries between planning and execution
 | `schema_version`      | integer | Yes      | Must be exactly `1`.                                                                               |
 | `objective`           | string  | Yes      | Non-blank description of the task objective.                                                       |
 | `baseline`            | object  | Yes      | Pre-task snapshot of relevant files and revision context.                                          |
-| `documents`           | array   | Yes      | Array of 13-doc specification records (can be empty for routine patches).                          |
+| `documents`           | array   | Yes      | Array of 14-doc specification records (can be empty for routine patches).                          |
 | `acceptance_criteria` | array   | Yes      | Non-empty array of verifiable criteria.                                                            |
 | `operation`           | object  | Yes      | The planned state mutation operation.                                                              |
 | `approval`            | object  | No       | Captured user approval reference (mandatory for high-risk operations at `execute` and `complete`). |
@@ -234,8 +234,8 @@ Captures pre-mutation state.
 Tracks document-driven governance artifacts.
 
 - Each entry:
-  - `kind` (_string, required_): One of the 13 canonical document stems:
-    `brd`, `prd`, `frd`, `techstack`, `blueprint`, `design`, `ui-ux`, `wireframe`, `roadmap`, `runbook`, `deployment`, `security`, `qa`.
+  - `kind` (_string, required_): One of the 14 canonical document stems:
+    `brd`, `prd`, `frd`, `techstack`, `blueprint`, `design`, `ui-ux`, `wireframe`, `roadmap`, `runbook`, `deployment`, `security`, `qa`, `erd`.
   - `path` (_string, required_): Project-root-relative path to the document file. File must exist.
   - `status` (_string, required_): One of `"current"`, `"draft"`, `"stale"`, `"conflicting"`.
 - Stage rules:
@@ -377,7 +377,7 @@ The following JSON shows the structural layout of a transition record. It is an 
 
 2. **Per-Document Base Fields (All Transitions):**
    - `path` (_string, required_): Bounded, strict project-relative path. Traversal (`..`), absolute paths, and symlink escapes are rejected. For `intake-authoring`, the file need not exist yet, but its parent directory must be safe. For all other transitions, the file must exist as a regular UTF-8 file.
-   - `kind` (_string, required_): Must be one of the 13 canonical document kinds (`blueprint`, `brd`, `prd`, `frd`, `techstack`, `design`, `wireframe`, `ui-ux`, `security`, `qa`, `deployment`, `runbook`, `roadmap`).
+   - `kind` (_string, required_): Must be one of the 14 canonical document kinds (`blueprint`, `brd`, `prd`, `frd`, `techstack`, `design`, `wireframe`, `ui-ux`, `security`, `qa`, `deployment`, `runbook`, `roadmap`, `erd`).
    - `audience` (_string, required_): Non-blank description of target human or agent reader.
    - `reader_task` (_string, required_): Non-blank description of task reader must execute.
    - `sources` (_array of objects, required_): Non-empty list of source evidence objects grounding prerequisites and factual context in existing regular UTF-8 files within `--project-root`.

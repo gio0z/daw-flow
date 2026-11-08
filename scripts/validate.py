@@ -24,6 +24,7 @@ CANONICAL_TEMPLATES = (
     "brd.md",
     "deployment.md",
     "design.md",
+    "erd.md",
     "frd.md",
     "prd.md",
     "qa.md",
@@ -502,16 +503,26 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
         except OSError:
             add_error("file_read_error", "SKILL.md", "Failed to read SKILL.md.")
 
-    # 4. Check routing.md 13 sections and 9 fields
+    # 4. Check routing.md sections and 9 fields
     routing_file = root_path / "references" / "routing.md"
-    if routing_file.is_file() and not any("routing.md" in f["path"] and f["code"] in ("symlink_escapes_package", "path_escapes_package") for f in findings):
+    if routing_file.is_file() and not any(
+        "routing.md" in f["path"]
+        and f["code"] in ("symlink_escapes_package", "path_escapes_package")
+        for f in findings
+    ):
         try:
             r_content = routing_file.read_text(encoding="utf-8")
             pattern = r"###\s+(\d+)\.\s+`([^`]+)`"
             sections = re.findall(pattern, r_content)
             found_templates = [s[1] for s in sections]
-            if len(sections) != 13 or set(found_templates) != set(CANONICAL_TEMPLATES):
-                add_error("routing_sections_mismatch", "references/routing.md", "references/routing.md must contain exactly 13 sections for canonical templates.")
+            if len(sections) != len(CANONICAL_TEMPLATES) or set(found_templates) != set(
+                CANONICAL_TEMPLATES
+            ):
+                add_error(
+                    "routing_sections_mismatch",
+                    "references/routing.md",
+                    f"references/routing.md must contain exactly {len(CANONICAL_TEMPLATES)} sections for canonical templates.",
+                )
 
             section_splits = re.split(r"(?=###\s+\d+\.\s+`[^`]+`)", r_content)
             for chunk in section_splits:
@@ -805,7 +816,7 @@ def validate_contract(
             d_status = doc.get("status")
 
             if not isinstance(d_kind, str) or d_kind not in CANONICAL_DOC_STEMS:
-                add_error("invalid_document_kind", f"{d_loc}.kind", "Document kind must be one of the 13 canonical stems.")
+                add_error("invalid_document_kind", f"{d_loc}.kind", "Document kind must be one of the canonical stems.")
             elif d_kind in seen_kinds:
                 add_error("duplicate_document_kind", f"{d_loc}.kind", f"Duplicate document kind: {d_kind}")
             else:

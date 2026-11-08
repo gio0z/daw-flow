@@ -268,6 +268,8 @@ Verification is complete when:
 5. Every criterion is mapped to an inspectable primary observation comparing expected versus actual outcomes.
 6. No dry-runs are recorded as deployment/migration proofs.
 
+- **Post-release closure evidence rule:** For post-release feedback or incident fixes, verify code correctness on the current revision as scoped proof, but separately distinguish deployed proof: post-release evidence (log/health observation plus artifact digest and window on the released surface) is required before any production-resolution claim, and local test/staging evidence is recorded as local-only proof with production resolution explicitly unexercised. A verifier `pass` proposes parent acceptance of scoped evidence only; it never closes an incident or authorizes publication, and maintenance/monitoring remains opt-in per `references/operations.md` §6 and the post-release closure loop.
+
 ---
 
 ## 7. Stop / Replan Triggers
