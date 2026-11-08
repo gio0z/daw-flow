@@ -1,6 +1,6 @@
 ---
 name: daw-build
-description: "Test-driven implementation and code construction: applies behavioral test strategies appropriate to change type, enforces behavioral regression tests before fixes where behavior is uncertain or testable, ensures non-tautological tests, applies minimal-diff code changes without overengineering, and isolates parallel subagents into disjoint file boundaries."
+description: "Test-driven implementation and code construction: applies behavioral test strategies appropriate to change type, enforces behavioral regression tests before fixes where behavior is uncertain or testable, ensures non-tautological tests, applies minimal-diff code changes without overengineering, isolates parallel subagents into disjoint file boundaries, and executes refactor/maintain/spike lifecycle modes (behavior-preserving structural edits, dependency upgrades with lockfile fidelity, throwaway spike prototypes in isolated worktrees)."
 compatibility: "Fully self-contained procedural skill; no external dependencies required."
 ---
 
@@ -16,7 +16,9 @@ Invoke `daw-build` when:
 
 - Implementing planned engineering tasks, features, components, or API endpoints defined in a specification or plan.
 - Applying bug fixes and remediations backed by a diagnosed root cause and reproduction contract (from `daw-debug`).
-- Refactoring internal subsystem implementations while preserving all public contracts and invariants.
+- Executing the `refactor` route: behavior-preserving structural changes only, with characterization oracles first and no behavior change (see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)).
+- Executing the `maintain` route: dependency/toolchain upgrades, deprecation removal, and version migrations, one dependency group at a time with the lockfile committed (see [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol)).
+- Executing the `spike` route: throwaway prototypes in an isolated worktree to resolve technical uncertainty; never merged (see [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol)).
 - Executing multi-task implementation plans decomposed across parallel or sequential worker agents.
 
 **Do NOT use `daw-build` for:**
@@ -57,6 +59,14 @@ Before writing or modifying code:
     - Build outputs supply inspectable primary observations across the assigned scope and current revision rather than self-certifying completion; `status: "pass"` is a proposed module state for parent evaluation. The parent authors acceptance decisions independently (optionally in a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record)); worker claims of acceptance are untrusted. The parent holds the [Ranked Result Triage queue](../../references/operations.md#ranked-result-triage) and decides corrective dispatch; builder output proposes prioritized findings only and never self-approves or deploys.
     - **Delegated (subagent) vs. standalone mode:** A delegated worker under a parent orchestrator is edit-only: it makes the assigned code change and returns an integration candidate with a proposed prioritized findings list (or explicit no-actionable-finding with its scoped N/A/proof). It obeys the parent's centralized checks, does NOT run tests/lint/formatters/gates while the parent owns final verification, and marks unrun proof `unexercised`. It never escalates a completed candidate into a fake `needs-fix`. A standalone build (no parent owning centralized verification) runs the needed task-scoped tests itself and records their actual observed results.
 13. **Parent Prefinal Coupling Check Awareness:** For all code-changing tasks, the builder prepares clear accounting of touched files, modified interface signatures, and direct callers/dependencies. The parent orchestrator evaluates these at the [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint) before final completion.
+
+### Lifecycle Build Modes (refactor / maintain / spike)
+
+- **Inner development loop (all modes):** After each edit, run the smallest relevant check or keep the app running; smoke early before expanding scope; do not batch many untested edits. See [Inner Development Loop](../../references/developer-lifecycle.md#1-inner-development-loop).
+- **Refactor mode:** Run the existing suite first and pin current observable behavior with characterization tests before any structural edit. Commit structural-only changes (move/rename/extract) with no behavior change; if a characterization probe fails, stop and report instead of adjusting tests to match. See [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol).
+- **Maintain mode:** Read the upstream changelog and breaking changes first. Upgrade one dependency group at a time, commit the lockfile with each group, run the relevant suite per group, and roll back per group on failure. See [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol).
+- **Spike mode:** Work only in the isolated worktree on the disposable `spike/<topic>` branch; no tests are required, the timebox in §2B applies, and spike code is never merged. Record findings (question, what was tried, result, evidence) and return them via the handoff; production code re-enters `feature`/`refactor`. See [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol).
+- **Time-box escalation:** Each plan task declares an estimate/timebox. On expiry, stop and escalate to the parent with findings and the current diff state; never silently extend the budget. See [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets).
 
 ## 3. Step-by-Step Procedure
 
@@ -129,7 +139,8 @@ Return a complete, observable JSON handoff before any transition using [routing 
 **Handoff Selection:** Choose `handoff_to` from the active route only; the handoff is advisory metadata for the parent orchestrator and `daw-build` never invokes another module directly.
 
 - **`patch` route:** `daw-build` precedes `daw-verify`. On `status: "pass"`, recommend `daw-verify`.
-- **`feature` / `bugfix` routes:** The active route places `daw-review` before `daw-verify`. On `status: "pass"`, recommend `daw-review` — never skip review to reach verification.
+- **`feature` / `bugfix` / `refactor` / `maintain` routes:** The active route places `daw-review` before `daw-verify`. On `status: "pass"`, recommend `daw-review` — never skip review to reach verification.
+- **`spike` route:** On `status: "pass"`, recommend `daw-ask` with the spike findings (question, approach, result, evidence); spike output is throwaway and never advances to `daw-review`/`daw-verify` or merge.
 - **Halted (`status: "fail"` or `"blocked"`):** Return `handoff_to: null`. A stopped or failed build stage never advances the pipeline.
 
 Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
@@ -189,6 +200,7 @@ For high-risk modifications without exact interactive authorization or required 
 7. **Local Verification by Mode (Contract §I):** Standalone build — authorized non-interactive verification commands were executed in the local environment and output was directly inspected. Delegated worker — verification is parent-owned; the worker marks it `unexercised` and never self-certifies.
 8. **Code vs. Evidence Distinguished (Contract §D, §G):** File modifications are recorded separately from observed runtime verification evidence.
 9. Build evidence supplies concrete scope and current revision observations; proposed module completion remains subject to independent parent evaluation per the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) and [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries).
+10. **Lifecycle mode criteria:** Refactor — characterization suite green before and after with no behavior change; maintain — one dependency group per commit with lockfile committed and per-group suite run; spike — isolated `spike/<topic>` worktree only, findings recorded, nothing merged.
 
 ---
 

@@ -16,6 +16,7 @@
   - [`skills/daw-setup/SKILL.md`](skills/daw-setup/SKILL.md): Interactive configuration setup, tool command discovery & project conventions.
   - [`skills/daw-wizard/SKILL.md`](skills/daw-wizard/SKILL.md): Interactive greenfield requirements interview & initial specification document authoring.
   - [`skills/daw-untangle/SKILL.md`](skills/daw-untangle/SKILL.md): Read-only system coupling analysis, hidden dependency mapping & bounded boundary unentanglement.
+  - [`skills/daw-ship/SKILL.md`](skills/daw-ship/SKILL.md): Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness.
 - **Route Engine & Policy:**
   - [`scripts/route.py`](scripts/route.py): Read-only, zero-dependency suite routing engine and `--check-suite` structural validator.
   - [`references/suite-manifest.json`](references/suite-manifest.json): Declarative routing policy table and module mapping schema.
@@ -38,7 +39,7 @@
   - [`references/installation.md`](references/installation.md): Environment discovery paths, packaging layout, sibling symlink distribution, and skill registration.
   - [`references/task-contract.example.json`](references/task-contract.example.json): Canonical JSON task-contract example envelope.
   - [`references/change-coupling.md`](references/change-coupling.md): Change-coupling taxonomy, dependency tracing heuristics, and boundary unentanglement reference.
-  - [`references/route-request.example.json`](references/route-request.example.json): Canonical JSON route request example envelope.
+  - [`references/developer-lifecycle.md`](references/developer-lifecycle.md): Professional delivery lifecycle protocols (inner loop, time-boxing, spike, refactor, maintenance, bisection, commit hygiene, PR/CI, review feedback, release, retro).
 - - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md), [`templates/erd.md`](templates/erd.md) (conditional).
 - **Standalone Repository Specifications:**
   - [`CHANGELOG.md`](CHANGELOG.md): Chronological suite change history and architecture decisions log.

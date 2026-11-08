@@ -55,6 +55,12 @@ Inspect observable repository facts without executing mutating commands:
 - Git remote: `git remote -v` and default branch (`main` / `master`).
 - Existing agent context files: Check root `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` and inspect if a `## DAW Configuration` block already exists.
 - Specification directory conventions: Inspect `docs/specs/`, `docs/`, `docs/adr/`. Default is `docs/specs/`.
+- Delivery conventions (for the `ship` route; see [Commit Hygiene](../../references/developer-lifecycle.md#7-commit-hygiene), [Pull Request & CI Protocol](../../references/developer-lifecycle.md#8-pull-request--ci-protocol), and [Release Readiness](../../references/developer-lifecycle.md#10-release-readiness)):
+  - **Commit convention:** `CONTRIBUTING.md`, commitlint config (`.commitlintrc*`, `commitlint.config.*`), or observed `git log --oneline -20` prefixes (Conventional Commits, emoji/short-tag style). Record the observed format or `none`.
+  - **PR template:** `.github/pull_request_template.md`, `docs/pull_request_template.md`, or a CONTRIBUTING check; record the path or `none`.
+  - **CI config:** `.github/workflows/`, `.gitlab-ci.yml`, or equivalent; record the observed required-check names (for PR readiness) or `none`.
+  - **Release process:** `CHANGELOG.md` presence, `release-please`/`semantic-release` config, tag format (`git tag --list | tail`), or version file (`VERSION`, `package.json` version, `Cargo.toml` version); record the observed process or `none`.
+  - **Branch naming:** Observed active branches (`git branch -a`) and any branch-protection rule detectable from remotes/docs; record the pattern (e.g. `feature/*`, `daw/<task-id>-*`, `spike/<topic>`) or `none`.
 - Project build/test/lint configurations:
   - Node/JS: `package.json` scripts (`test`, `lint`, `build`).
   - Python: `pyproject.toml`, `setup.cfg`, `pytest.ini`, `Makefile`.
@@ -75,6 +81,7 @@ Present discovered facts as pre-filled defaults, not questions the repository al
 6. **high_risk_paths:** Identified sensitive paths (e.g. `migrations/`, `deploy/`, `infra/`, `.github/workflows/`) or `none`.
 7. **issue_tracker:** `github` | `gitlab` | `local-markdown` | `none`.
 8. **default_branch:** Detected default branch (`main` or `master`).
+9. **Delivery conventions (ship route):** `commit_convention`, `pr_template`, `ci_checks`, `release_process`, `branch_pattern` — discovered values or `none` (never guessed). Required for `ship` route readiness; `none` means the ship stage works from observed repo behavior with an explicit note.
 
 Show the proposed block diff and obtain explicit confirmation.
 
@@ -103,9 +110,18 @@ Exact block format:
 - high_risk_paths: migrations/, deploy/
 - issue_tracker: github
 - default_branch: main
+- commit_convention: conventional
+- pr_template: .github/pull_request_template.md
+- ci_checks: ci/test
+- release_process: changelog+tags
+- branch_pattern: feature/*
 
 <!-- daw-config:end -->
 ```
+
+### Step 4: Record Retrospective Lessons
+
+After a shipped or completed workflow, record durable lessons (recurring verifier findings, convention gaps, recurring CI failures) into this same DAW config block or a `docs/retro/` note and reference it from the block, per [Retrospective & Convention Feedback](../../references/developer-lifecycle.md#11-retrospective--convention-feedback). Update in place; never duplicate the block.
 
 ---
 
@@ -127,7 +143,12 @@ Required `details`: `target_file` and `configuration`, retaining all configurati
     "workspace": "in-place",
     "high_risk_paths": ["migrations/", "deploy/"],
     "issue_tracker": "github",
-    "default_branch": "main"
+    "default_branch": "main",
+    "commit_convention": "conventional",
+    "pr_template": ".github/pull_request_template.md",
+    "ci_checks": ["ci/test"],
+    "release_process": "changelog+tags",
+    "branch_pattern": "feature/*"
   }
 }
 ```

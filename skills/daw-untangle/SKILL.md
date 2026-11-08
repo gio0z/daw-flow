@@ -18,8 +18,8 @@ The untangle module performs deterministic, read-only structural analysis and ch
 - **Explicit Structural Investigation:** Answering inquiries regarding coupling, circular dependencies, shotgun surgery risks, or architectural boundary friction.
 - **Change-Coupling Diagnosis:** Investigating whether two or more subsystems or modules should change together or be decoupled.
 - **Pre-Refactoring Scoping:** Preparing for structural refactoring by diagnosing coupling roots, hidden dependencies, and invariant requirements before authoring implementation plans or mutating code.
+- **First Stage of the `refactor` Route:** On the `refactor` route, `daw-untangle` is Stage 1: it outputs the target structure and the safe step sequence for `daw-plan` (see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)). It remains strictly read-only — the sequence is a proposal, never executed here.
 - **Subsystem Boundary Audits:** Auditing an authorized named component or subsystem for leaky abstractions, mega-context passing, or shallow module layering.
-- **Parent Prefinal Check Escalation:** Investigating demonstrated hidden dependencies, unclear interface boundaries, or shotgun surgery risks escalated by the parent orchestrator from the [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint) or `daw-review` before final delivery.
 
 ### Precedence in Suite Pipeline
 
@@ -196,6 +196,8 @@ The outer schema is defined only in routing §5. Preserve the following module-s
 - `decision_log`: `topic`, `rationale`, and `alternatives_considered`, including legitimate resilience patterns checked and preserved as non-findings.
 - `dependencies`, `invariants`, and `non_goals`: scoped external/cross-subsystem links, required behavior, and exclusions.
 - `proposed_change`: `summary`, `boundary`, and affected files/consumers in `impact`; proposals grant no execution authority.
+- `target_structure` (refactor route): the proposed module boundary — modules created/merged/split, new public interfaces, and invariants preserved.
+- `safe_step_sequence` (refactor route): ordered structural-only steps (rename, extract, move, split) for `daw-plan`, each with files touched, the behavior-preservation oracle (characterization probe) expected before/after, and the rollback point. Each step changes structure only; no step bundles a behavior change.
 - `verification_plan.suggested_checks`: checks for downstream execution, never represented as exercised by untangle.
 - `unknowns`: unresolved facts, downstream design choices, and qualified negative evidence; distinguish analysis-blocking gaps from ordinary proposal uncertainty.
 
@@ -292,6 +294,7 @@ Before finalizing an untangle run, verify the following exit criteria:
 
 - **To `daw-design`:** When the proposed restructuring involves high-level architectural trade-offs, breaking API changes, or cross-subsystem contracts requiring formal specification updates or operator decision gating.
 - **To `daw-plan`:** When the structural diagnosis is complete, module boundaries are settled, and the task is ready for concrete, ordered file-by-file implementation task decomposition.
+- **To `daw-plan` (refactor route):** When `daw-untangle` is Stage 1 of the `refactor` route, hand off `target_structure` and `safe_step_sequence` to `daw-plan` for decomposition into behavior-preserving tasks. The handoff stays advisory and read-only; `daw-untangle` never executes steps or grants mutation authority.
 - **To Orchestrator / Operator:** Return the canonical handoff envelope with `handoff_to: null`. The orchestrator or operator evaluates the findings and explicitly authorizes downstream execution.
 
 _Reference Link:_ See [Change Coupling Reference](../../references/change-coupling.md), [Shared Routing Contract](../../references/routing.md), and [Parent Specification](../../SKILL.md).

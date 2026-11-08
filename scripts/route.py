@@ -23,7 +23,10 @@ MAX_INPUT_BYTES = 1024 * 1024  # 1 MiB bounded input limit
 MAX_MODULE_BYTES = 256 * 1024  # 256 KiB bounded module read limit
 
 VALID_ENUMS: dict[str, frozenset[str]] = {
-    "intent": frozenset({"bootstrap", "adopt", "feature", "bugfix", "patch", "review", "untangle", "ask", "setup"}),
+    "intent": frozenset({
+        "bootstrap", "adopt", "feature", "bugfix", "patch", "review", "untangle", "ask", "setup",
+        "refactor", "maintain", "spike", "ship",
+    }),
     "requirements": frozenset({"clear", "unclear", "unknown"}),
     "risk": frozenset({"low", "high", "unknown"}),
     "workspace": frozenset({"in-place", "isolated", "unknown"}),
@@ -43,6 +46,7 @@ MANIFEST_MODULE_KEYS = frozenset({
     "daw-setup",
     "daw-wizard",
     "daw-untangle",
+    "daw-ship",
 })
 
 # Invariant stage definitions per intent (v1 fixed canonical policy)
@@ -59,7 +63,17 @@ CANONICAL_ROUTE_STAGES: dict[str, Any] = {
     "untangle": ["daw-untangle"],
     "ask": ["daw-ask"],
     "setup": ["daw-setup"],
+    "refactor": ["daw-untangle", "daw-plan", "daw-build", "daw-review", "daw-verify"],
+    "maintain": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+    "spike": ["daw-workspace", "daw-build", "daw-ask"],
+    "ship": ["daw-ship"],
 }
+
+# Mutating intents that select in-place vs isolated workspace before stages run.
+WORKSPACE_EVALUATING_INTENTS = frozenset({"feature", "bugfix", "patch", "refactor", "maintain"})
+
+# Intents whose stages cannot start while requirements are entirely unknown.
+REQUIREMENTS_GATED_INTENTS = frozenset({"bootstrap", "feature", "patch", "refactor", "maintain"})
 
 
 def _reject_constant(_: str) -> None:
@@ -191,7 +205,7 @@ def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) 
 
 
 def _validate_module_entries(modules: Any) -> list[dict[str, str]]:
-    """Validate manifest modules object and all 11 entries."""
+    """Validate manifest modules object and all canonical entries."""
     findings: list[dict[str, str]] = []
     if not isinstance(modules, dict):
         return [{"code": "MANIFEST_INVALID_MODULES", "message": "Manifest modules must be a JSON object."}]
@@ -259,7 +273,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
         # Invariant checks for flags
         expected_doc = (r_name in ("bootstrap", "adopt", "setup"))
         expected_ro = (r_name in ("review", "untangle", "ask"))
-        expected_ws = (r_name in ("feature", "bugfix", "patch"))
+        expected_ws = (r_name in WORKSPACE_EVALUATING_INTENTS)
 
         if r_def.get("documentation_only") is not expected_doc:
             findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' documentation_only must be {expected_doc}."})
@@ -334,7 +348,7 @@ def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[
 
 
 def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[dict[str, str]]:
-    """Verify that all 11 canonical modules exist on disk within root."""
+    """Verify that all canonical modules exist on disk within root."""
     findings: list[dict[str, str]] = []
     modules = manifest.get("modules", {})
     for mod_name in sorted(MANIFEST_MODULE_KEYS):
@@ -347,7 +361,7 @@ def check_suite_modules(root: pathlib.Path, manifest: dict[str, Any]) -> list[di
 
 
 def check_suite(root: pathlib.Path | str | None = None) -> list[dict[str, str]]:
-    """Validate suite manifest and verify all 11 canonical modules on disk within root."""
+    """Validate suite manifest and verify all canonical modules on disk within root."""
     resolved_root = find_suite_root(root)
     manifest, findings = load_manifest(resolved_root)
     if findings:
@@ -424,10 +438,12 @@ def resolve_route(
     needs_input = False
 
     if requirements == "unknown":
-        if intent in ("bootstrap", "feature", "patch"):
+        if intent in REQUIREMENTS_GATED_INTENTS:
             needs_input = True
             reasons.append(f"Requirements unknown for {intent}; detailed input required before planning stages.")
             blockers.append({"code": "REQUIREMENTS_UNKNOWN", "message": f"Requirements are unknown for intent '{intent}'."})
+        elif intent == "spike":
+            reasons.append("Requirements unknown for spike: a time-boxed throwaway experiment exists to resolve them.")
         elif intent == "adopt":
             reasons.append("Requirements unknown for adopt: proceeding with source observation and intake.")
         else:
@@ -475,7 +491,7 @@ def resolve_route(
             interactive_approval_required=interactive_approval_required,
         )
 
-    # All 11 core suite modules must exist on disk
+    # All canonical suite modules must exist on disk
     module_findings = check_suite_modules(resolved_root, manifest)
     if module_findings:
         return create_response(
@@ -499,6 +515,13 @@ def resolve_route(
 
     if prepend_workspace:
         stages = ["daw-workspace"] + [s for s in stages if s != "daw-workspace"]
+
+    if intent == "spike":
+        reasons.append("Spike output is throwaway: findings return through daw-ask; production code re-enters feature/refactor.")
+    elif intent == "refactor":
+        reasons.append("Refactor must preserve observable behavior: characterization tests precede structural edits.")
+    elif intent == "ship":
+        reasons.append("Ship prepares integration only: push, merge, tag, and publish each need point-of-risk authorization.")
 
     reasons.append("Route resolved successfully.")
     return create_response(

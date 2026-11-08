@@ -1,5 +1,19 @@
 # Suite Change History & Architecture Log
 
+## 0.2.0 (2026-11-08) — Professional Developer Lifecycle
+
+### Added
+
+- New module `daw-ship` (`skills/daw-ship/SKILL.md`): integration & delivery — commit hygiene, pull requests, CI triage, review feedback, merge & release readiness. The suite is now **12 modules**.
+- New shared reference `references/developer-lifecycle.md`: inner dev loop, time-boxing & escalation budgets, spike protocol, behavior-preserving refactor protocol, dependency/maintenance upgrade protocol, regression bisection, commit hygiene, PR/CI protocol, review feedback protocol, release readiness, retro fed back into `AGENTS.md`.
+- Four new intents (total **13**: bootstrap, adopt, feature, bugfix, patch, review, untangle, ask, setup, refactor, maintain, spike, ship). `refactor` (`daw-untangle -> daw-plan -> daw-build -> daw-review -> daw-verify`), `maintain`, `spike` (`daw-workspace -> daw-build -> daw-ask`, always isolated, throwaway), and `ship` (`daw-ship`).
+
+### Changed
+
+- Module count 11 -> 12 and intent count 9 -> 13 across router, routing, `README.md`, `AGENTS.md`, `docs/PRD.md`, `docs/TRD.md`, `docs/DESIGN.md`, `docs/WORKFLOW.md`, and references.
+- `VERSION` and root `SKILL.md` `metadata.version` bumped to `0.2.0`.
+- Installer update now creates the `daw-ship` alias.
+
 ## 0.1.2 (2026-11-08)
 
 - Version bump for the 2026-11-08 corrections below: optional Figma/FigCraft-first mockup review, workflow artifact governance, separate conditional ERD kind (14-kind catalog), substantive Blueprint, and post-release feedback/incident closure loop. `VERSION` and `SKILL.md` `metadata.version` updated together.

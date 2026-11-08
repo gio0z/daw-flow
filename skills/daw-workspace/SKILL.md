@@ -28,7 +28,9 @@ Invoke `daw-workspace` when:
 - Beginning a multi-step task that requires workspace state evaluation (`in-place` vs `isolated`).
 - Isolated worktree branching is explicitly authorized by the user or task policy (never infer isolation authorization merely from high risk).
 - Workspace inspection is required to inventory dirty files, active branch, and untracked artifacts before editing.
+- Setting up the disposable `spike` worktree: Stage 1 of the `spike` route (`daw-workspace` -> `daw-build` -> `daw-ask`) creates an isolated worktree on branch `spike/<topic>` for the throwaway prototype (see [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol)).
 - Cleaning up or safely exiting an authorized worktree session without data loss.
+- Discarding the spike worktree and its `spike/<topic>` branch after `daw-ask` records the findings, under explicit user authorization (see Procedure D, Spike teardown).
 
 Do NOT invoke `daw-workspace` for:
 
@@ -88,7 +90,15 @@ Identify:
 
 Isolation requires explicit user or task-policy authorization, not merely high risk. Use a unique, non-colliding branch and a safe path; in-repo paths must be ignored before creation, and exclude changes require authorization. Worktrees still share ports, databases, locks, daemons, and secrets. [Procedure B](#procedure-b-authorized-isolated-worktree-setup) is the sole operational setup procedure.
 
-### Principle 4: Baseline Smoke Verification
+### Principle 4: Spike Worktree Lifecycle (Disposable)
+
+The `spike` route always runs in its own isolated worktree on the disposable branch `spike/<topic>` — never in-place on the user's working tree. The branch is created fresh per spike topic (e.g., `spike/grpc-bloat-check`) and the worktree is discarded once `daw-ask` synthesizes the findings. Discard or branch deletion requires explicit user authorization; the findings handoff is the deliverable, not the code. See [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol).
+
+### Principle 5: Feature Branch Naming (Per DAW Config)
+
+Feature branches follow `branch_pattern` from the DAW config block (see `daw-setup`); when unset, fall back to the observed repo convention or `feature/<short-description>`. Spike branches always use `spike/<topic>` regardless of the feature pattern.
+
+### Principle 6: Baseline Smoke Verification
 
 An authorized isolated worktree needs baseline integrity evidence before changes. Perform the branch/commit inspection and applicable smoke/build check in Procedure B. User-reported failures are ground truth: never rerun their failing check solely to confirm the report.
 
@@ -150,6 +160,19 @@ When work in an isolated worktree is finished:
      git worktree remove .worktrees/feature-name
      ```
 
+### Procedure D: Spike Worktree Teardown (Authorized)
+
+After `daw-ask` records spike findings, on explicit user authorization only:
+
+1. Confirm findings are recorded in the handoff (question, approach, result, evidence) — findings live beyond the branch.
+2. Return to the main worktree, remove the spike worktree, and delete the disposable branch:
+   ```bash
+   git worktree remove .worktrees/spike-<topic>
+   git branch -D spike/<topic>
+   ```
+3. Verify no spike artifacts remain in the main tree (`git status --porcelain` clean of spike files).
+
+Never merge spike branches; never discard dirty spike state without explicit authorization to discard that state.
 ---
 
 ## 5. Output Contract

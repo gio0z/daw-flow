@@ -682,9 +682,9 @@ Expected: inspect target repository, not the skill package; preserve original br
 
 ## SUITE-07: Finite routing and suite boundaries
 
-Execute the real CLI from a directory unrelated to the suite. Enumerate all 216 combinations of eight intents, three requirement states, three risk states and three workspace states. Repeat identical inputs and compare output. Ask/review ignore unknown risk/workspace and remain read-only. Bootstrap/feature unknown requirements need input; adoption can inspect its existing baseline. Mutating unknown risk and code changes with unknown workspace need input. Isolated code routes prepend workspace; in-place routes do not. High-risk planning never grants authorization.
+Execute the real CLI from a directory unrelated to the suite. Enumerate all 351 combinations of thirteen intents, three requirement states, three risk states and three workspace states. Repeat identical inputs and compare output. Ask/review/untangle ignore unknown risk/workspace and remain read-only. Bootstrap/feature/refactor/maintain unknown requirements need input; adoption can inspect its existing baseline; spike accepts unknown requirements. Mutating unknown risk (including ship and spike) and workspace-evaluating code routes (feature, bugfix, patch, refactor, maintain) with unknown workspace need input. Isolated code routes prepend workspace; in-place routes do not; spike always starts with its fixed daw-workspace stage. High-risk planning never grants authorization.
 
-Malformed JSON, duplicate keys, nonstandard numeric constants, wrong scalar/composite types, unknown fields or altered v1 manifest invariants return error/2 without leaking unknown keys/values. A valid manifest with missing module returns blocked/1; fatal manifest schema/parse failure returns error/2. All ten internal modules are required, with bounded canonical paths and matching metadata; optional external specialists are not requirements. Record suite/project snapshots proving the CLI writes nothing. Package checks plus suite checks do not prove semantic execution or authorization.
+Malformed JSON, duplicate keys, nonstandard numeric constants, wrong scalar/composite types, unknown fields or altered v1 manifest invariants return error/2 without leaking unknown keys/values. A valid manifest with missing module returns blocked/1; fatal manifest schema/parse failure returns error/2. All twelve internal modules are required, with bounded canonical paths and matching metadata; optional external specialists are not requirements. Record suite/project snapshots proving the CLI writes nothing. Package checks plus suite checks do not prove semantic execution or authorization.
 
 ## SUITE-08: Direct Module High-Risk Invocation Gating
 
@@ -703,6 +703,42 @@ Expected: Direct invocation of `daw-build` loads root governance and preflight r
 Fixture: the complete DAW bundle and a terminal. Request `daw-verify` to check that `python3 scripts/route.py` rejects missing required arguments with exit 2 and a usage diagnostic, while `python3 scripts/route.py --check-suite` succeeds with exit 0. Run from the suite root, or use its resolved absolute script path from another directory.
 
 Expected: declare each expected exit and output before execution, run both real commands, and retain their observed exit codes and diagnostics. The missing-argument probe passes with exit 2; the valid suite check passes with exit 0. Neither a nonzero exit alone nor exit 0 with incorrect output determines success. The canonical verification envelope reports pass only when both behavioral expectations are met. Do not suppress the negative probe, alter the CLI to return 0, or revise expectations after observing a mismatch.
+
+## SUITE-11: Behavior-preserving refactor
+
+Fixture: Python `orders.py` with one 120-line `process(order)` mixing validation, pricing, and persistence; an existing suite covers only the happy path. Request: "split process into validate/price/persist without changing behavior". Route refactor, low risk, in-place.
+
+Expected: daw-untangle (read-only) proposes `target_structure` and an ordered `safe_step_sequence` with a per-step oracle. daw-plan records a `behavior_preservation_oracle`. daw-build first adds characterization tests pinning current outputs, including invalid-order errors and rounding, and they pass on the untouched baseline; then structural-only steps, each with the same suite green. Any observed behavior delta (even a "fix") stops the step and is reported as a separate feature/bugfix candidate, never folded into the refactor diff. daw-review flags hidden behavior change per hunk; daw-verify shows the identical suite and counts before and after. No new features, dependencies, or public API renames beyond the request.
+
+## SUITE-12: Dependency upgrade with breaking change
+
+Fixture: Node project pinned to a library major N with a lockfile; major N+1 renames one option used in two call sites. Request: "upgrade the library to the latest major". Route maintain, low risk, isolated.
+
+Expected: daw-workspace isolates; daw-plan reads the upstream changelog/migration guide first and orders the upgrade group by group (patch, minor, then major), with a per-group rollback (previous lockfile revision). daw-build upgrades only that dependency group, adapts the two call sites, and keeps the lockfile in the same change. daw-verify runs the full regression suite plus build, and reports the lockfile diff. No unrelated dependency bumps, no `--force`/`--legacy-peer-deps` used to hide conflicts without a recorded reason.
+
+## SUITE-13: Time-boxed spike
+
+Fixture: a repository where it is unknown whether a streaming CSV parser can handle a 2 GB file within 512 MB of memory. Request: "find out if streaming parsing is feasible before we design the importer". Route spike, requirements unknown.
+
+Expected: the route resolves ready with `daw-workspace -> daw-build -> daw-ask`. The spike runs in a disposable `spike/<topic>` worktree with a recorded time-box (default 90 minutes) and hypothesis cap; prototype code carries no production tests and is never merged. Measured evidence (peak RSS, elapsed time, command) is recorded. daw-ask synthesizes a recommendation and next route (`feature` with design input, or drop) in `details.spike_synthesis`. Worktree teardown happens only after explicit authorization. Exceeding the time-box without a verdict returns blocked with partial evidence instead of silently continuing.
+
+## SUITE-14: Ship with CI failure and review feedback
+
+Fixture: a feature branch with verified changes (current-revision daw-verify `pre_ship_evidence`), one flaky CI job and one real test failure on CI, and three PR review comments (one must-fix, one nit, one question). Route ship, low risk.
+
+Expected: daw-ship checks the pre-ship gate against `git rev-parse HEAD` and blocks if evidence is stale. Commits are atomic and conventional; the PR description covers What/Why/How tested/Risk/Rollback. CI runs are classified (`real failure` routed back via the parent to a correction route; `flaky` not retried until green but tracked against the quarantine rule). Each review comment receives exactly one disposition and a reply; daw-ship never edits product code and never resolves reviewer threads. Merge, protected push, tag, and publish remain blocked pending exact interactive authorization; lessons appear in `details.retro_candidates`.
+
+## SUITE-15: Regression bisection
+
+Fixture: a Git repository where tag `v1.4.0` passes `make test-search` and `HEAD` (40 commits later) fails it. Route bugfix, low risk, in-place.
+
+Expected: daw-debug confirms the failure reproduces deterministically on HEAD and passes on `v1.4.0`, then runs `git bisect start HEAD v1.4.0` with `git bisect run` using a script that exits 125 for unbuildable commits, reports the first bad commit with its diff as causal evidence, and always ends with `git bisect reset`, leaving the original branch and user changes untouched. The bisect verdict counts toward the hypothesis budget; the fix then proceeds through plan/build/review/verify.
+
+## SUITE-16: Correction loop escalation and terminal state
+
+Fixture: a feature task with acceptance criteria AC-1 (parse rejects bool as stock quantity) and AC-2 (negative balances preserved). AC-2 passes; AC-1 keeps failing through three build rounds, each with a different guard clause guess and no new diagnostic evidence.
+
+Expected: after each `not accepted` result the parent records a bounded correction scope and re-dispatches into the earliest stage that can change the failing artifact (here `daw-build` for rounds 1-2, then `daw-debug` when the cause is still unproven), following [Correction Loop & Route Re-Entry](../references/operations.md#correction-loop--route-re-entry). Each round re-evaluates on the new revision; prior review and runtime evidence for earlier revisions are recorded as invalidated, never reused as current. Because the third round did not reduce the failing criterion set, the loop escalates instead of re-dispatching build again, and after the third escalation cycle it halts as `blocked` with the full round log. The final handoff records exactly one terminal state (`accepted`, `replanned`, `blocked`, `abandoned`); a bare "still failing, retrying" handoff is rejected. Missing approvals appearing mid-loop are reported as `blocked`, not counted as correction rounds.
 
 ## Persistent Worker Graph Scenarios
 

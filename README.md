@@ -5,9 +5,11 @@ A portable planning, execution, and verification suite for AI coding agents. Pyt
 > **"Otaknya boleh generative, tangannya harus deterministic."**
 > _(Generative cognitive reasoning for context and planning; deterministic execution and verification for system state)._
 
-Based on the architectural principles articulated in Rama Digital's [_Agentic Tapi Deterministic Workflow AI Agent_](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent), this package provides a self-contained engineering workflow suite combining root router dispatch, an explicit 11-module execution architecture (`skills/daw-*/`), the canonical 14-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
+Based on the architectural principles articulated in Rama Digital's [_Agentic Tapi Deterministic Workflow AI Agent_](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent), this package provides a self-contained engineering workflow suite combining root router dispatch, an explicit 12-module execution architecture (`skills/daw-*/`), the canonical 14-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
 
-> **Instructional Contract & Scope Notice:** This suite provides instructional workflow guidance for coding agents. It directs execution across 11 bundled modules (`skills/daw-*/`). It does not install daemon supervisors, background services, runtime interceptors, or automated enforcement mechanisms. Route evaluation (`scripts/route.py`) and package validation (`scripts/validate.py`) are read-only structural checks, not automated dispatchers or semantic proofs of correctness. Deterministic scripts and specifications do not guarantee semantic success; truthful verification requires inspecting observable runtime evidence against Acceptance Criteria.
+> **Professional delivery lifecycle:** End-to-end flow — setup -> clarify/spike -> design -> plan -> build with inner loop -> review -> verify -> ship (commit / PR / CI / review-feedback loop) -> release -> retro feeding `AGENTS.md`. Protocols in [Developer Lifecycle](references/developer-lifecycle.md); new intents `refactor`, `maintain`, `spike`, and `ship` (via `daw-ship`) are first-class routes (13 intents, 12 modules total).
+
+> **Instructional Contract & Scope Notice:** This suite provides instructional workflow guidance for coding agents. It directs execution across 12 bundled modules (`skills/daw-*/`). It does not install daemon supervisors, background services, runtime interceptors, or automated enforcement mechanisms. Route evaluation (`scripts/route.py`) and package validation (`scripts/validate.py`) are read-only structural checks, not automated dispatchers or semantic proofs of correctness. Deterministic scripts and specifications do not guarantee semantic success; truthful verification requires inspecting observable runtime evidence against Acceptance Criteria.
 
 ---
 
@@ -90,7 +92,7 @@ See [installation and compatibility](references/installation.md) for exact paths
 
 ## 2. Suite Architecture & Bundled Modules
 
-The DAW suite is self-contained as a complete 11-module bundle. It does not depend on external workflow frameworks. All 11 bundled modules in `skills/daw-*/` are core dependencies:
+The DAW suite is self-contained as a complete 12-module bundle. It does not depend on external workflow frameworks. All 12 bundled modules in `skills/daw-*/` are core dependencies:
 
 | Module            | Location                        | Role                                                                     |
 | :---------------- | :------------------------------ | :----------------------------------------------------------------------- |
@@ -105,12 +107,13 @@ The DAW suite is self-contained as a complete 11-module bundle. It does not depe
 | **daw-setup**     | `skills/daw-setup/SKILL.md`     | Interactive configuration setup, tool command discovery & conventions.   |
 | **daw-wizard**    | `skills/daw-wizard/SKILL.md`    | Greenfield requirements interview & initial specification authoring.     |
 | **daw-untangle**  | `skills/daw-untangle/SKILL.md`  | Read-only structural analysis, change-coupling & boundary investigation. |
+| **daw-ship**      | `skills/daw-ship/SKILL.md`      | Integration & delivery: commits, PRs, CI triage, review feedback, merge. |
 
-> **Missing Module Policy:** All 11 modules are required. If any bundled module is missing from the suite, execution is blocked. The workflow does not silently fall back to shallow inline approximations. External specialist skills (such as application security auditors, database optimizers, or frontend engineers) are optional orchestrator augmentations, not mandatory bundled dependencies.
+> **Missing Module Policy:** All 12 modules are required. If any bundled module is missing from the suite, execution is blocked. The workflow does not silently fall back to shallow inline approximations. External specialist skills (such as application security auditors, database optimizers, or frontend engineers) are optional orchestrator augmentations, not mandatory bundled dependencies.
 
 ### Progressive-Disclosure Supporting Protocols
 
-The 11 public modules are the only standalone discoverable and executable workflow units. Supporting protocols are scoped reference markdown files, not separate sub-skills, registered routes, child commands, or runtime layers:
+The 12 public modules are the only standalone discoverable and executable workflow units. Supporting protocols are scoped reference markdown files, not separate sub-skills, registered routes, child commands, or runtime layers:
 
 - **Shared Grilling Protocol (`references/grilling.md`):** Canonical bounded-round elicitation protocol used by `daw-wizard`, `daw-ask`, and `daw-design`. Enforces structured question rounds, separates repo facts from user decisions, tracks the active decision dependency frontier, offers grounded recommendations rather than fabricated consensus, and halts on material blockers without demanding ceremony for trivial changes.
 - **Domain Modeling Resource (`skills/daw-design/references/domain-modeling.md`):** Design-owned guidance on ubiquitous language, bounded contexts, domain invariants, and entities to deepen `blueprint.md` and related specs.
@@ -154,7 +157,7 @@ Automated routing is governed deterministically by `references/suite-manifest.js
 # Evaluate routing request against an input JSON payload
 python3 scripts/route.py references/route-request.example.json
 
-# Verify suite integrity (manifest + 10 bundled modules)
+# Verify suite integrity (manifest + 12 bundled modules)
 python3 scripts/route.py --check-suite
 ```
 
@@ -174,7 +177,7 @@ Routing requires classified input facts rather than arbitrary keyword matching:
 }
 ```
 
-- `intent`: enum `bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `ask` | `setup`
+- `intent`: enum `bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `untangle` | `ask` | `setup` | `refactor` | `maintain` | `spike` | `ship`
 - `requirements`: enum `clear` | `unclear` | `unknown`
 - `risk`: enum `low` | `high` | `unknown`
 - `workspace`: enum `in-place` | `isolated` | `unknown`
@@ -189,6 +192,10 @@ Routing requires classified input facts rather than arbitrary keyword matching:
 6. `bugfix` -> `daw-debug`, `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (workspace prepended if `isolated`)
 7. `patch` -> `daw-build`, `daw-verify` (workspace prepended if `isolated`)
 8. `feature` -> `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (or starts with `daw-design` if requirements are `unclear`; workspace prepended if `isolated`)
+9. `refactor` -> `daw-untangle`, `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (behavior-preserving; workspace prepended if `isolated`)
+10. `maintain` -> `daw-plan`, `daw-build`, `daw-review`, `daw-verify` (workspace prepended if `isolated`)
+11. `spike` -> `daw-workspace`, `daw-build`, `daw-ask` (always isolated; throwaway output only)
+12. `ship` -> `daw-ship` (integration-only; unknown risk -> `needs-input`, high risk -> interactive approval)
 
 ### High-Risk Gating & Preflight Rules
 
@@ -220,7 +227,7 @@ The suite includes two read-only Python 3.10+ standard library diagnostic utilit
 
 1. **Suite Integrity Check (`route.py --check-suite`):**
    - Validates that `references/suite-manifest.json` conforms to schema 1.
-   - Verifies all 11 bundled module `SKILL.md` files exist within the suite root and prevents symlink path escapes.
+   - Verifies all 12 bundled module `SKILL.md` files exist within the suite root and prevents symlink path escapes.
    - Exits `0` on pass (`ready`), `1` on missing modules/blockers (`blocked`), `2` on malformed manifest (`error`).
 
 2. **Package & Task Contract Validator (`validate.py`):**
@@ -280,7 +287,7 @@ DAW incorporates specification-driven execution semantics governed by the canoni
 
 ### GitHub Spec Kit Adoption Matrix
 
-The table below summarizes the alignment between upstream GitHub Spec Kit mechanisms (pinned to commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) and the DAW architecture. DAW adopts all high-value specification-driven mechanisms into its existing 10-module pipeline, while intentionally excluding external daemons, rigid file naming mandates, embedded markdown scripts, and ungrounded efficacy claims:
+The table below summarizes the alignment between upstream GitHub Spec Kit mechanisms (pinned to commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) and the DAW architecture. DAW adopts all high-value specification-driven mechanisms into its existing 12-module pipeline, while intentionally excluding external daemons, rigid file naming mandates, embedded markdown scripts, and ungrounded efficacy claims:
 
 | Upstream Spec Kit Mechanism                           | Pinned Upstream Source                                        | DAW Architecture Alignment                                                                          | Status & Architectural Rationale                                                                                                                                                                                                                                                                                  |
 | :---------------------------------------------------- | :------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -295,7 +302,7 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 | **Local Toolchain Integration & Template Overrides**  | `.specify/extensions.yml`, `workflows/speckit/workflow.yml`   | Discovered workspace scripts and local template overrides executed via Contract §I                  | **Adopted with Invariant:** Reuses local workspace commands and custom templates; local overrides and custom templates may strengthen but can NEVER weaken canonical safety gates, acceptance criteria, or verification evidence requirements. Verification commands must actually execute (no simulated output). |
 | **Capability-Based Risk Gating**                      | Implicit in command execution                                 | Explicitly codified in `references/operations.md` and `references/routing.md`                       | **Already Covered:** DAW natively classifies operations into low/medium/high/critical risk tiers with deterministic human approval gates.                                                                                                                                                                         |
 | **14-Document Specification Matrix**                  | Ad-hoc markdown documents (`spec.md`, `plan.md`)              | Canonical 14-document matrix (`templates/`, incl. conditional ERD) with dual-audience review rubric | **Already Covered:** Comprehensive architectural, functional, security, QA, data-model, and operational specifications with formal state transitions.                                                                                                                                                             |
-| **Structured Machine Handoff Envelopes**              | Implicit markdown frontmatter / conversational state          | Strict JSON handoff schema (`references/routing.md#5-canonical-module-handoff-contract`)            | **Already Covered:** Rigorous, observable JSON envelope emitted across all 10 module transitions, separating machine handoff from human reporting.                                                                                                                                                                |
+| **Structured Machine Handoff Envelopes**              | Implicit markdown frontmatter / conversational state          | Strict JSON handoff schema (`references/routing.md#5-canonical-module-handoff-contract`)            | **Already Covered:** Rigorous, observable JSON envelope emitted across all 12 module transitions, separating machine handoff from human reporting.                                                                                                                                                                |
 | **Read-Only Standard Library Validation**             | Ad-hoc npm/bash scripts                                       | Native Python stdlib utilities (`scripts/validate.py`, `scripts/doc_quality.py`)                    | **Already Covered:** Zero-dependency, portable structural linting and schema validation.                                                                                                                                                                                                                          |
 | **Daemon Supervisors & Runtime Interceptors**         | Suggested background watchers / daemons                       | Intentionally omitted: DAW uses instructional agent skill execution                                 | **Intentionally Excluded:** Violates DAW's zero-dependency portable design; agent workflows operate through prompt and tool guidance, not background daemon listeners.                                                                                                                                            |
 | **Mandated Rigid Single-File Schemas**                | Hardcoded `spec.md`, `plan.md`, `tasks.md`, `constitution.md` | Proportional documentation tailored to project scale (6-doc core or inline mappings)                | **Intentionally Excluded:** Avoids bureaucratic file duplication; small bug fixes and patches keep mappings inline without forcing ceremonial file creation.                                                                                                                                                      |
@@ -311,6 +318,7 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 
 - [Grilling Protocol (`references/grilling.md`)](references/grilling.md): Canonical bounded-round elicitation protocol used by `daw-wizard`, `daw-ask`, and `daw-design`.
 - [Routing & Specification Manifest (`references/routing.md`)](references/routing.md): Detailed intent precedence, 14-doc authoring rules, and stage pipeline handoffs.
+- [Developer Lifecycle (`references/developer-lifecycle.md`)](references/developer-lifecycle.md): Inner loop, time-boxing, spike, refactor, maintenance, bisection, commit hygiene, PR/CI, review feedback, release, and retro protocols.
 - [Installation & Compatibility Guide (`references/installation.md`)](references/installation.md): Supported agent paths, symlink aliasing, and OS compatibility.
 - [Validation & Verification Policy (`references/validation.md`)](references/validation.md): Package validation rules, structural contracts, and validation diagnostics.
 - [Operations & Execution Manual (`references/operations.md`)](references/operations.md): Preflight gates, fail-closed approvals, rollback mechanics, and persistent worker graph contracts.

@@ -15,9 +15,11 @@ Structured root-cause diagnosis isolating causal mechanisms from surface symptom
 Invoke `daw-debug` when:
 
 - Investigating runtime failures, crashes, unhandled exceptions, or test regressions.
+- Performing regression bisection when a known-good revision exists: narrow the introducing commit between last-good and first-bad, then hand the culprit commit to `daw-plan`/`daw-build` (see [Regression Bisection Protocol](../../references/developer-lifecycle.md#6-regression-bisection-protocol)).
 - Analyzing incorrect behavioral output, silent data corruption, or inconsistent state transitions.
 - Investigating performance degradations, timeouts, deadlocks, or resource leaks.
 - Diagnosing user-reported errors or production incidents where the causal mechanism is unknown.
+- Working under a declared time-box budget per [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets).
 
 **Do NOT use `daw-debug` for:**
 
@@ -69,6 +71,16 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 | H2  | Concurrency race condition | Shared cache accessed without mutex under async load     | Execute serial reproduction vs concurrent test | Open                                        | Awaiting test          |
 | H3  | Upstream contract breach   | Third-party parser returning unexpected shape            | Inspect raw wire payload at boundary           | Open                                        | Awaiting test          |
 
+### Step 2A: Regression Bisection (known-good revision exists)
+
+When the failure is a regression and a last-known-good revision is available:
+
+1. Confirm the failure reproduces at the first-bad revision and passes at the last-good revision (do not rerun user-reported failures solely to confirm them; use a targeted reproduction script per §2).
+2. Bisect: `git bisect start <first-bad> <last-good>` (or `git bisect run <narrowest failing check>` for an automated verdict), alternating until one commit remains; record each verdict against the hypothesis ledger.
+3. `git bisect reset` when done; report the single culprit commit with its diff and the changed contract (what the commit altered) as the confirmed mechanism input.
+4. Work inside the time-box budget for this step; on expiry stop mid-bisection, record the current `git bisect` state and narrowed range, and escalate to the parent instead of guessing.
+5. Bisect verdicts count toward the 3-hypothesis per-symptom budget in Step 4; at the cap, stop and escalate with the narrowed range.
+
 ### Step 3: Single-Variable Isolation & Falsification
 
 - **One Variable Experiment:** Change or test exactly one variable per experiment. If reproduction requires modifying code, environment, or configuration, modify one factor at a time.
@@ -85,7 +97,7 @@ Construct an explicit hypothesis ledger before testing or inspecting source code
 
 ### Step 4: Halt Thrashing & Replan Gate
 
-- **Anti-Thrashing Rule:** If two consecutive hypotheses are falsified without narrowing the boundary, or if attempts to reproduce the issue yield contradictory results:
+- **Anti-Thrashing Rule (time-box budget):** Per [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets): two consecutive falsified hypotheses without narrowing the boundary triggers an early stop and replan below; the hard cap is 3 distinct hypotheses per symptom total — at the cap, stop and escalate to the parent rather than testing a fourth. Contradictory reproduction results also trigger the stop:
   1. Stop speculative testing immediately.
   2. Re-examine assumptions: verify whether environment, dependencies, dirty working tree state, or configuration drift are masking the issue.
   3. Expand appropriate observations — bounded debugger breakpoints/stack/value inspection when available and authorized, otherwise logging or tracing — at the outermost subsystem boundary rather than guessing deeper internal states.

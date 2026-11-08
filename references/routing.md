@@ -9,7 +9,7 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 ## 1. Intent Precedence & Routing Hierarchy
 
-Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 9 finite intents:
+Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 13 finite intents:
 
 | Precedence | Intent      | Classification Criteria                                                                                 | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
 | :--------: | :---------- | :------------------------------------------------------------------------------------------------------ | :-------: | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,15 +22,20 @@ Routing in DAW is deterministic and requires classified input facts. The workflo
 |   **7**    | `bugfix`    | Defect resolution requiring RCA, minimal fix, security review, regression verification.                 |    No     |    No    | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                               |
 |   **8**    | `patch`     | Pre-diagnosed minimal change or surgical fix with zero spec changes (requires `requirements: "clear"`). |    No     |    No    | `daw-build` -> `daw-verify`                                                                                                                            |
 |   **9**    | `feature`   | New capability or functional evolution requiring plan, implementation, review, verification.            |    No     |    No    | Clear: `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`<br>Unclear: `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` |
+|   **10**   | `refactor`  | Behavior-preserving structural restructuring; observable behavior must not change.                      |    No     |    No    | `daw-untangle` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                            |
+|   **11**   | `maintain`  | Dependency/toolchain upgrade, deprecation removal, version migration.                                   |    No     |    No    | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                                                                                              |
+|   **12**   | `spike`     | Time-boxed throwaway prototype to resolve technical uncertainty; output never merges.                   |    No     |    No    | `daw-workspace` -> `daw-build` -> `daw-ask`                                                                                                            |
+|   **13**   | `ship`      | Integration and delivery of verified work: commit, PR, CI, review feedback, merge, release readiness.   |    No     |    No    | `daw-ship`                                                                                                                                             |
 
 ### Precedence Rules & Invariants
 
 - When user intent is evaluation, code audit, or PR review, `review` takes precedence. This is an evaluation-only dispatch: the `review` route itself remains read-only and runs `daw-review` only. An explicit parent request that combines evaluation with authorized correction is sequenced by the parent: finish the read-only review first, then route the authorized correction as its own existing intent based on findings (`bugfix`, `patch`, or `feature`). No new intent, enum, or stage is introduced.
-- When user intent is explicit structural analysis, coupling investigation, modular boundary assessment, or change-coupling inspection, `untangle` takes precedence. Strictly read-only; ignores unknown risk or workspace preferences; no `daw-workspace`, approval execution, or mutation. Dispatches to `daw-untangle`. (Note: refactoring implementation requests themselves are NOT silently routed to untangle; mutating refactoring uses standard feature/patch routes after scope is accepted. Untangle is an explicit bounded investigation, never an extra mandatory stage on all requests or an unsolicited whole-codebase cleanup mandate). Governed by [references/change-coupling.md](change-coupling.md).
+- When user intent is explicit structural analysis, coupling investigation, modular boundary assessment, or change-coupling inspection, `untangle` takes precedence. Strictly read-only; ignores unknown risk or workspace preferences; no `daw-workspace`, approval execution, or mutation. Dispatches to `daw-untangle`. (Note: refactoring implementation requests themselves are NOT silently routed to untangle; mutating behavior-preserving restructuring uses the `refactor` route (precedence 10) after scope is accepted. Untangle is an explicit bounded investigation, never an extra mandatory stage on all requests or an unsolicited whole-codebase cleanup mandate). Governed by [references/change-coupling.md](change-coupling.md).
 - When user intent is conversational Q&A, guidance, or trade-off evaluation, `ask` takes precedence.
 - Read-only user intent always wins: `review`, `untangle`, and `ask` ignore risk and workspace preferences and never mutate code or specifications.
+- When user intent is explicit behavior-preserving restructuring, `refactor` takes precedence over `feature`/`patch`; it evaluates workspace and requires known requirements (unknown -> `needs-input`), preserving observable behavior with characterization tests first. When user intent is an upgrade/migration, `maintain` takes precedence over `feature`; it evaluates workspace and requires known requirements (unknown -> `needs-input`). When user intent is a time-boxed uncertainty probe, `spike` takes precedence over `feature`; it always runs `daw-workspace` -> `daw-build` -> `daw-ask`, allows unknown requirements, and its output is throwaway only. When user intent is commit/PR/CI/merge/release delivery of verified work, `ship` takes precedence; it dispatches to `daw-ship`, does not evaluate workspace, and unknown risk -> `needs-input` while high risk -> interactive approval.
 
-If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfix`, `patch`, `feature`):
+If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfix`, `patch`, `feature`, `refactor`, `maintain`):
 
 - `workspace: "isolated"`: The router prepends `daw-workspace` to the stages pipeline.
 - `workspace: "in-place"`: The router proceeds without prepending `daw-workspace`.
@@ -42,7 +47,7 @@ If `evaluates_workspace` is enabled in the manifest for mutating intents (`bugfi
 
 ## 2. Declarative Suite Manifest Policy & Route Engine
 
-Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 9 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades (schema enum additions remain additive within schema_version: 1).
+Routing policy is declared statically in [references/suite-manifest.json](suite-manifest.json) under `schema_version: 1`. The route engine validates requests against this fixed declarative schema and enforces canonical stage pipelines for all 13 intents. The policy is fixed and schema-governed rather than freely configurable at runtime; modifications to routing stages or capabilities require code/schema upgrades (schema enum additions remain additive within schema_version: 1).
 
 ### Strict Envelope Parsing & Limits
 
@@ -52,18 +57,23 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 
 ### Declarative Intent Stage Mapping
 
-| Intent              | Stage Pipeline                                                            | Constraints / Evaluation                                                               |
-| :------------------ | :------------------------------------------------------------------------ | :------------------------------------------------------------------------------------- |
-| `ask`               | `daw-ask`                                                                 | Read-only; ignores risk and workspace.                                                 |
-| `review`            | `daw-review`                                                              | Read-only; ignores risk and workspace.                                                 |
-| `untangle`          | `daw-untangle`                                                            | Read-only; ignores risk and workspace. Strictly non-mutating structural analysis.      |
-| `setup`             | `daw-setup`                                                               | Documentation-only; allows unclear requirements.                                       |
-| `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                | Documentation-only; allows unclear requirements.                                       |
-| `adopt`             | `daw-design` -> `daw-plan`                                                | Documentation-only; preserves user code.                                               |
-| `bugfix`            | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`  | Prepends `daw-workspace` if `workspace: "isolated"`.                                   |
-| `patch`             | `daw-build` -> `daw-verify`                                               | Prepends `daw-workspace` if `workspace: "isolated"`. Requires `requirements: "clear"`. |
-| `feature` (clear)   | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                 | Prepends `daw-workspace` if `workspace: "isolated"`.                                   |
-| `feature` (unclear) | `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` | Requires requirements clarification or design intake.                                  |
+| Intent              | Stage Pipeline                                                              | Constraints / Evaluation                                                                                           |
+| :------------------ | :-------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- |
+| `ask`               | `daw-ask`                                                                   | Read-only; ignores risk and workspace.                                                                             |
+| `review`            | `daw-review`                                                                | Read-only; ignores risk and workspace.                                                                             |
+| `untangle`          | `daw-untangle`                                                              | Read-only; ignores risk and workspace. Strictly non-mutating structural analysis.                                  |
+| `setup`             | `daw-setup`                                                                 | Documentation-only; allows unclear requirements.                                                                   |
+| `bootstrap`         | `daw-wizard` -> `daw-design` -> `daw-plan`                                  | Documentation-only; allows unclear requirements.                                                                   |
+| `adopt`             | `daw-design` -> `daw-plan`                                                  | Documentation-only; preserves user code.                                                                           |
+| `bugfix`            | `daw-debug` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`    | Prepends `daw-workspace` if `workspace: "isolated"`.                                                               |
+| `patch`             | `daw-build` -> `daw-verify`                                                 | Prepends `daw-workspace` if `workspace: "isolated"`. Requires `requirements: "clear"`.                             |
+| `feature` (clear)   | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                   | Prepends `daw-workspace` if `workspace: "isolated"`.                                                               |
+| `feature` (unclear) | `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`   | Requires requirements clarification or design intake.                                                              |
+| `refactor`          | `daw-untangle` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify` | Prepends `daw-workspace` if `workspace: "isolated"`. Requires `requirements: "clear"`; behavior must be preserved. |
+| `maintain`          | `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`                   | Prepends `daw-workspace` if `workspace: "isolated"`. Requires `requirements: "clear"`.                             |
+| `spike`             | `daw-workspace` -> `daw-build` -> `daw-ask`                                 | Always isolated; allows unknown requirements. Throwaway output only.                                               |
+| `ship`              | `daw-ship`                                                                  | Integration-only; does not evaluate workspace. Unknown risk -> `needs-input`; high risk -> interactive approval.   |
+| `feature` (unclear) | `daw-design` -> `daw-plan` -> `daw-build` -> `daw-review` -> `daw-verify`   | Requires requirements clarification or design intake.                                                              |
 
 ### Requirements Clarity Gate
 
@@ -480,17 +490,20 @@ The lifecycle of feature delivery within DAW routes integrates the procedural re
    - Never expand project scope based solely on generic suggestions in specialist skill files.
 2. **No Recursive Routing & Progressive Disclosure of Supporting Resources:**
    - Under no circumstances may an agent reading `routing.md` invoke `deterministic-agentic-workflow` as a child task. Routing is a top-level deterministic mapping, executed once per planning stage.
-   - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 11 public execution modules (`skills/daw-*/`). Supporting resources (`references/change-coupling.md`, `references/grilling.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
+   - **Reading Scoped Support Resources is NOT Module Invocation:** The suite maintains exactly 12 public execution modules (`skills/daw-*/`). Supporting resources (`references/change-coupling.md`, `references/grilling.md`, `references/developer-lifecycle.md`, `skills/daw-design/references/domain-modeling.md`, `skills/daw-design/references/builder-readiness.md`) are documentation files for on-demand progressive disclosure. Reading these resources does not constitute module dispatch, child skill discovery, or sub-task execution.
    - Supporting references grant no new execution permissions or tools, and loading them does not spawn background workers.
    - **Targeted Reference Lookups:** When consulting reference manuals (`routing.md`, `operations.md`), agents MUST use progressive disclosure—querying or reading ONLY the specific section heading or line range needed rather than ingesting entire multi-thousand-line references upfront.
    - Parent agents retain full control over delegation. If an independent assessment of builder-readiness is warranted, the parent delegates to the existing `daw-review` module rather than recursively re-dispatching design or creating ad-hoc wrapper skills.
    - Handoff schema contracts remain fixed: any protocol-specific status or findings belong under the existing optional `details` object without introducing new required top-level JSON fields.
+3. **Failure, Correction & Re-Entry:**
+   - A module `fail` or `blocked` result is not a terminal workflow state. The parent re-enters through the canonical [Correction Loop & Route Re-Entry](operations.md#correction-loop--route-re-entry), which names the re-entry edge per failing evidence, defines a correction round, states the progress test, and fixes the escalation/hard-stop caps.
+   - Re-entry never bypasses fail-closed approvals, the pre-ship gate, or evidence invalidation on revision; a correction round does not inherit an earlier approval.
 
 ---
 
 ## 5. Canonical Module Handoff Contract
 
-This section defines the canonical output envelope produced by all 11 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`).
+This section defines the canonical output envelope produced by all 12 internal execution modules (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`, `daw-ship`).
 
 > **Contract Scope Note:** This schema defines the **runtime module handoff contract** returned across module completion stages. It is distinct from the top-level route decision payload emitted by `scripts/route.py` and the task verification envelope checked by `scripts/validate.py`.
 

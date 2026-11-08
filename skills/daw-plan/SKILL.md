@@ -1,6 +1,6 @@
 ---
 name: daw-plan
-description: "Deterministic implementation planning and task decomposition: maps concrete ordered tasks, explicit file ownership, dependencies, acceptance criteria, and verification gates without unwanted document churn."
+description: "Deterministic implementation planning and task decomposition: maps concrete ordered tasks, explicit file ownership, dependencies, acceptance criteria, time-box estimates, and verification gates without unwanted document churn."
 ---
 
 # DAW Plan (`daw-plan`)
@@ -13,9 +13,9 @@ The planning module converts design specifications, architectural requirements, 
 
 ## 1. Trigger & Scope
 
-### When to Invoke
-
 - Transitioning from design (`daw-design`) to implementation.
+- Planning the `refactor` route: sequence behavior-preserving structural steps with their characterization oracles (see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)).
+- Planning the `maintain` route: dependency upgrade order (one dependency group at a time) with per-group rollback steps (see [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol)).
 - Decomposing a multi-step engineering task, refactoring, or bug fix into execution slices.
 - Structuring subagent task distributions for sequential or staged parallel execution.
 
@@ -92,6 +92,13 @@ The planning module converts design specifications, architectural requirements, 
 
 ### Step 3: Task Decomposition, Slicing & Infrastructure Justification (Contract §D)
 
+#### Step 3A: Lifecycle Route Entries (refactor / maintain)
+
+- **Refactor entries:** One task per safe structural step (rename, extract, move, split) in the order produced by `daw-untangle`, each carrying a behavior-preservation oracle: the characterization suite or probe that proves identical observable behavior before and after. No step may bundle a behavior change; if an oracle fails mid-sequence, the plan halts at that step and returns to the parent.
+- **Maintain entries:** Group upgrades by dependency (one group per task/commit), order groups by risk (patch-only first, then minor, then major), and attach per-group rollback steps (revert the group commit and lockfile) plus the upstream changelog/breaking-change check as the first task of each group.
+- **Ship handoff:** Every code-changing route (`feature`, `bugfix`, `patch`, `refactor`, `maintain`) ends by recommending the `ship` route to the parent for commit hygiene, PR, and release readiness; `daw-plan` never dispatches `daw-ship` itself and never performs git operations.
+- **Time-box:** Each task carries an estimate/timebox; on expiry `daw-build` escalates per [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets) rather than extending silently.
+
 1. Break work into discrete, bounded tasks representing independently demonstrable or testable behavior slices.
 2. Explicitly name the exact target files to create, modify, or delete for each task. A task may satisfy several criteria; artificial one-to-one mapping is not required.
 3. **Supporting Infrastructure Justification:** A foundational or infrastructure task (e.g., scaffolding, schema migrations, test harness setup) that lacks an associated user story is permitted ONLY when accompanied by an explicit prerequisite justification explaining why downstream story slices depend on it.
@@ -149,6 +156,7 @@ When invoked to re-plan or reconcile gaps identified during execution, review, o
 Return a complete, observable JSON handoff before any transition using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. Direct-user reports remain concise prose. `status: "pass"` proposes only planning-stage criteria and the internal readiness self-check, not independent prebuild acceptance, implementation/test completion, or parent acceptance; observations must identify current scope and revisions. Keep the planning payload under `details` as defined below.
 
 - **Mandatory Task Fields:** Each task in `details.tasks` MUST specify `task_id`, `title`, `target_files`, `depends_on`, `parallel_safe`, `acceptance_criteria`, non-interactive `verification_command`, and `expected_outcome`. Legacy `verification_command` is a reference/action field; real surface action may serve the same check where a command would be fake. If a task checks the UI, it MUST carry matching rendered mockup refs or mark UI scope blocked. If a task lacks a user story, it must include `infrastructure_justification`.
+- **Lifecycle fields (refactor / maintain):** Tasks carry `timebox` and, for refactor, the `behavior_preservation_oracle`; for maintain, the dependency group, `lockfile_committed`, and rollback step. Code-changing routes record the recommended terminal `ship` route for the parent.
 - **Saved Plan & Progress Refs:** `details` MUST include `saved_plan_ref` and `saved_progress_ref` for multi-step work under [Workflow Artifacts](../../references/workflow-artifacts.md). Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
 - **Traceability Mapping:** `details.traceability` records exact source refs and revisions with the compact bidirectional mapping from requirement/AC ID to user story, task IDs, target files, dependencies, verification/expected outcomes, status, evidence reference, and separate parent decision. It consumes the design `details.erd_selection` disposition verbatim: a selected ERD's ref + revision and erd-01..03 coverage, or the reasoned skip/N/A/reuse disposition — never invented schema or migrations.
 - **Ranked Queue Ref:** `details` references the parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage) queue in the durable plan/progress record; planner does not auto-deploy from worker pass.
@@ -289,6 +297,6 @@ Select `handoff_to` from the active route:
 - **`bootstrap` / `adopt`:** Terminal. Return `handoff_to: null` with `status: "pass"`; do not recommend `daw-build`.
 - **`patch`:** Precedes `daw-build` directly. Trivial inline patches do not require independent prebuild readiness review. Return `handoff_to: "daw-build"`.
 - **`feature` / `bugfix`:** For spec-dependent features, recommend `daw-review` for parent-directed independent prebuild readiness review (or the stage immediately following `daw-plan` in the active route plan), preserving review/verify ordering. Do not skip stages.
-- **Halted (`fail` / `blocked`) or verification failure during planning:** Return `handoff_to: null`; report the blocker and let the parent route to `daw-debug` or replan.
+- **`refactor` / `maintain`:** After the readiness checkpoint under `daw-review`, recommend `daw-build` (the active route continues `daw-build` -> `daw-review` -> `daw-verify`); record the terminal `ship` recommendation for the parent.
 
 _Reference Link:_ See [Canonical Feature Delivery Contract](../../references/document-quality.md#feature-delivery-contract), [Shared Routing Contract](../../references/routing.md), [Changes Lifecycle Guide](../../references/operations.md#parent-acceptance-checkpoint), [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), and [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record).

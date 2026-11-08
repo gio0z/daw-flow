@@ -19,9 +19,13 @@
 | 6   | REQ-WF-06 / AC-WF-06.1–.4 | `references/workflow-artifacts.md` §5                                | UI scope has inspectable rendered mockup linked to requirement/AC/screen IDs; no-UI records scoped N/A; mockup acceptance ≠ runtime proof                                                                       |
 | 7   | REQ-WF-07 / AC-WF-07.1–.5 | `references/operations.md#ranked-result-triage`                      | Every completed result (integrated, rejected, stale, no-findings, cancelled) has parent triage record; worker proposes order, parent globally reranks; closure needs integration + parent-observed verification |
 
-Non-goals: stateless validators; no new routes/modules/schemas/templates beyond the existing 13; no daemon/crash recovery/enforcement; read-only roles never write; no git/branch/push orchestration; no runtime provenance claimed.
+Non-goals: stateless validators; no new routes/modules/schemas/templates beyond the existing 13 document kinds (the prior 14-kind catalog is unchanged); no daemon/crash recovery/enforcement; read-only roles never write; no git/branch/push orchestration beyond the gated `ship` route; no runtime provenance claimed.
 
-Reconciled contradiction: the prior PRD required all core documents for every full feature — it said all core, not all 13. It is replaced by a proportional written specification, with the full 13-document suite required only when explicitly requested (PRD `AC-RTE-01.2`, `AC-MOD-02.3`).
+Reconciled contradiction: the prior PRD required all core documents for every full feature — it said all core, not all 13. It is replaced by a proportional written specification, with the full 14-document suite required only when explicitly requested (PRD `AC-RTE-01.2`, `AC-MOD-02.3`).
+
+## Professional Delivery Lifecycle (PDL status)
+
+- This workspace record predates the PDL upgrade. Current suite: 12 modules, 13 intents (`refactor`, `maintain`, `spike`, `ship` added via `daw-ship`), version 0.2.0. End-to-end flow setup -> clarify/spike -> design -> plan -> build (inner loop) -> review -> verify -> ship -> release -> retro is authoritative in [`references/developer-lifecycle.md`](../references/developer-lifecycle.md); `VERSION` and `SKILL.md` `metadata.version` are 0.2.0.
 
 ## Plan (stable T IDs preserved; exact file sets; one owner per file)
 

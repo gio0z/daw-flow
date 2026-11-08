@@ -17,10 +17,13 @@ Invoke `daw-review` when:
 - Evaluating completed features, bug fixes, or refactors before integration, branch merging, or user sign-off.
 - Conducting intermediate stage-gate evaluations during multi-step engineering plans.
 - Re-evaluating previously flagged review findings after an orchestrator-directed fix cycle.
+- Auditing fixups: on the `ship` route, `daw-review` may audit `daw-ship` fixup commits (post-review-feedback corrections) for hidden behavior change, with findings routed back through the parent, never self-applied.
 - Auditing security, input validation, error handling, or performance regression risks in modified code.
 - Auditing specification documents and evaluating workflow transitions (`review-ready`, `review-rework`) for selected canonical specifications.
 - Conducting parent-requested proportional independent prebuild cross-artifact conformity review (readiness checkpoint) for spec-dependent or nontrivial features before build. (Prebuild readiness is a bounded review checkpoint, NOT a completed postbuild route `daw-review` or runtime proof. It does not advance the postbuild code review stage of the route, nor does it insert a new route stage into `../../references/routing.md` or cause module recursion; routine settled patches do not mandate an extra prebuild review stage).
 - Conducting structural cohesion and change-coupling checks as part of Stage 2 review on modified diffs where applicable (feature and bugfix routes per `../../references/routing.md`).
+- **Refactor review:** On the `refactor` route, checking specifically for hidden behavior change: any diff hunk that alters observable behavior (not just structure) is a blocking finding. See [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol).
+- **Review Feedback ownership:** Feedback from humans on a PR is handled by `daw-ship` (see [Review Feedback Protocol](../../references/developer-lifecycle.md#9-review-feedback-protocol)). `daw-review` does not take PR feedback directly; it may audit the fixup diff `daw-ship` produces.
   - **Reusing Accepted Current Review:** When the current matching scope and artifact revision have already been reviewed and accepted by the parent orchestrator, the parent reuses that accepted review evidence without triggering a duplicate review.
   - **Patch Route Proportionality:** Patch routes remain `build -> verify`; the parent orchestrator performs a bounded proportional diff check without mandating an extra `daw-review` stage or reviewer for routine patches or one-line fixes.
   - **Non-Code / Docs-Only Changes:** Tasks with no code or structural impact (documentation-only, comment-only, formatting) record an explicit inline N/A rationale rather than triggering a code review stage.
@@ -125,12 +128,16 @@ _Stage 1 determines whether a full Stage 2 audit is useful. A failed conformity 
    - Delete dead weight: ensure deprecated shims, obsolete comments, and unused functions were removed (clean cutover).
    - Reject arbitrary code restyling or formatting churn on untouched lines.
 5. **Structural Cohesion & Change-Coupling Audit (Parent Prefinal Check Alignment):**
-   - Audit modified code against [Change Coupling Reference](../../references/change-coupling.md) and [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint): check for accidental co-change, circular dependencies, leaky abstractions, shotgun surgery risks, or surplus taxonomy (shallow wrappers, speculative interfaces) while preserving legitimate retries, security guards, and transaction boundaries.
-   - **Finding Disposition:**
-     - **Material Findings:** Direct correctness, security, invariant violations, broken encapsulation, or circular dependencies BLOCK review acceptance (`CHANGES_REQUESTED` or `status: "fail"`).
-     - **Unrelated Improvements:** Observations regarding out-of-scope code or non-blocking cosmetic improvements must NOT be conflated with blocking findings or trigger unsolicited refactoring; report them separately as informational notes for parent consideration.
-   - **Non-Code / Docs-Only Changes:** For documentation or non-code changes without structural impact, record an explicit inline N/A rationale.
-   - **Escalation to `daw-untangle`:** If the structural check reveals deep, hidden, or unclear architectural entanglements across distant subsystems that cannot be settled from diff inspection alone, recommend that the parent escalate to `daw-untangle` (scoped strictly to the affected area, not the whole repository).
+
+- **Refactor behavior-change audit:** For `refactor` route diffs, compare each hunk against the plan's behavior preservation oracle: flag any hunk that changes observable behavior, alters a public signature, or adjusts tests to match new behavior as a hidden behavior change (`CHANGES_REQUESTED`). Structural-only hunks with an intact oracle are passing.
+- **Ship fixup audit:** When reviewing fixup commits produced by `daw-ship` from human PR feedback, verify the fixup addresses only the feedback scope and introduces no unrelated behavior change; out-of-scope hunks are findings, not fixes.
+- Audit modified code against [Change Coupling Reference](../../references/change-coupling.md) and [Prefinal Coupling Checkpoint](../../references/change-coupling.md#prefinal-coupling-checkpoint): check for accidental co-change, circular dependencies, leaky abstractions, shotgun surgery risks, or surplus taxonomy (shallow wrappers, speculative interfaces) while preserving legitimate retries, security guards, and transaction boundaries.
+- **Finding Disposition:**
+  - **Material Findings:** Direct correctness, security, invariant violations, broken encapsulation, or circular dependencies BLOCK review acceptance (`CHANGES_REQUESTED` or `status: "fail"`).
+  - **Unrelated Improvements:** Observations regarding out-of-scope code or non-blocking cosmetic improvements must NOT be conflated with blocking findings or trigger unsolicited refactoring; report them separately as informational notes for parent consideration.
+- **Non-Code / Docs-Only Changes:** For documentation or non-code changes without structural impact, record an explicit inline N/A rationale.
+- **Escalation to `daw-untangle`:** If the structural check reveals deep, hidden, or unclear architectural entanglements across distant subsystems that cannot be settled from diff inspection alone, recommend that the parent escalate to `daw-untangle` (scoped strictly to the affected area, not the whole repository).
+
 6. **Concrete Evidence vs. Subjective Taste:**
    - Every flagged issue must cite specific file paths, line numbers, and an objective technical reason or static code proof.
    - Reject subjective stylistic preferences that do not impact correctness, maintainability, or established project conventions.
@@ -270,7 +277,7 @@ Upon exit:
 
 - Deliver the structured Review Report to the parent orchestrator.
 - If changes are requested: Orchestrator routes specific findings to `daw-build` or `daw-debug`.
-- If passed: Orchestrator routes to `daw-verify` or final delivery.
+- If passed: Orchestrator routes to `daw-verify` or final delivery (or, on the `ship` route, returns fixup-audit evidence to the parent for `daw-ship`).
 - References:
   - Root contract: `../../SKILL.md`
   - Specifications and routing: `../../references/routing.md`

@@ -22,11 +22,14 @@ Generative analysis synthesizes test matrix needs and diagnoses failures, but tr
 
 Invoke `daw-verify` when:
 
-- Code, configuration, documentation, or infrastructure changes have been made during a `daw-build` stage for feature, bugfix, or patch routes.
+- Code, configuration, documentation, or infrastructure changes have been made during a `daw-build` stage for feature, bugfix, patch, refactor, or maintain routes.
+- Proving refactor equivalence: the same test suite passes identically before and after with characterization probes pinned, demonstrating no behavior change (see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)).
+- Proving an upgrade: full regression suite plus build pass and lockfile diff reviewed (see [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol)).
 - Pre-handoff verification is required before opening a PR, delivering to user, or marking a milestone complete.
 - A regression sweep is needed across affected packages, CLI endpoints, or API surfaces.
 - Fresh failure evidence must be captured before/after a fix.
 - Conducting convergence assessment and change impact verification against actual codebase, authoritative specifications, and latest runtime execution evidence.
+- Assembling pre-ship evidence handoff for `daw-ship`: verdict, exercised checks, regression counts, and limitations packaged as the evidence bundle the ship stage consumes for commit hygiene, PR, and release readiness.
 
 Do NOT invoke `daw-verify` for:
 
@@ -183,6 +186,18 @@ Inspect the actual codebase and latest runtime evidence against authoritative co
 - **Metrics Coverage Denominator Rule:** Denominator includes all buildable requirements and acceptance criteria in scope. Exclude ONLY justified non-buildable/out-of-scope criteria (such as post-launch business KPIs) with explicit written justification. Unresolved gaps or unmapped criteria are NEVER silently excluded from the denominator.
 - **Zero Relaxation of Tests or Proofs:** Never suppress test failures, comment out tests, or weaken assertions to manufacture a passing grade. Generic user "proceed" instructions cannot override failing tests or blocking verification criteria.
 
+### Rule 5: Refactor Equivalence Proof
+
+- Run the same test suite and characterization probes before and after the structural change; both runs must pass with identical observable behavior. Any behavior delta is a failing verdict even if new tests pass. See [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol).
+
+### Rule 6: Upgrade Proof
+
+- Run the full regression suite plus the build; include the lockfile diff in `details`. A group that fails the suite or lacks a committed lockfile change is failing, not passed. See [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol).
+
+### Rule 7: Pre-Ship Evidence Handoff
+
+- On `status: "pass"` for any code-changing route, package `details.pre_ship_evidence` — verdict, exercised checks (claim/check/actual), regression suite counts, convergence, coverage, and limitations — so `daw-ship` can consume current-revision evidence for commit hygiene, PR, and release readiness without re-running the suite. The verifier itself never commits, pushes, or opens PRs.
+
 ---
 
 ## 5. Output Contract
@@ -267,6 +282,7 @@ Verification is complete when:
 4. Any `Blocked` or `Unexercised` items are explicitly justified in `limitations`. Unexercised required criteria cannot be marked as passed or accepted.
 5. Every criterion is mapped to an inspectable primary observation comparing expected versus actual outcomes.
 6. No dry-runs are recorded as deployment/migration proofs.
+7. **Refactor / upgrade proof (route-specific):** Refactor — characterization and suite green before and after with identical behavior; upgrade — full regression plus build pass with lockfile diff included.
 
 - **Post-release closure evidence rule:** For post-release feedback or incident fixes, verify code correctness on the current revision as scoped proof, but separately distinguish deployed proof: post-release evidence (log/health observation plus artifact digest and window on the released surface) is required before any production-resolution claim, and local test/staging evidence is recorded as local-only proof with production resolution explicitly unexercised. A verifier `pass` proposes parent acceptance of scoped evidence only; it never closes an incident or authorizes publication, and maintenance/monitoring remains opt-in per `references/operations.md` §6 and the post-release closure loop.
 

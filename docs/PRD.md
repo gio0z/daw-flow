@@ -113,27 +113,30 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 
 - **REQ-RTE-01: Declarative Route Manifest & Policy**
   - _Description:_ Suite routing must be governed declaratively by `references/suite-manifest.json` via `scripts/route.py REQUEST`.
-  - _AC-RTE-01.1:_ Input request schema requires strict JSON keys: `schema_version` (integer 1), `intent` (`bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `untangle` | `ask` | `setup`), `requirements` (`clear` | `unclear` | `unknown`), `risk` (`low` | `high` | `unknown`), and `workspace` (`in-place` | `isolated` | `unknown`). Rejects unknown keys, duplicate keys, or nonstandard constants.
+  - _AC-RTE-01.1:_ Input request schema requires strict JSON keys: `schema_version` (integer 1), `intent` (`bootstrap` | `adopt` | `feature` | `bugfix` | `patch` | `review` | `untangle` | `ask` | `setup` | `refactor` | `maintain` | `spike` | `ship`), `requirements` (`clear` | `unclear` | `unknown`), `risk` (`low` | `high` | `unknown`), and `workspace` (`in-place` | `isolated` | `unknown`). Rejects unknown keys, duplicate keys, or nonstandard constants.
   - _AC-RTE-01.2:_ Output response schema guarantees deterministic keys: `schema_version`, `status` (`ready` | `needs-input` | `blocked`), `stages` (ordered list of module names), `reasons` (list of strings), `blockers` (list of code/message objects), `constraints` (`read_only`, `documentation_only`, `interactive_approval_required`, `authorization_granted: false`), and `limitations` (list of strings).
   - _AC-RTE-01.3:_ Route execution exit codes: `0` (route ready), `1` (needs-input or incomplete modules), `2` (malformed input, manifest violation, or CLI usage error).
 - **REQ-RTE-02: Policy Routing Logic & Workspace Selection**
-  - _Description:_ Route calculation honors declared matrix:
-    - `bootstrap` -> `[daw-wizard, daw-design, daw-plan]` (`documentation_only: true`).
-    - `adopt` -> `[daw-design, daw-plan]` (`documentation_only: true`).
-    - `setup` -> `[daw-setup]` (`documentation_only: true`).
-    - `feature` with clear requirements -> `[daw-plan, daw-build, daw-review, daw-verify]`.
-    - `feature` with unclear requirements -> `[daw-design, daw-plan, daw-build, daw-review, daw-verify]`.
-    - `bugfix` -> `[daw-debug, daw-plan, daw-build, daw-review, daw-verify]`.
-    - `patch` -> `[daw-build, daw-verify]`.
-    - `review` -> `[daw-review]` (`read_only: true`).
-    - `ask` -> `[daw-ask]` (`read_only: true`).
-    - `untangle` -> `[daw-untangle]` (`read_only: true`).
-  - _AC-RTE-02.1:_ For mutating intents (`feature`, `bugfix`, `patch`), when `workspace` is `isolated`, `daw-workspace` is prepended to the stage list. When `workspace` is `in-place`, execution proceeds normal. When `workspace` is `unknown`, status is `needs-input`.
+  - `bootstrap` -> `[daw-wizard, daw-design, daw-plan]` (`documentation_only: true`).
+  - `adopt` -> `[daw-design, daw-plan]` (`documentation_only: true`).
+  - `setup` -> `[daw-setup]` (`documentation_only: true`).
+  - `feature` with clear requirements -> `[daw-plan, daw-build, daw-review, daw-verify]`.
+  - `feature` with unclear requirements -> `[daw-design, daw-plan, daw-build, daw-review, daw-verify]`.
+  - `bugfix` -> `[daw-debug, daw-plan, daw-build, daw-review, daw-verify]`.
+  - `patch` -> `[daw-build, daw-verify]`.
+  - `review` -> `[daw-review]` (`read_only: true`).
+  - `ask` -> `[daw-ask]` (`read_only: true`).
+  - `untangle` -> `[daw-untangle]` (`read_only: true`).
+  - `refactor` -> `[daw-untangle, daw-plan, daw-build, daw-review, daw-verify]`.
+  - `maintain` -> `[daw-plan, daw-build, daw-review, daw-verify]`.
+  - `spike` -> `[daw-workspace, daw-build, daw-ask]` (always isolated, throwaway output).
+  - `ship` -> `[daw-ship]` (integration-only; unknown risk -> `needs-input`, high risk -> interactive approval).
+  - _AC-RTE-02.1:_ For mutating intents (`feature`, `bugfix`, `patch`, `refactor`, `maintain`), when `workspace` is `isolated`, `daw-workspace` is prepended to the stage list. When `workspace` is `in-place`, execution proceeds normal. When `workspace` is `unknown`, status is `needs-input`.
   - _AC-RTE-02.2:_ Read-only intents (`ask`, `review`, `untangle`) ignore unknown risk and unknown workspace.
   - _AC-RTE-02.3:_ When `risk` is `high`, `constraints.interactive_approval_required` is set to `true`, and `constraints.authorization_granted` is permanently `false`.
 - **REQ-RTE-03: Structural Suite Verification (`--check-suite`)**
   - _Description:_ `scripts/route.py --check-suite [--root ROOT]` validates structural consistency of the suite manifest and bundled modules without modifying existing validator contracts.
-  - _AC-RTE-03.1:_ Validates all 11 declared module paths exist within the root boundary, checks frontmatter scalar integrity, and verifies route mapping soundness.
+  - _AC-RTE-03.1:_ Validates all 12 declared module paths exist within the root boundary, checks frontmatter scalar integrity, and verifies route mapping soundness.
   - _AC-RTE-03.2:_ Returns exit code 0 when the suite is complete and sound; returns exit code 1 if any module or route definition is broken or missing.
 
 ### 4. Non-Functional Requirements
@@ -147,7 +150,7 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
 ### 5. Scope & Non-Goals
 
 - **In Scope:**
-  - Suite router and 11 specialized modular skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`).
+  - Suite router and 12 specialized modular skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`, `daw-ship`).
   - Declarative route policy engine and structural check (`scripts/route.py`, `references/suite-manifest.json`).
   - Static structural validation of skill packages and task contract schemas via `scripts/validate.py`.
   - Hash matching against disk files and root path containment verification.
@@ -156,6 +159,7 @@ Deterministic Agentic Workflow is an open-source, portable specification, suite 
   - Persona impersonation or external identity spoofing in advisory skills (`daw-ask`).
   - Runtime credential validation or cryptographic authorization tokens.
   - Standalone unbundled distribution of child modules without the suite root.
+- **Professional delivery lifecycle (PDL):** The `refactor`, `maintain`, `spike`, and `ship` intents (12-module suite, 13 intents) are authoritative in [`references/developer-lifecycle.md`](../references/developer-lifecycle.md): inner loop, time-boxing, spike, behavior-preserving refactor, maintenance upgrade, bisection, commit hygiene, PR/CI, review feedback, release readiness, and retro proposals feeding `AGENTS.md`. No daemon, auto-merge, or unattended publish/deploy.
   - Git branch, commit, or push orchestration.
 - **Correction scope non-goals (WF):** Stateless validator engines bounded to current files; no new routes, modules, schemas, or templates beyond the then-existing 13 (the later LC correction below adds only the conditional ERD kind); no runtime daemon, crash recovery, or enforcement daemon; read-only roles do not write. Subagent triage does not transfer parent acceptance and external deployment is not automatic. Source provenance for REQ-WF-01..07: user conversation explicitly authorizing the WT docs stage, mockup, and ranking corrections, plus user-supplied articles [Cara Bikin Requirement Lebih Jelas (EARS patterns)](https://ramadigital.id/blog/acceptance-criteria-ears-pattern-cara-bikin-requirement-lebih-jelas) and [Agentic Tapi Deterministic: Workflow AI Agent](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent); canonical DAW authorities are `references/workflow-artifacts.md`, `references/document-quality.md#acceptance-criteria-ears`, and `references/operations.md#ranked-result-triage`; inherited project guidance citations in `references/document-quality.md` (§2) remain existing guidance and are not claimed as user-supplied WF sources; no external provenance is claimed for runtime behavior.
 - **Lifecycle correction (LC):** Requirements REQ-LC-01..05 and their acceptance criteria are authoritative in [ERD and Application Lifecycle Correction](erd-lifecycle-workflow.md): substantive Blueprint (LC-01), conditional separate ERD with erd-01..03 and no invented schema or migration authorization (LC-02), 14-kind registry/gate integration (LC-03), post-release feedback/incident closure through existing routes where local proof never means production resolved (LC-04), and consistent propagation (LC-05). No new route, module, monitoring, or publish automation.

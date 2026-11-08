@@ -138,12 +138,38 @@ HISTORICAL_10_ROUTES = {
     "setup": {"documentation_only": True, "read_only": False, "stages": ["daw-setup"], "allow_unclear_requirements": True, "evaluates_workspace": False},
 }
 
+HISTORICAL_11_MODULES = frozenset({
+    "daw-design",
+    "daw-plan",
+    "daw-debug",
+    "daw-build",
+    "daw-review",
+    "daw-verify",
+    "daw-workspace",
+    "daw-ask",
+    "daw-setup",
+    "daw-wizard",
+    "daw-untangle",
+})
+HISTORICAL_11_ROUTES = {
+    "bootstrap": {"documentation_only": True, "read_only": False, "stages": ["daw-wizard", "daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "adopt": {"documentation_only": True, "read_only": False, "stages": ["daw-design", "daw-plan"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+    "feature": {"documentation_only": False, "read_only": False, "stages_clear": ["daw-plan", "daw-build", "daw-review", "daw-verify"], "stages_unclear": ["daw-design", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "bugfix": {"documentation_only": False, "read_only": False, "stages": ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-verify"], "evaluates_workspace": True},
+    "patch": {"documentation_only": False, "read_only": False, "stages": ["daw-build", "daw-verify"], "evaluates_workspace": True},
+    "review": {"documentation_only": False, "read_only": True, "stages": ["daw-review"], "evaluates_workspace": False},
+    "untangle": {"documentation_only": False, "read_only": True, "stages": ["daw-untangle"], "evaluates_workspace": False},
+    "ask": {"documentation_only": False, "read_only": True, "stages": ["daw-ask"], "evaluates_workspace": False},
+    "setup": {"documentation_only": True, "read_only": False, "stages": ["daw-setup"], "allow_unclear_requirements": True, "evaluates_workspace": False},
+}
+
 HISTORICAL_MODULES = HISTORICAL_8_MODULES
 HISTORICAL_ROUTES = HISTORICAL_8_ROUTES
 
 HISTORICAL_PROFILES = (
     (HISTORICAL_8_MODULES, HISTORICAL_8_ROUTES),
     (HISTORICAL_10_MODULES, HISTORICAL_10_ROUTES),
+    (HISTORICAL_11_MODULES, HISTORICAL_11_ROUTES),
 )
 
 

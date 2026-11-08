@@ -32,10 +32,10 @@
 
 The Deterministic Agentic Workflow system is an offline, read-only, zero-dependency validation suite, routing engine, and documentation specification implemented in Python 3.10+ standard library. The core operational components are:
 
-1. **Suite Route Engine (`scripts/route.py`):** Provides declarative routing computation from structured JSON input requests against `references/suite-manifest.json`, dynamically selecting stages from the 11 specialized modular skills (`skills/daw-*`). Also provides `--check-suite` structural verification of the bundled suite.
+1. **Suite Route Engine (`scripts/route.py`):** Provides declarative routing computation from structured JSON input requests against `references/suite-manifest.json`, dynamically selecting stages from the 12 specialized modular skills (`skills/daw-*`). Also provides `--check-suite` structural verification of the bundled suite.
 2. **Agent Skill Package Validator (`scripts/validate.py package`):** Verifies the internal structural integrity of the workflow package itself, including YAML frontmatter scalar metadata, canonical template existence, routing table cross-references, URI schemes, and internal markdown link resolution.
 3. **Task Contract Lifecycle Validator (`scripts/validate.py contract`):** Enforces a deterministic, three-stage lifecycle contract (`plan` -> `execute` -> `complete`) on task definition files within a project repository.
-4. **Specialized Module Skills (`skills/daw-*`):** Self-contained, deeply specified skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`) containing concrete operational steps and returning clean orchestrator handoffs.
+4. **Specialized Module Skills (`skills/daw-*`):** Self-contained, deeply specified skills (`daw-design`, `daw-plan`, `daw-debug`, `daw-build`, `daw-review`, `daw-verify`, `daw-workspace`, `daw-ask`, `daw-setup`, `daw-wizard`, `daw-untangle`, `daw-ship`) containing concrete operational steps and returning clean orchestrator handoffs.
 5. **Packaging Layout Helper (`scripts/package_layout.py`):** Shared standard library definition of operational bundle files and directory roots for installation and staging.
 
 ### 2. Runtime Environment & Target Compatibility

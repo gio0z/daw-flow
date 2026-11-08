@@ -13,11 +13,10 @@ The advisor serves as a conversational front door and Socratic sounding board fo
 
 ## 1. Trigger & Scope
 
-### When to Invoke
-
 - Exploratory questions, design queries, debugging consultations, or direction requests ("How to structure X?", "What should we do next?").
 - Clarifying problems before authoring specifications or plans.
 - Second opinions on trade-offs, libraries, or refactorings.
+- Final Stage of the `spike` Route: synthesizing throwaway spike findings from `daw-build` into a recommendation and the next route (`feature`, `refactor`, or `daw-design`). Read-only — spike code is never merged (see [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol)).
 
 ### Non-Goals & Invariants
 
@@ -79,6 +78,16 @@ Apply this step when material user decisions remain; load the shared grilling pr
 2. Select the appropriate next DAW module only when further work is needed (`daw-wizard` for greenfield specs, `daw-design` for architecture/spec adoption, `daw-plan` for settled decomposition, `daw-debug` for failures). The recommendation is opt-in or parent-routed, never execution permission.
 3. A proposed `status: "pass"` means advice was delivered within read-only criteria, not implementation completion or parent acceptance. Downstream blockers remain explicit under `details`.
 
+### Step 5: Spike Findings Synthesis (final stage of `spike` route)
+
+When `daw-ask` is the last stage of the `spike` route (`daw-workspace` -> `daw-build` -> `daw-ask`):
+
+1. Consume the spike findings from `daw-build`: the precise technical question, what was tried, the result (works / does not work / partial), and the observed evidence (commands run, outputs, performance or compatibility observations, artifacts left on the disposable branch).
+2. Synthesize into a recommendation: the chosen path, the rejected alternatives with reasons, the risks and limits of the spike evidence (timeboxed, throwaway, not production-verified), and the recommended next route — `feature` or `refactor` for production implementation, `daw-design` when the spike reveals a product-level decision, or a repeat spike with a narrowed question.
+3. Record `details.spike_synthesis: {question, result, recommendation, next_route, evidence_refs, limitations}` in the handoff. Read-only: never merge spike code, never author production plans, and never execute the recommended route — the parent routes it.
+
+- [ ] Spike-route synthesis (when applicable): findings consumed, recommendation and next route recorded, spike code left unmerged.
+
 ---
 
 ## 4. Output Contract
@@ -122,6 +131,7 @@ At handoff, `output_paths` is empty. A proposed `status: "pass"` covers answered
 ## 7. Handoff Protocol
 
 - **To `daw-design`:** For architectural changes, new components, or multi-module contracts.
+- **Spike-route completion:** On the `spike` route the parent does not dispatch further build stages from `daw-ask`; the recommendation and next route are the terminal output, and spike code remains throwaway.
 - **To `daw-plan`:** When architecture is settled and requires task decomposition.
 - **To `daw-debug`:** For investigating reproducible bugs or failures.
 - **To Orchestrator:** For an actual parent handoff, return the canonical structured payload; only the orchestrator dispatches downstream work.

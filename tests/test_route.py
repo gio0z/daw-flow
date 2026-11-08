@@ -33,7 +33,7 @@ def make_request(
 
 
 def setup_suite_fixture(base_dir: pathlib.Path) -> pathlib.Path:
-    """Create a fully valid suite fixture with manifest and all 11 modules."""
+    """Create a fully valid suite fixture with manifest and all 12 modules."""
     manifest_src = REPO_ROOT / "references" / "suite-manifest.json"
     manifest_dst = base_dir / "references" / "suite-manifest.json"
     manifest_dst.parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +283,99 @@ class TestRouteSuite(unittest.TestCase):
 
         # Restore clean manifest
         manifest_file.write_text(clean_manifest_text, encoding="utf-8")
+    def test_lifecycle_intents_resolve_exact_stages(self):
+        cases = [
+            ("refactor", ["daw-untangle", "daw-plan", "daw-build", "daw-review", "daw-verify"]),
+            ("maintain", ["daw-plan", "daw-build", "daw-review", "daw-verify"]),
+            ("spike", ["daw-workspace", "daw-build", "daw-ask"]),
+            ("ship", ["daw-ship"]),
+        ]
+        for intent, stages in cases:
+            with self.subTest(intent=intent):
+                req = make_request(intent=intent, requirements="clear", risk="low", workspace="in-place")
+                res = route.resolve_route(req, root=self.suite_root)
+                self.assertEqual(res["status"], "ready")
+                self.assertEqual(res["stages"], stages)
+                self.assertFalse(res["constraints"]["read_only"])
+                self.assertFalse(res["constraints"]["documentation_only"])
+                self.assertFalse(res["constraints"]["interactive_approval_required"])
+                self.assertFalse(res["constraints"]["authorization_granted"])
+
+    def test_refactor_maintain_workspace_isolation(self):
+        for intent in ("refactor", "maintain"):
+            with self.subTest(intent=intent):
+                req = make_request(intent=intent, requirements="clear", risk="low", workspace="isolated")
+                res = route.resolve_route(req, root=self.suite_root)
+                self.assertEqual(res["status"], "ready")
+                self.assertEqual(res["stages"][0], "daw-workspace")
+                self.assertEqual(res["stages"].count("daw-workspace"), 1)
+                req = make_request(intent=intent, requirements="clear", risk="low", workspace="unknown")
+                res = route.resolve_route(req, root=self.suite_root)
+                self.assertEqual(res["status"], "needs-input")
+                self.assertEqual(res["stages"], [])
+
+    def test_refactor_maintain_requirements_unknown_gate(self):
+        for intent in ("refactor", "maintain"):
+            with self.subTest(intent=intent):
+                req = make_request(intent=intent, requirements="unknown", risk="low", workspace="in-place")
+                res = route.resolve_route(req, root=self.suite_root)
+                self.assertEqual(res["status"], "needs-input")
+                self.assertEqual(res["stages"], [])
+                self.assertTrue(any(b["code"] == "REQUIREMENTS_UNKNOWN" for b in res["blockers"]))
+
+    def test_spike_allows_unknown_requirements_and_ignores_workspace(self):
+        req = make_request(intent="spike", requirements="unknown", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-workspace", "daw-build", "daw-ask"])
+        self.assertTrue(any("throwaway" in r for r in res["reasons"]))
+        for ws in ("unknown", "isolated"):
+            with self.subTest(workspace=ws):
+                req = make_request(intent="spike", requirements="unknown", risk="low", workspace=ws)
+                res = route.resolve_route(req, root=self.suite_root)
+                self.assertEqual(res["status"], "ready")
+                self.assertEqual(res["stages"], ["daw-workspace", "daw-build", "daw-ask"])
+
+    def test_ship_risk_gating(self):
+        req = make_request(intent="ship", requirements="clear", risk="unknown", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "needs-input")
+        self.assertEqual(res["stages"], [])
+        self.assertTrue(any(b["code"] == "RISK_UNKNOWN" for b in res["blockers"]))
+        req = make_request(intent="ship", requirements="clear", risk="high", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-ship"])
+        self.assertTrue(res["constraints"]["interactive_approval_required"])
+        self.assertFalse(res["constraints"]["authorization_granted"])
+
+    def test_check_suite_missing_ship_module(self):
+        ship_file = self.suite_root / "skills" / "daw-ship" / "SKILL.md"
+        ship_file.unlink()
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MODULE_NOT_FOUND" and "daw-ship" in f["message"] for f in findings))
+
+    def test_lifecycle_manifest_invariants(self):
+        manifest_file = self.suite_root / "references" / "suite-manifest.json"
+        clean = json.loads((REPO_ROOT / "references" / "suite-manifest.json").read_text(encoding="utf-8"))
+        for intent, bad in (("refactor", ["daw-plan", "daw-build"]), ("maintain", ["daw-build", "daw-verify"]), ("spike", ["daw-build", "daw-ask"]), ("ship", ["daw-build"])):
+            data = json.loads(json.dumps(clean))
+            data["routes"][intent]["stages"] = bad
+            manifest_file.write_text(json.dumps(data), encoding="utf-8")
+            findings = route.check_suite(self.suite_root)
+            self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings), intent)
+        for intent, ws in (("refactor", False), ("maintain", False), ("spike", True), ("ship", True)):
+            data = json.loads(json.dumps(clean))
+            data["routes"][intent]["evaluates_workspace"] = ws
+            manifest_file.write_text(json.dumps(data), encoding="utf-8")
+            findings = route.check_suite(self.suite_root)
+            self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in findings), intent)
+        data = json.loads(json.dumps(clean))
+        data["routes"]["ship"]["read_only"] = True
+        manifest_file.write_text(json.dumps(data), encoding="utf-8")
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_INVARIANT_VIOLATION" for f in route.check_suite(self.suite_root)))
+        manifest_file.write_text(json.dumps(clean), encoding="utf-8")
+        self.assertEqual(route.check_suite(self.suite_root), [])
     def test_cli_rejects_unknown_flags(self):
         script_path = str(REPO_ROOT / "scripts" / "route.py")
         cmd = [sys.executable, script_path, "--unknown-flag", "--root", str(self.suite_root)]

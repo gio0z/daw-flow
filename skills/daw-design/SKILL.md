@@ -17,6 +17,7 @@ The design module governs structural analysis, architectural evaluation, domain 
 
 - Creating a new feature, component, API endpoint, service, or data model.
 - Refactoring architectures with multi-module blast radius or breaking interfaces.
+- Resolving purely technical uncertainty (unproven libraries, APIs, or mechanisms) with a time-boxed prototype: recommend the `spike` route instead of authoring long documents (see [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol)).
 - Drafting or updating specifications across the 14-kind catalog (six baseline plus conditional ERD).
 - Disambiguating domain models, resolving semantic overload, or recording architectural decisions (ADRs).
 
@@ -95,6 +96,8 @@ The design module governs structural analysis, architectural evaluation, domain 
 8. **Safe Answer Reinjection:** `daw-design` is the authorized specification write module. When receiving user answers from interactive grilling or read-only inquiry handoffs (from `daw-ask` or parent handoff via `details.elicitation_updates`), `daw-design` safely reinjects answers into the authoritative specifications, reconciles conflicting text, updates affected acceptance criteria, and marks remaining unknowns to block only dependent scope.
 9. Conclude grilling when open decisions are resolved or deferred; preserve internal grilling classification under `details` (never use non-canonical values for top-level `status`). If a material blocker remains, exit with canonical `status: "blocked"`.
 
+   - **Technical-uncertainty check:** If the blocking unknown is technical (will library X work for our use? does API Y support Z?) rather than a product or business decision, do not stall the design in documents: recommend the `spike` route to the parent, naming the precise question the spike must answer. `daw-design` never dispatches the spike itself. See [Spike Protocol](../../references/developer-lifecycle.md#3-spike-protocol).
+
 ### Step 4: Alternatives, Trade-Offs & ADR Conjunctive Gating
 
 1. Evaluate meaningful alternatives when genuine architectural choices exist (e.g. storage models, concurrency patterns).
@@ -165,6 +168,7 @@ Preserve these module-specific fields under `details`, using empty collections o
 - `architectural_summary`, `target_specifications`, `key_invariants`, and `explicit_non_goals`: grounded design, relevant artifact paths, boundaries, and exclusions.
 - `erd_selection`: `{selected: bool, ref: "path or null", reason: "one-line scoped reason", reuse_existing: bool}` — `selected: false` records scoped skip/N/A (or reuse of an adequate separate existing model); `selected: true` links the separate ERD to Blueprint/FRD/techstack per [Workflow Artifacts §1A](../../references/workflow-artifacts.md#1a-conditional-erd-selection--ownership-seam).
 - `evaluated_alternatives`: material choices with `chosen`, `alternative`, and `rationale`; empty when alternatives are waived.
+- `spike_recommendation`: present when a technical unknown should go to the `spike` route instead of further documents: `{question, rationale}`.
 - `domain_modeling`: `disambiguated_terms`, `adr_references`, and `convention_path`, respecting domain/ADR gates and repository conventions.
 - `builder_readiness`: `substantive_design`, `seams_checked`, `blocking_unknowns`, `safe_reversible_choices`, `mockup_readiness`, and `readiness_verdict`; disclose waived inspection for localized work. `mockup_readiness` is `{required: bool, status: "reviewed"|"na"|"blocked", ref: "path or null", req_ac_screen_ids: [...], states_viewports_focus: "...", capability: "actual available tool or null", blocks_ui_only: bool}` — `required: false` with scoped rationale for no-UI/small nonvisual reuse; `blocked` only when the affected UI scope lacks direction/capability.
 - `interface_contracts`: material consumer inputs/outputs and failure contracts, with provenance for unsettled proposals.
@@ -266,6 +270,7 @@ Before finalizing handoff from `daw-design`, verify:
 ## 7. Handoff Protocol
 
 - **To `daw-plan`:** Once design is settled, builder-readiness is verified, and consequential items are approved, hand off specifications and interface contracts to `daw-plan` for deterministic task decomposition.
+- **To `spike` (recommendation to parent):** When the remaining blocking unknown is technical rather than product, recommend the `spike` route (`daw-workspace` -> `daw-build` -> `daw-ask`) with the precise technical question; the prototype runs throwaway in an isolated worktree and its findings return via `daw-ask` before design resumes. `daw-design` never dispatches modules recursively.
 - **To `daw-ask`:** If user requests deeper conversational exploration or shifts direction.
 - **Independent Review Delegation:** When architectural risk or blast radius warrants independent auditing, recommend `daw-review` to the parent router in handoff notes. `daw-design` NEVER dispatches modules recursively.
 

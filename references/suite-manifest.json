@@ -10,6 +10,10 @@
       "path": "skills/daw-plan/SKILL.md",
       "description": "Structured task planning, phase breakdowns & risk assessment"
     },
+    "daw-ship": {
+      "path": "skills/daw-ship/SKILL.md",
+      "description": "Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness"
+    },
     "daw-debug": {
       "path": "skills/daw-debug/SKILL.md",
       "description": "Root cause analysis, reproduction & failure diagnostics"
@@ -116,6 +120,36 @@
       "read_only": false,
       "stages": ["daw-setup"],
       "allow_unclear_requirements": true,
+      "evaluates_workspace": false
+    },
+    "refactor": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": [
+        "daw-untangle",
+        "daw-plan",
+        "daw-build",
+        "daw-review",
+        "daw-verify"
+      ],
+      "evaluates_workspace": true
+    },
+    "maintain": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+      "evaluates_workspace": true
+    },
+    "spike": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": ["daw-workspace", "daw-build", "daw-ask"],
+      "evaluates_workspace": false
+    },
+    "ship": {
+      "documentation_only": false,
+      "read_only": false,
+      "stages": ["daw-ship"],
       "evaluates_workspace": false
     }
   }
