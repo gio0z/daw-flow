@@ -38,6 +38,10 @@ def setup_suite_fixture(base_dir: pathlib.Path) -> pathlib.Path:
     manifest_dst = base_dir / "references" / "suite-manifest.json"
     manifest_dst.parent.mkdir(parents=True, exist_ok=True)
     manifest_dst.write_text(manifest_src.read_text(encoding="utf-8"), encoding="utf-8")
+    flow_src = REPO_ROOT / "references" / "best-practice-flow.md"
+    flow_dst = base_dir / "references" / "best-practice-flow.md"
+    flow_dst.parent.mkdir(parents=True, exist_ok=True)
+    flow_dst.write_text(flow_src.read_text(encoding="utf-8"), encoding="utf-8")
 
     manifest_data = json.loads(manifest_dst.read_text(encoding="utf-8"))
     for mod_name, mod_info in manifest_data["modules"].items():
@@ -720,6 +724,69 @@ class TestRouteSuite(unittest.TestCase):
         data = json.loads(proc.stdout)
         self.assertEqual(data["status"], "ready")
         self.assertEqual(data["stages"], ["daw-build", "daw-verify"])
+
+    def test_check_suite_accepts_flow_gate_manifest(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        cmd = [sys.executable, script_path, "--check-suite", "--root", str(self.suite_root)]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["status"], "ready")
+
+    def test_flow_gate_blocks_feature_on_empty_project(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            req_file = self.suite_root / "request.json"
+            req_data = make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")
+            req_file.write_text(json.dumps(req_data), encoding="utf-8")
+            cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root), "--project-root", str(project_root)]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 1)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "blocked")
+            self.assertTrue(any(b["code"] == "FLOW_GATE_MISSING_ARTIFACT" for b in data["blockers"]))
+
+    def test_flow_gate_passes_with_artifacts(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            (project_root / "docs" / "specs").mkdir(parents=True)
+            (project_root / "docs" / "specs" / "prd.md").write_text("# PRD\nRequirements.\n", encoding="utf-8")
+            (project_root / "docs" / "plans").mkdir(parents=True)
+            (project_root / "docs" / "plans" / "p.md").write_text("# Plan\nexpected: run tests\n", encoding="utf-8")
+            req_file = self.suite_root / "request.json"
+            req_data = make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")
+            req_file.write_text(json.dumps(req_data), encoding="utf-8")
+            cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root), "--project-root", str(project_root)]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "ready")
+
+    def test_flow_gate_skipped_without_project_root(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        req_file = self.suite_root / "request.json"
+        req_data = make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")
+        req_file.write_text(json.dumps(req_data), encoding="utf-8")
+        cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root)]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["status"], "ready")
+
+    def test_flow_gate_skips_ask_intent(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            req_file = self.suite_root / "request.json"
+            req_data = make_request(intent="ask", requirements="clear", risk="low", workspace="in-place")
+            req_file.write_text(json.dumps(req_data), encoding="utf-8")
+            cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root), "--project-root", str(project_root)]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "ready")
 
 
 if __name__ == "__main__":

@@ -223,7 +223,7 @@ Before final delivery of any code-changing workflow, the parent orchestrator exe
 
 ## 4. Verification & Structural Validation
 
-The suite includes two read-only Python 3.10+ standard library diagnostic utilities. These scripts perform structural inspection and schema validation; they do not automatically dispatch agents, enforce runtime policies, or provide semantic proof of code correctness:
+The suite includes two read-only Python 3.10+ standard library diagnostic utilities plus one companion generator. The diagnostics perform structural inspection and schema validation; they do not automatically dispatch agents, enforce runtime policies, or provide semantic proof of code correctness. The generator writes exactly one artifact and only on explicit request:
 
 1. **Suite Integrity Check (`route.py --check-suite`):**
    - Validates that `references/suite-manifest.json` conforms to schema 1.
@@ -235,6 +235,10 @@ The suite includes two read-only Python 3.10+ standard library diagnostic utilit
    - `python3 scripts/validate.py contract <file> --stage <stage>`: Validates structured project task contracts against the phase schema (`plan`, `execute`, `complete`).
    - `python3 scripts/validate.py docs <record> --project-root <dir> --transition <edge> --documents <docs...>`: Validates documentation workflow transition eligibility across 5 lifecycle edges (`intake-authoring`, `authoring-review`, `review-ready`, `review-rework`, `rework-review`) against the [Document Quality Standards & Review Rubric](references/document-quality.md). Checks criterion coverage, SHA-256 digests, and grounded line-slice source quotes. Operates as a passive, read-only CLI check invoked explicitly by the parent orchestrator; it installs no daemons or hooks, and checks structural evidence eligibility without certifying semantic truth or human comprehension.
      Truthful verification requires inspecting observable runtime evidence (exit codes, test runner reports, diff checks) against defined Acceptance Criteria. Structural validity checks ensure the repository adheres to contract conventions; they are not substitutes for functional testing.
+
+3. **Ledger Derivation (`derive_ledger.py`, the suite's only writer):**
+   - `python3 scripts/derive_ledger.py --project-root <dir> [--write]`: projects `<spec_dir>/ledger.json` from the doc-transition records already under `docs/decisions/`, `docs/specs/records/`, or `docs/evidence/`, so specifications stay the only hand-authored artifact.
+   - Every field is copied from a record: `state` from `transition.to`, `sha256` from the record that still matches the document's current bytes, `record` from the file itself, `history` from the rest of the transition chain. An edited document is reported as `derive_doc_unmapped` (drift) rather than silently re-pinned, and a conflicted chain is reported as `derive_doc_conflict` — `--write` refuses instead of guessing. Without `--write` it prints the ledger it would write and touches nothing.
 
 ---
 
@@ -285,6 +289,19 @@ DAW incorporates specification-driven execution semantics governed by the canoni
 - **H. Scoped Pause/Resume & Canonical Block State:** When material decisions, missing credentials, or review blockers halt progress, the orchestrator transitions the affected scope to a canonical `blocked` state, recording the reason, owner, pending question, and permitted next action. Non-interactive execution without user response is never treated as consent. On resumption, scope, revisions, prerequisites, and authorizations are rechecked before re-dispatch.
 - **I. Local Toolchain Integration & Reusable Verification:** Workflows discover and execute actual project scripts, local test commands, and linters directly from the workspace. Automated verification commands must actually execute and return observable output; simulated check logs are prohibited. Local configurations may strengthen but never weaken canonical safety or acceptance criteria.
 
+### Adopted Flow & Enforcement Gates
+
+The delivery flow is adopted rather than invented, and it is enforced rather than merely described. [Best Practice Flow](references/best-practice-flow.md) records the eight steps — constitution first, clarify then specify, vertical-slice plans with one-action steps, acceptance plus an exact verification command per task, small test-first diffs, independent review, run-it-to-prove-it verification, and commit/PR hygiene as its own route — each tagged with its source (`spec-kit`, `superpowers`, `pocock`) and an anchor to the DAW rule that already implements it.
+
+Two gates keep that mapping honest:
+
+| Gate                | Command                                                          | Fails / blocks when                                                                                                                                                                                                                                                 |
+| :------------------ | :--------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Static mapping gate | `python3 scripts/validate.py flow --project-root .`              | A step, its source tag, its DAW anchor, the cross-links from `SKILL.md` / `references/routing.md`, or the manifest `flow_gate` entry is missing or inconsistent.                                                                                                    |
+| Route flow gate     | `python3 scripts/route.py REQUEST.json --project-root <project>` | An affected intent (`feature`, `bugfix`, `refactor`, `maintain`) is dispatched while a required artifact step (spec, plan, plan carrying verification `expected` markers) is unsatisfied; status drops from `ready` to `blocked` with `FLOW_GATE_MISSING_ARTIFACT`. |
+
+Both gates are read-only and advisory about authority: passing them never authorizes a mutation, a deployment, or any action beyond the operator's explicit request.
+
 ### GitHub Spec Kit Adoption Matrix
 
 The table below summarizes the alignment between upstream GitHub Spec Kit mechanisms (pinned to commit [`3ca735b846afcbcf3304d571f296ec542464e08c`](https://github.com/github/spec-kit/tree/3ca735b846afcbcf3304d571f296ec542464e08c)) and the DAW architecture. DAW adopts all high-value specification-driven mechanisms into its existing 12-module pipeline, while intentionally excluding external daemons, rigid file naming mandates, embedded markdown scripts, and ungrounded efficacy claims:
@@ -316,6 +333,7 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 
 ## 6. References & Documentation
 
+- [Best Practice Flow (`references/best-practice-flow.md`)](references/best-practice-flow.md): The eight adopted delivery steps (spec-kit, superpowers, Matt Pocock) mapped to the DAW rule that implements each, with the machine mapping read by both enforcement gates.
 - [Grilling Protocol (`references/grilling.md`)](references/grilling.md): Canonical bounded-round elicitation protocol used by `daw-wizard`, `daw-ask`, and `daw-design`.
 - [Routing & Specification Manifest (`references/routing.md`)](references/routing.md): Detailed intent precedence, 14-doc authoring rules, and stage pipeline handoffs.
 - [Developer Lifecycle (`references/developer-lifecycle.md`)](references/developer-lifecycle.md): Inner loop, time-boxing, spike, refactor, maintenance, bisection, commit hygiene, PR/CI, review feedback, release, and retro protocols.

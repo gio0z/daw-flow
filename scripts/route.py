@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import sys
 from typing import Any, Tuple
 
@@ -360,6 +361,38 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
 
     return findings
 
+FLOW_GATE_STEP_RE = re.compile(r"^BPF-[1-8]$")
+
+
+def _validate_flow_gate(gate: Any, routes: Any) -> list[dict[str, str]]:
+    """Validate optional manifest flow_gate block, if present."""
+    if gate is None:
+        return []
+    if not isinstance(gate, dict):
+        return [{"code": "MANIFEST_FLOW_GATE_INVALID", "message": "Manifest flow_gate must be a JSON object."}]
+    findings: list[dict[str, str]] = []
+    document = gate.get("document")
+    if not isinstance(document, str) or not document.strip():
+        findings.append({"code": "MANIFEST_FLOW_GATE_INVALID", "message": "Manifest flow_gate.document must be a non-empty string."})
+    required_steps = gate.get("required_steps")
+    if not isinstance(required_steps, list) or not required_steps:
+        findings.append({"code": "MANIFEST_FLOW_GATE_INVALID", "message": "Manifest flow_gate.required_steps must be a non-empty array."})
+    else:
+        for entry in required_steps:
+            if not isinstance(entry, str) or not FLOW_GATE_STEP_RE.match(entry):
+                findings.append({"code": "MANIFEST_FLOW_GATE_UNKNOWN_STEP", "message": "Manifest flow_gate.required_steps contains a step id not matching ^BPF-[1-8]$."})
+                break
+    affected_intents = gate.get("affected_intents")
+    if not isinstance(affected_intents, list) or not affected_intents:
+        findings.append({"code": "MANIFEST_FLOW_GATE_INVALID", "message": "Manifest flow_gate.affected_intents must be a non-empty array."})
+    else:
+        route_keys = set(routes.keys()) if isinstance(routes, dict) else set()
+        for entry in affected_intents:
+            if not isinstance(entry, str) or entry not in route_keys:
+                findings.append({"code": "MANIFEST_FLOW_GATE_UNKNOWN_INTENT", "message": "Manifest flow_gate.affected_intents entry must be a key of routes."})
+                break
+    return findings
+
 
 def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[str, str]]]:
     """Load and strictly validate references/suite-manifest.json."""
@@ -387,7 +420,7 @@ def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[
         return None, [{"code": "MANIFEST_MALFORMED", "message": "Manifest root must be a JSON object."}]
 
     findings: list[dict[str, str]] = []
-    allowed_keys = {"schema_version", "suite", "modules", "routes"}
+    allowed_keys = {"schema_version", "suite", "modules", "routes", "flow_gate"}
     unknown_keys = set(data.keys()) - allowed_keys
     if unknown_keys:
         findings.append({"code": "MANIFEST_UNKNOWN_KEYS", "message": f"Manifest contains {len(unknown_keys)} unknown key(s). Raw keys redacted."})
@@ -401,6 +434,7 @@ def load_manifest(root: pathlib.Path) -> Tuple[dict[str, Any] | None, list[dict[
 
     findings.extend(_validate_module_entries(data.get("modules")))
     findings.extend(_validate_route_entries(data.get("routes")))
+    findings.extend(_validate_flow_gate(data.get("flow_gate"), data.get("routes")))
 
     return data, findings
 
@@ -504,9 +538,154 @@ def _eval_condition(cond_expr: str, ctx: dict[str, Any]) -> bool:
         return False
 
 
+
+FENCED_JSON_RE = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
+FLOW_NEVER_GATED_INTENTS = frozenset({"review", "untangle", "ask", "setup", "spike", "ship", "patch", "bootstrap", "adopt"})
+
+
+def _load_flow_mapping(suite_root: pathlib.Path, document_rel: str) -> dict[str, Any] | None:
+    """Read the first fenced ```json block from the flow document under suite root."""
+    doc_path, err = daw_common.resolve_bounded_path(suite_root, document_rel)
+    if err or doc_path is None or not doc_path.is_file():
+        return None
+    try:
+        if doc_path.stat().st_size > MAX_INPUT_BYTES:
+            return None
+        content = doc_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    match = FENCED_JSON_RE.search(content)
+    if not match:
+        return None
+    try:
+        data = daw_common.parse_strict_json(match.group(1))
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _project_spec_dir(project_root: pathlib.Path) -> str:
+    """Resolve {spec_dir} from the project's daw-config when parseable, else docs/specs."""
+    try:
+        from check_config import parse_config_block
+    except ImportError:
+        return "docs/specs"
+    for agent_file in ("AGENTS.md", "CLAUDE.md"):
+        af = project_root / agent_file
+        if not af.is_file():
+            continue
+        try:
+            text = af.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        config = parse_config_block(text)
+        spec_dir = config.get("spec_dir")
+        if spec_dir and spec_dir.strip():
+            return spec_dir.strip()
+        if "<!-- daw-config:start -->" in text and config:
+            return "docs/specs"
+        if "<!-- daw-config:start -->" in text:
+            return "docs/specs"
+    return "docs/specs"
+
+
+def _flow_gate_blockers(
+    suite_root: pathlib.Path,
+    project_root: pathlib.Path,
+    manifest: dict[str, Any],
+    intent: str,
+) -> list[dict[str, str]]:
+    """Evaluate the flow artifact gate for an affected intent. Fail closed."""
+    gate = manifest.get("flow_gate")
+    if not isinstance(gate, dict):
+        return [{"code": "FLOW_GATE_UNREADABLE", "message": "Flow gate configuration is missing or invalid in the suite manifest."}]
+    affected = gate.get("affected_intents", [])
+    if intent not in affected:
+        return []
+    if intent in FLOW_NEVER_GATED_INTENTS:
+        return []
+    document = gate.get("document")
+    if not isinstance(document, str) or not document.strip():
+        return [{"code": "FLOW_GATE_UNREADABLE", "message": "Flow gate document is missing or invalid in the suite manifest."}]
+    mapping = _load_flow_mapping(suite_root, document)
+    if mapping is None:
+        return [{"code": "FLOW_GATE_UNREADABLE", "message": f"Flow gate document {document} is unreadable or unparseable."}]
+    required_steps = gate.get("required_steps", [])
+    if not isinstance(required_steps, list):
+        required_steps = []
+    required_set = {s for s in required_steps if isinstance(s, str)}
+    step_names = {}
+    steps = mapping.get("steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if isinstance(step, dict) and isinstance(step.get("id"), str):
+                name = step.get("name")
+                step_names[step["id"]] = name if isinstance(name, str) and name.strip() else step["id"]
+    spec_dir = _project_spec_dir(project_root)
+    blockers: list[dict[str, str]] = []
+    artifact_steps = mapping.get("artifact_steps")
+    if not isinstance(artifact_steps, list):
+        return [{"code": "FLOW_GATE_UNREADABLE", "message": "Flow gate machine mapping has no artifact_steps."}]
+    for entry in artifact_steps:
+        if not isinstance(entry, dict):
+            continue
+        step_id = entry.get("step")
+        if not isinstance(step_id, str) or step_id not in required_set:
+            continue
+        patterns = entry.get("patterns")
+        if not isinstance(patterns, list) or not patterns:
+            patterns = []
+        require_text = entry.get("require_text")
+        satisfied = False
+        for pattern in patterns:
+            if not isinstance(pattern, str) or not pattern.strip():
+                continue
+            expanded = pattern.replace("{spec_dir}", spec_dir)
+            if pathlib.PurePosixPath(expanded).is_absolute() or expanded.startswith("/") or expanded.startswith("\\"):
+                continue
+            if ".." in pathlib.PurePosixPath(expanded).parts:
+                continue
+            for matched in sorted(project_root.glob(expanded)):
+                if not matched.is_file():
+                    continue
+                try:
+                    if matched.stat().st_size > MAX_INPUT_BYTES:
+                        continue
+                except OSError:
+                    continue
+                if require_text is None:
+                    satisfied = True
+                    break
+                if not isinstance(require_text, str):
+                    continue
+                try:
+                    text = matched.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                if require_text in text:
+                    satisfied = True
+                    break
+            if satisfied:
+                break
+        if not satisfied:
+            step_name = step_names.get(step_id, step_id)
+            shown = [p.replace("{spec_dir}", spec_dir) for p in patterns if isinstance(p, str)]
+            requirement = f" containing '{require_text}'" if isinstance(require_text, str) else ""
+            blockers.append({
+                "code": "FLOW_GATE_MISSING_ARTIFACT",
+                "message": (
+                    f"Flow step {step_id} ({step_name}): no artifact matching {shown}{requirement}"
+                ),
+            })
+    return blockers
+
+
 def resolve_route(
     request_data: Any,
     root: pathlib.Path | str | None = None,
+    project_root: pathlib.Path | str | None = None,
 ) -> dict[str, Any]:
     """Resolve procedural route from request and manifest."""
     valid_req, req_blockers = validate_request(request_data)
@@ -702,6 +881,27 @@ def resolve_route(
                 reasons.append(f"Extension hook '{hp}': {len(hook_ids)} hook(s) declared.")
 
     reasons.append("Route resolved successfully.")
+    if project_root is not None and intent not in FLOW_NEVER_GATED_INTENTS:
+        gate = manifest.get("flow_gate")
+        affected: list[Any] = gate.get("affected_intents", []) if isinstance(gate, dict) else []
+        if intent in affected:
+            gate_blockers = _flow_gate_blockers(resolved_root, pathlib.Path(project_root), manifest, intent)
+            if gate_blockers:
+                missing = ", ".join(
+                    b["message"].split(": ")[0].removeprefix("Flow step ").strip()
+                    for b in gate_blockers
+                    if b.get("code") == "FLOW_GATE_MISSING_ARTIFACT" and ": " in b.get("message", "")
+                )
+                suffix = f" Missing flow steps: {missing}." if missing else " Missing flow artifacts."
+                return create_response(
+                    status="blocked",
+                    stages=stages,
+                    reasons=reasons + [f"Flow gate blocked intent '{intent}': required artifacts are missing.{suffix}"],
+                    blockers=gate_blockers,
+                    read_only=read_only,
+                    documentation_only=documentation_only,
+                    interactive_approval_required=interactive_approval_required,
+                )
     return create_response(
         status="ready",
         stages=stages,
@@ -850,6 +1050,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Bare invocation: analyze project context and suggest an initial route.",
     )
+    parser.add_argument("--project-root", default=None, help="Project root for flow artifact gate (affected intents only)")
 
     args = parser.parse_args(argv)
     root = find_suite_root(args.root)
@@ -922,8 +1123,7 @@ def main(argv: list[str] | None = None) -> int:
         err_res = create_response(status="error", blockers=[{"code": "REQUEST_PARSE_ERROR", "message": f"Request file is not valid JSON: {err}"}], reasons=["JSON parse error."])
         print(json.dumps(err_res, indent=2) if args.format == "json" else format_text_output(err_res))
         return 2
-
-    result = resolve_route(req_data, root=root)
+    result = resolve_route(req_data, root=root, project_root=args.project_root)
     print(json.dumps(result, indent=2) if args.format == "json" else format_text_output(result))
 
     status = result["status"]

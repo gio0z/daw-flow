@@ -16,17 +16,24 @@ try:
     from scripts.check_config import validate_config_file
     from scripts.check_contract import validate_contract
     from scripts.check_docs import validate_docs
+    from scripts.check_flow import validate_flow
     from scripts.check_ledger import validate_ledger
     from scripts.check_package import validate_package
     from scripts.check_status import validate_status
+    from scripts.check_surface import SURFACE_LIMITATIONS, validate_surface_session
     from scripts.daw_common import DuplicateKeyError, output_result, parse_strict_json, resolve_bounded_path
 except ImportError:
     from check_config import validate_config_file  # type: ignore[import-not-found]
     from check_contract import validate_contract  # type: ignore[import-not-found]
     from check_docs import validate_docs  # type: ignore[import-not-found]
+    from check_flow import validate_flow  # type: ignore[import-not-found]
     from check_ledger import validate_ledger  # type: ignore[import-not-found]
     from check_package import validate_package  # type: ignore[import-not-found]
     from check_status import validate_status  # type: ignore[import-not-found]
+    from check_surface import (  # type: ignore[import-not-found]
+        SURFACE_LIMITATIONS,
+        validate_surface_session,
+    )
     from daw_common import (  # type: ignore[import-not-found]
         DuplicateKeyError,
         output_result,
@@ -115,16 +122,32 @@ def main() -> None:
     config_parser.add_argument("--project-root", required=True, help="Project root directory bounding paths and commands.")
     config_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json.")
 
+    verify_parser = subparsers.add_parser(
+        "verify", help="Validate a recorded role-based surface session (UI work)."
+    )
+    verify_parser.add_argument("file", help="Path to the surface session JSON file (relative or absolute).")
+    verify_parser.add_argument("--project-root", required=True, help="Project root directory.")
+    verify_parser.add_argument(
+        "--stage",
+        choices=["execute", "complete"],
+        default="complete",
+        help="execute checks shape only; complete requires every leg passed (default).",
+    )
+    verify_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format.")
+
     status_parser = subparsers.add_parser("status", help="Aggregate read-only project status preflight.")
     status_parser.add_argument("--project-root", required=True, help="Project root directory to inspect.")
     status_parser.add_argument("--agent-file", default=None, help="Agent file holding the daw-config block (default: AGENTS.md, then CLAUDE.md).")
     status_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json.")
 
+    flow_parser = subparsers.add_parser("flow", help="Validate the best-practice-flow mapping and suite-manifest flow_gate wiring.")
+    flow_parser.add_argument("--project-root", required=True, help="Project root directory to inspect.")
+    flow_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json.")
+
     try:
         args = parser.parse_args()
     except SystemExit as e:
         sys.exit(e.code)
-
     if args.subcommand == "package":
         if args.root:
             root_path = pathlib.Path(args.root).resolve()
@@ -141,6 +164,23 @@ def main() -> None:
             sys.stderr.write("OS error reading package.\n")
             sys.exit(2)
 
+        output_result(res, args.format)
+        sys.exit(0 if res["valid"] else 1)
+
+    elif args.subcommand == "flow":
+        try:
+            proj_root = pathlib.Path(args.project_root).resolve()
+        except (OSError, RuntimeError, ValueError):
+            sys.stderr.write("Error: Cannot resolve project root.\n")
+            sys.exit(2)
+        if not proj_root.is_dir():
+            sys.stderr.write("Error: Project root is not a directory.\n")
+            sys.exit(2)
+        try:
+            res = validate_flow(proj_root)
+        except OSError:
+            sys.stderr.write("OS error computing flow.\n")
+            sys.exit(2)
         output_result(res, args.format)
         sys.exit(0 if res["valid"] else 1)
 
@@ -313,6 +353,50 @@ def main() -> None:
             except OSError:
                 sys.stderr.write("OS error validating config.\n")
                 sys.exit(2)
+        output_result(res, args.format)
+        sys.exit(0 if res["valid"] else 1)
+
+    elif args.subcommand == "verify":
+        proj_root_raw = pathlib.Path(args.project_root)
+        try:
+            proj_root = proj_root_raw.resolve()
+        except OSError:
+            sys.stderr.write("Error: Cannot resolve project root.\n")
+            sys.exit(2)
+        if not proj_root.is_dir():
+            sys.stderr.write("Error: Project root is not a directory.\n")
+            sys.exit(2)
+
+        session_file = pathlib.Path(args.file)
+        if not session_file.is_absolute():
+            session_file = proj_root / session_file
+        try:
+            if not session_file.is_file():
+                sys.stderr.write("Error: Session file does not exist or is not a file.\n")
+                sys.exit(2)
+            raw = session_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            sys.stderr.write("Error reading session file.\n")
+            sys.exit(2)
+        try:
+            session_data = parse_strict_json(raw)
+        except (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError):
+            sys.stderr.write("Error parsing session JSON: malformed JSON or duplicate keys.\n")
+            sys.exit(2)
+
+        findings = validate_surface_session(
+            session_data,
+            prefix="surface_session",
+            enforce_passed=args.stage == "complete",
+            required=True,
+        )
+        res = {
+            "valid": not any(f["severity"] == "error" for f in findings),
+            "check": "verify",
+            "schema_version": 1,
+            "findings": findings,
+            "limitations": SURFACE_LIMITATIONS,
+        }
         output_result(res, args.format)
         sys.exit(0 if res["valid"] else 1)
 

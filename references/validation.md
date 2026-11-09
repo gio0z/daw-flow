@@ -36,6 +36,9 @@ python3 "$SKILL_DIR/scripts/validate.py" contract task-contract.json --project-r
 
 # Run the read-only aggregate status preflight (config + ledger + task contracts)
 python3 "$SKILL_DIR/scripts/validate.py" status --project-root "$PROJECT_DIR" --format json
+
+# Verify the adopted best-practice flow mapping (steps, sources, anchors, cross-links)
+python3 "$SKILL_DIR/scripts/validate.py" flow --project-root "$SKILL_DIR" --format json
 ```
 
 ```bash
@@ -157,12 +160,14 @@ When `--format json` is specified, stdout contains a single JSON object adhering
 ### Envelope Fields
 
 - `schema_version` (_integer_): Exactly `1`.
-- `check` (_string_): One of `"package"`, `"contract"`, `"docs"`, `"ledger"`, `"config"`, or `"status"`.
+- `check` (_string_): One of `"package"`, `"contract"`, `"docs"`, `"ledger"`, `"config"`, `"status"`, `"flow"`, or `"verify"`.
 - `valid` (_boolean_): `true` if there are zero `error` severity findings; `false` otherwise. For `docs`, this indicates eligibility for the requested transition edge.
 - `transition` (_string, docs check only_): The requested transition string (e.g., `"review-ready"`).
 - `eligible` (_boolean, docs check only_): Identical to `valid`, explicitly naming transition eligibility.
-- `summary` (_object, status check only_): `{ "config", "ledger", "tasks": { "complete_valid", "complete_invalid", "in_progress" } }` (see §10).
-- `recommended_route` (_string, status check only_): One of `"setup"`, `"upgrade-recheck"`, `"design-rework"`, `"verify"`, `"none"` (see §10).
+- `summary` (_object, status check only_): `{ "config", "ledger", "plans", "tasks": { "complete_valid", "complete_invalid", "in_progress" } }` (see §10).
+- `recommended_route` ( _string_, status check only): One of `"setup"`, `"upgrade-recheck"`, `"design-rework"`, `"plan"`, `"verify"`, `"none"` (see §10).
+- `next_actions` (_array of objects, status check only_): Always-present, non-empty array of advisory next steps (see §10). Each entry is `{action, kind, command, why, blocking}` with `kind` one of `"author"`, `"run"`, or `"decide"` and `command` a literal shell string or `null`; index `0` is the primary next action. Commands carry the literal placeholders `$SKILL_DIR` (suite root) and `$PROJECT_DIR` (project root). The array is advisory only and never authorizes execution or grants mutation rights.
+- `steps` (_integer, flow check only_): Number of adopted flow steps found in the machine mapping; `8` when the document is intact (see §11).
 - `findings` (_array of objects_): List of diagnostic findings.
   - `severity` (_string_): `"error"` (fails validation, triggers exit 1) or `"warning"` (does not fail validation, allows exit 0).
   - `code` (_string_): Machine-readable diagnostic code (e.g., `baseline_changed`, `missing_approval`, `invalid_stage`).
@@ -221,6 +226,7 @@ Task contracts represent deterministic boundaries between planning and execution
 | `approval`            | object  | No       | Captured user approval reference (mandatory for high-risk operations at `execute` and `complete`).                                                 |
 | `evidence`            | array   | No       | Verification records mapped to Acceptance Criteria (mandatory at `complete`).                                                                      |
 | `result`              | object  | No       | Post-change snapshot (`result` = post-change snapshot), recorded after verify: forbidden at `plan`, optional at `execute`, required at `complete`. |
+| `surface`             | string  | No       | Optional classification `"ui"` or `"non-ui"`. Declaring `"ui"` makes the role-based surface session mandatory at `complete`; when omitted, a UI-shaped `operation.scope` emits `surface_declaration_inferred`. |
 
 ---
 
@@ -307,10 +313,11 @@ Records the post-change snapshot of the changed files, captured after verify. `b
 
 - `revision` (_string, required_): Non-blank revision ID of the post-change state (e.g. commit SHA or worktree ID). Blank → `invalid_result_revision`. At `complete` it must differ from `baseline.revision` (`result_revision_unchanged`).
 - `files` (_array of objects, required_): Snapshot of changed files after verify. Each entry `{"path": "src/x.py", "sha256": "<hex>"}`: `path` is a bounded project-relative path (same boundary checks as `baseline.files[].path`); `sha256` is 64 lowercase hex. Unknown keys → `unknown_field`. Empty `files` at `complete` → `empty_result_files`.
+- `surface_session` (_object, conditionally required_): The role-based session recorded for a UI-affecting change (`surface: "ui"`). Required at `complete` (`surface_session_missing`), validated for shape at `execute`, and ignored with a warning when `surface` is not declared. Shape and rules: §13.
 - Stage rules:
   - `plan`: `result` is forbidden; presence → `result_not_allowed`.
   - `execute`: Optional. If present, every `result` file must exist and its current SHA-256 must equal the recorded value, else `result_changed` (code changed after verification).
-  - `complete`: Required; absence → `missing_result`. Every recorded file must exist and match its current SHA-256, else `result_changed`. `result.revision` must not equal `baseline.revision` (`result_revision_unchanged`).
+  - `complete`: Required; absence → `missing_result`. Every recorded file must exist and match its current SHA-256, else `result_changed`. `result.revision` must not equal `baseline.revision` (`result_revision_unchanged`). When `surface: "ui"`, a complete `surface_session` is also required (§13) and every leg must be `passed`.
 
 ---
 
@@ -638,15 +645,42 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
 
 ### Summary & recommended_route Precedence
 
-`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `recommended_route` resolves in this precedence order:
+`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `summary.plans` is `ok` when `docs/plans/*.md` exists for a project whose `spec_dir` already holds specification Markdown, `missing` when specifications exist without any saved plan, and `not_applicable` when no specifications exist yet. It exists because the route flow gate blocks `feature`/`bugfix`/`refactor`/`maintain` without a saved plan; a status that answered `none` there would contradict the gate.
+
+`recommended_route` resolves in this precedence order:
 
 1. `config` is `missing` or `invalid` => `setup`.
 2. `config` is `stale` => `upgrade-recheck`.
 3. `ledger` is `invalid` or `missing` => `design-rework`.
-4. Any `complete_invalid` task => `verify`.
-5. Otherwise => `none`.
+4. `plans` is `missing` => `plan`.
+5. Any `complete_invalid` task => `verify`.
+6. Otherwise => `none`.
 
 `recommended_route` is advisory only: it never authorizes dispatch, enlarges user scope, or grants mutation authority. An explicit status-only request reports this envelope and stops; an ordinary task request continues on its own authorized route, with error findings blocking only the spec-dependent mutating routes named in root §2.
+
+### Next Actions
+
+`next_actions` is always present and non-empty; index `0` is the primary next action. `command` strings use the literal shell placeholders `$SKILL_DIR` (suite root) and `$PROJECT_DIR` (project root). `blocking` for the primary entry is `true` iff an error-severity finding exists for that area (`config:` prefix for setup, `ledger:` for design-rework, `contract[` for verify); follow-up entries inherit it. Each route yields exactly 2 entries, except `none` which yields 1:
+
+1. config `missing` or `invalid` -> `setup`
+   - `{"action":"setup","kind":"author","command":null,"why":"No usable <!-- daw-config:start --> block in the agent file; run the setup route to discover commands and author it.","blocking":true}`
+   - `{"action":"setup-verify","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" config \"AGENTS.md\" --project-root \"$PROJECT_DIR\"","why":"Confirm the authored config block parses and its commands resolve.","blocking":true}`
+2. config `stale` -> `upgrade-recheck`
+   - `{"action":"upgrade-recheck","kind":"author","command":null,"why":"The config block's daw_version is older than the installed VERSION; review CHANGELOG.md and update daw_version.","blocking":false}`
+   - `{"action":"upgrade-recheck-verify","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" status --project-root \"$PROJECT_DIR\"","why":"Re-run status; the config is current when summary.config is ok.","blocking":false}`
+3. ledger `missing` or `invalid` -> `design-rework`
+   - `{"action":"design-rework","kind":"author","command":null,"why":"<specific: spec dir has documents but no ledger.json / ledger.json does not validate>; re-enter the document workflow (review-rework -> rework-review -> review-ready) and persist state in <spec_dir>/ledger.json.","blocking":true iff ledger area has an error-severity finding}`
+   - `{"action":"design-rework-verify","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" ledger \"<spec_dir>/ledger.json\" --project-root \"$PROJECT_DIR\"","why":"After the ledger is written, run this to confirm it validates; before it exists the command exits 2.","blocking":same as above}`
+     (`<spec_dir>` is substituted with the parsed `spec_dir`; if `spec_dir` is unknown, fall back to `docs/specs`.)
+4. any `complete_invalid` task -> `verify`
+   - `{"action":"verify","kind":"author","command":null,"why":"<n> completed task contract(s) fail complete-stage validation; re-verify each against the current revision before claiming completion.","blocking":true}`
+   - `{"action":"verify-run","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" contract \"<first failing contract relpath>\" --stage complete --project-root \"$PROJECT_DIR\"","why":"After the fix, run this to reproduce or clear the failing contract validation.","blocking":true}`
+     (first failing contract in sorted glob order, including contracts that are malformed JSON.)
+5. `plans` is `missing` -> `plan`
+   - `{"action":"plan","kind":"author","command":null,"why":"Specifications exist but no saved plan does; the route flow gate blocks feature/bugfix/refactor/maintain until a plan with per-step expected results is saved under docs/plans/.","blocking":true}`
+   - `{"action":"plan-verify","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" status --project-root \"$PROJECT_DIR\"","why":"Re-run status; summary.plans becomes `ok` once the plan is saved.","blocking":true}`
+6. otherwise (`none`)
+   - `{"action":"none","kind":"decide","command":null,"why":"No preflight blocker detected; continue the authorized route (or dispatch the classified route) and keep the plan/progress record current.","blocking":false}`
 
 ### Output Envelope
 
@@ -658,22 +692,209 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
   "summary": {
     "config": "ok",
     "ledger": "ok",
+    "plans": "ok",
     "tasks": { "complete_valid": 1, "complete_invalid": 0, "in_progress": 1 }
   },
   "recommended_route": "none",
+  "next_actions": [
+    {
+      "action": "none",
+      "kind": "decide",
+      "command": null,
+      "why": "No preflight blocker detected; continue the authorized route (or dispatch the classified route) and keep the plan/progress record current.",
+      "blocking": false
+    }
+  ],
   "findings": [],
   "limitations": [
     "Read-only aggregate: never runs tests, evidence commands, or builds, and never writes files.",
     "Task discovery is limited to the convention path docs/evidence/<task-id>/contract.json; contracts stored elsewhere are not checked.",
-    "Inherits every composed check's limitations (config, ledger, docs, contract); semantic truth of evidence is never evaluated."
+    "Inherits every composed check's limitations (config, ledger, docs, contract); semantic truth of evidence is never evaluated.",
+    "next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights."
   ]
 }
 ```
 
-`valid` is `true` iff there are zero error-severity findings. Text output prints the summary and `recommended_route` in addition to findings.
+`valid` is `true` iff there are zero error-severity findings. Text output prints the summary, `recommended_route`, and a `Next actions:` block in addition to findings.
 
 ### Limitations
 
 - Read-only; does not run tests or evidence commands (command resolvability only, per §9).
 - Task discovery is limited to the convention path `docs/evidence/<task-id>/contract.json`, globbed one level; contracts stored elsewhere are not seen.
 - Inherits each composed check's limitations (§2, §8–§9).
+- next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights.
+
+## 11. Best Practice Flow Check (`scripts/validate.py flow`)
+
+The read-only companion to [Best Practice Flow](best-practice-flow.md). It verifies that the flow's machine mapping is intact: the eight adopted steps exist in order, each carries a valid source and a DAW anchor that resolves **in this repository**, both cross-link documents still reference the flow, and the manifest `flow_gate` block names steps and intents that actually exist. It owns no workflow rules of its own; it only checks that the documented mapping has not drifted from the suite.
+
+### CLI Invocation
+
+```bash
+python3 "$SKILL_DIR/scripts/validate.py" flow --project-root "$SKILL_DIR" --format json
+```
+
+Arguments: `--project-root ROOT` (required; this is the **suite root**, not a target project), `--format text|json` (default `text`). Exit codes match §1 (`0` no error findings, `1` error findings, `2` usage/IO error).
+
+### Checks
+
+- `flow_doc_missing`: `references/best-practice-flow.md` is absent, unsafe, or unreadable.
+- `flow_mapping_missing`, `flow_malformed`, `flow_schema_version_invalid`: the fenced JSON block is absent, not strict JSON, or not `flow_schema_version: 1`.
+- `flow_step_count`, `flow_step_id_invalid`, `flow_duplicate_step`, `flow_step_field_invalid`: `steps` is not exactly 8 entries, an id is not `BPF-<position>`, ids repeat, or `name`/`anchor`/`mandatory` is missing or invalid.
+- `flow_source_invalid`: `source` is not one of `spec-kit`, `superpowers`, `pocock`, `original`.
+- `flow_anchor_unresolved`: the anchor's file does not exist inside the suite root, escapes it, or the `#fragment` does not match the slug of an existing heading. The slug rule is lowercase → drop characters outside `[a-z0-9 -]` → spaces to `-` → collapse `-` runs → strip leading/trailing `-`.
+- `flow_missing_link`: a file listed in `cross_links` is missing or no longer contains a reference to `best-practice-flow.md`.
+- `flow_manifest_gate_missing`, `flow_gate_step_unknown`, `flow_gate_intent_unknown`, `flow_artifact_step_unknown`: the manifest has no usable `flow_gate` object, or it names a step absent from `steps`, an intent absent from `routes`, or an `artifact_steps` entry for an unknown step.
+
+### Output Envelope
+
+```json
+{
+  "valid": true,
+  "check": "flow",
+  "schema_version": 1,
+  "steps": 8,
+  "findings": [],
+  "limitations": [
+    "Read-only: never writes files, never runs subprocesses or builds, and never evaluates the semantic truth of the mapped rules.",
+    "Anchor resolution is limited to the exact heading-slug rule documented in _heading_slug; anchors stored elsewhere or using a different slugger are not checked.",
+    "Oversize inputs over 1 MiB are rejected unread rather than truncated, so a large file never yields a partial verdict."
+  ]
+}
+```
+
+`valid` is `true` iff there are zero error-severity findings.
+
+### Limitations
+
+- Structural only: a green result proves the mapping is well-formed and resolves, never that a step's rule is actually followed in a given task.
+- Anchors are matched with the suite's own slugger, so a heading renamed in a different convention can read as dangling.
+- The flow gate's runtime half lives in `route.py --project-root` and is documented in [routing §2](routing.md#invocation-commands); this check never inspects a target project.
+
+## 12. Ledger Derivation (`scripts/derive_ledger.py`)
+
+> **Not part of the read-only validator.** The validator and route engine never write. This separate tool is the suite's only writer: it emits `<spec_dir>/ledger.json` and nothing else, and only when `--write` is passed. It never invokes `validate.py`, and `validate.py` never invokes it.
+
+Specifications stay the single hand-authored source. The ledger is a **verified projection** of the doc-transition records that already exist under `docs/decisions/`, `docs/specs/records/`, or `docs/evidence/` — path, state, and pinned hash all come from a record, never from a fresh hash of edited bytes.
+
+### CLI Invocation
+
+```bash
+# Preview the ledger implied by existing records (writes nothing)
+python3 "$SKILL_DIR/scripts/derive_ledger.py" --project-root "$PROJECT_DIR" --format json
+
+# Emit <spec_dir>/ledger.json from those records
+python3 "$SKILL_DIR/scripts/derive_ledger.py" --project-root "$PROJECT_DIR" --write
+```
+
+Arguments: `--project-root ROOT` (required), `--spec-dir REL` (default: the project's `daw-config` `spec_dir`, else `docs/specs`), repeatable `--records-dir REL` (default: whichever of `docs/decisions`, `docs/specs/records`, `docs/evidence` exist), `--write`, `--format text|json`. Exit codes match §1.
+
+### Mapping Rules
+
+1. A record is **usable** only when it parses as strict JSON, carries `transition.to` in {`intake`, `authoring`, `review`, `rework`, `ready`}, and lists `documents[]` entries with a string `path` and a 64-hex `sha256`. Otherwise `derive_record_malformed` (warning) and it is skipped.
+2. A record is a **candidate** for a document only when its declared `sha256` equals the SHA-256 of the document's current bytes. A hash is never recomputed into the ledger.
+3. Several candidates for one document are resolved by their **transition chain**: candidates are keyed by `to`; the terminal candidate is the one whose `to` is no other candidate's `from`; exactly one terminal wins, others become `history`. Two candidates sharing a `to`, zero/multiple terminals, or a disconnected chain produce `derive_doc_conflict` (error) — the tool never guesses from file mtimes.
+4. No candidate → `derive_doc_unmapped` (warning) with either `no record names this document` or `every record's sha256 is stale for the current bytes — re-run the review transition`. A document edited after its record therefore reports drift instead of being silently re-pinned.
+5. A declared path missing from disk → `derive_doc_missing` (warning). Paths escaping the project root are rejected at resolution time.
+6. `--write` refuses whenever an error finding exists (`derive_write_refused`, exit 1), so a conflicted project is reported, never half-written.
+7. **The derived payload is validated before it is written.** The tool runs the existing ledger validator on the ledger it is about to emit and re-raises any error as `derive_ledger_invalid` (`ledger:<original path>`). A record that satisfied an older contract — a string `reviewer` where the current schema requires `{id, kind, author_id}`, or a `sources[].path` under `tmp/` — therefore makes derivation *fail loudly* instead of emitting a ledger that the very next command rejects. Migrate the record or re-run the review transition; never "fix" the ledger.
+Also warning-level: `derive_records_dir_missing` (no records source exists) and `derive_record_not_durable` (a record lives under an ephemeral path).
+
+### Output Envelope
+
+```json
+{
+  "valid": true,
+  "check": "derive_ledger",
+  "schema_version": 1,
+  "spec_dir": "docs/specs",
+  "documents": 6,
+  "unmapped": [],
+  "written": "docs/specs/ledger.json",
+  "findings": [],
+  "limitations": [
+    "Projects only what existing records declare; it never invents a state, a reviewer, or a hash.",
+    "Requires at least one doc-transition record per document; a project with specs but no records stays underived."
+  ]
+}
+```
+
+`written` is `null` without `--write`. `valid` is `true` iff there are zero error-severity findings.
+
+### Relationship to `status`
+
+`validate.py status` reports `summary.ledger: "missing"` (warning) when a spec directory holds Markdown but no `ledger.json`, and names `design-rework`. When a records source exists, that route's primary `next_actions` entry becomes `design-derive` with the `--write` command above, followed by the read-only `validate.py ledger` confirmation. Deriving a ledger never grants approval: it records what the review records already assert.
+
+## 13. Surface Session Verification (`scripts/validate.py verify`)
+
+The enforceable half of `daw-verify` Rule 8. A UI-affecting change must record one executed session on the running product, walked as a named role, and this check refuses to certify it when the record is incomplete. Read-only; it never proves the session was actually walked — only that the record is complete and internally coherent.
+
+### CLI Invocation
+
+```bash
+python3 "$SKILL_DIR/scripts/validate.py" verify surface-session.json --project-root "$PROJECT_DIR" --stage complete --format json
+```
+
+Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage execute|complete` (default `complete`; `execute` validates shape only, so a partially walked session can be recorded in flight), `--format text|json`. Exit codes match §1.
+
+### Session Schema
+
+```json
+{
+  "role": "PETUGAS_TPS",
+  "viewports": [
+    {"width": 390, "height": 844},
+    {"width": 1440, "height": 900}
+  ],
+  "legs": [
+    {
+      "kind": "write",
+      "name": "create deposit for today",
+      "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
+      "wire": "POST /api/v1/deposits -> 201",
+      "message": "Setoran berhasil disimpan.",
+      "status": "passed"
+    },
+    {
+      "kind": "read_back",
+      "name": "reopen the deposits screen",
+      "interaction": "reload and read the saved row",
+      "wire": "GET /api/v1/deposits?date=2026-11-09 -> 200",
+      "message": "1 setoran hari ini",
+      "status": "passed"
+    }
+  ]
+}
+```
+
+### Checks
+
+- `surface_session_missing`, `surface_session_invalid`: no session object where one is required, or a non-object payload.
+- `surface_role_missing`: `role` absent or blank — a session must name the operator who walked it.
+- `surface_viewport_missing`, `surface_viewport_invalid`, `surface_viewport_pair_missing`: fewer than two viewports, a non-positive/non-integer width or height, or no phone (≤ 480 px) plus desktop (≥ 1024 px) pair.
+- `surface_legs_missing`, `surface_leg_invalid`, `surface_leg_kind_invalid`: no legs, a non-object leg, or a `kind` outside `write`/`read_back`/`non_staff`.
+- `surface_leg_kind_missing`: the session lacks a required `write` or `read_back` leg.
+- `surface_leg_field_missing`: blank `name`, `interaction`, `wire`, or `message` — the message is what the operator actually reads.
+- `surface_leg_wire_undetermined`: `wire` names no HTTP status, no `exit N`, and no `-> N`, so the outcome is unproven.
+- `surface_leg_status_invalid`, `surface_leg_not_passed`: status outside `passed`/`failing`/`unexercised`, or any non-`passed` status at `complete`.
+- `surface_declaration_invalid`, `surface_declaration_inferred`, `surface_session_ignored` (contract check only): an unknown `surface` value, a UI-shaped scope without the declaration (warning), or a recorded session that no declaration enforces (warning).
+
+### Output Envelope
+
+```json
+{
+  "valid": true,
+  "check": "verify",
+  "schema_version": 1,
+  "findings": [],
+  "limitations": [
+    "Structural only: verifies that a session is recorded and complete, never that it was walked against the real product.",
+    "Cannot prove the message shown to the operator matches the wire outcome; a fabricated pass is undetectable here.",
+    "Viewport pairing is width-based (phone <= 480 px, desktop >= 1024 px); other form factors are not judged."
+  ]
+}
+```
+
+### Relationship to `daw-verify`
+
+Rule 8 records the session as `details.surface_session` and states the coverage floor; this check enforces the parts a machine can decide (presence, required legs, viewport pair, wire outcome, message, `passed` status). Passing it never authorizes acceptance: the parent still inspects the recorded observations against the running product.

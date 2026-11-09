@@ -1,6 +1,6 @@
 ---
 name: daw-verify
-description: "Use to verify implementation changes against explicit claims, acceptance criteria, and observable runtime evidence. Enforces claim-check-actual observation of latest outputs, meaningful smoke tests (CLI, API, UI), full relevant regression suites, fresh failure scenarios before/after without rerunning user-reported errors solely to confirm, and zero tolerance for mock-based claims or dry-run-as-deploy proofs."
+description: "Use to verify implementation changes against explicit claims, acceptance criteria, and observable runtime evidence. Enforces claim-check-actual observation of latest outputs, meaningful smoke tests (CLI, API, UI), role-based surface sessions on the real running product at phone and desktop widths before any UI pass, full relevant regression suites, fresh failure scenarios before/after without rerunning user-reported errors solely to confirm, and zero tolerance for mock-based claims or dry-run-as-deploy proofs."
 compatibility: "POSIX shell, CLI/API/UI test frameworks, Python 3.10+; fully self-contained markdown procedure."
 ---
 
@@ -28,6 +28,7 @@ Invoke `daw-verify` when:
 - Pre-handoff verification is required before opening a PR, delivering to user, or marking a milestone complete.
 - A regression sweep is needed across affected packages, CLI endpoints, or API surfaces.
 - Fresh failure evidence must be captured before/after a fix.
+- A UI-affecting change needs a role-based surface session (Rule 8) — the write leg, the read-back leg, the non-staff surface when one exists, and phone/desktop viewports when layout changed.
 - Conducting convergence assessment and change impact verification against actual codebase, authoritative specifications, and latest runtime execution evidence.
 - Assembling pre-ship evidence handoff for `daw-ship`: verdict, exercised checks, regression counts, and limitations packaged as the evidence bundle the ship stage consumes for commit hygiene, PR, and release readiness.
 
@@ -110,6 +111,7 @@ Apply [Operational Rule Diagnostics](../../references/operations.md#operational-
 - Acceptance criteria must be validated against real runtime boundaries appropriate to the surface (real CLI execution, actual API responses, live UI DOM states — see §4 surface selection).
 - UI behavior MUST NOT be established solely by `curl`, source-code inspection, static descriptions, or mocks. A UI claim requires actual browser or desktop evidence matched to the claim and surface as specified in §4: semantic controls use DOM/AX when exposed; custom canvas, mirrored, or custom-drawn surfaces use actual pixels/screenshot/input, where missing AX alone does not block valid visual evidence. Do NOT force both DOM and screenshot for every UI claim.
 - If an external system cannot be contacted, mark the verification status explicitly as `Blocked` or `Unexercised`, never `Passed`.
+- For UI-affecting work the whole criterion must additionally survive the role-based surface session in Rule 8: one read-back leg, one write leg, the non-staff surface when the product has one, and both viewports when layout or navigation changed.
 
 ---
 
@@ -199,6 +201,41 @@ Inspect the actual codebase and latest runtime evidence against authoritative co
 - On `status: "pass"` for any code-changing route, package `details.pre_ship_evidence` — verdict, exercised checks (claim/check/actual), regression suite counts, convergence, coverage, and limitations — so `daw-ship` can consume current-revision evidence for commit hygiene, PR, and release readiness without re-running the suite. The verifier itself never commits, pushes, or opens PRs.
 - Multi-session or multi-commit work persists the task contract and `daw-verify` evidence in the repo under `docs/evidence/<task-id>/` (or the contract's evidence paths) before commit; inline-only acceptance is limited to single-session trivial/patch work (see [Operations §2](../../references/operations.md#inline-vs-json-representation)).
 
+### Rule 8: Role-Based Surface Session (UI-Affecting Work)
+
+A unit suite, an API probe, and a screenshot of a static page are three ways to be wrong about a UI at the same time. A UI-affecting change therefore needs **one executed session on the running surface, walked as a named role**, before any leg of it may be marked `passed`.
+
+What the session must record, per flow leg:
+
+1. **Interaction** — the actual action taken (navigate, type, click, submit) and its target surface/context.
+2. **Wire outcome** — where the leg writes or reads data, the observed transport result: HTTP status with endpoint, command exit code, or the equivalent observable. A visible success message with a hidden 4xx is a failing leg.
+3. **What the operator reads** — the user-visible message, empty state, or error text rendered by the product, in the product's own language. A leg whose message was never read is `unexercised`; an English server string leaking into an Indonesian UI is a finding, not a nitpick.
+
+Coverage floor:
+
+- The **write leg** (creating/updating through the UI), the **read-back leg** (the value is visible again after refresh), and the **non-staff surface** (member/portal/customer view) when the product has one.
+- **Two viewports** — phone width (≈390 px) and desktop width (≈1440 px) — whenever the change touches layout, navigation, or typography; a scroll container that hides overflow without an affordance counts as a finding.
+- Every role named in the change's AC is a session; a role that was only reasoned about is `unexercised`.
+
+Scoped N/A is allowed for: backend-only changes with no rendered surface, flows the product genuinely does not have, and read-only exploratory work. "I ran the unit tests instead" is never an N/A reason, and an API probe never substitutes for the leg that a human clicks.
+
+Record the session as `details.surface_session`:
+
+```json
+{"role": "PETUGAS_TPS",
+ "viewport": {"width": 1440, "height": 900},
+ "legs": [
+   {"name": "create deposit for today",
+    "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
+    "wire": "POST /api/v1/deposits -> 201",
+    "message": "Setoran berhasil disimpan."}
+ ]}
+```
+
+A leg that was never walked stays `unexercised` and blocks acceptance of the UI criterion it covers.
+
+**Mechanical enforcement:** `python3 "$SUITE_ROOT/scripts/validate.py" verify surface-session.json --project-root <project> --stage complete` checks the parts a machine can decide — role, both viewports, a `write` and a `read_back` leg, a wire outcome with a concrete status/exit, a non-blank operator message, and `passed` status on every leg. Declaring `surface: "ui"` in the task contract makes the same check mandatory at `contract --stage complete` (`surface_session_missing`, `surface_leg_not_passed`). Passing it never replaces the parent's inspection of the recorded observations.
+
 ---
 
 ## 5. Output Contract
@@ -207,7 +244,7 @@ Return a complete, observable JSON handoff before concluding this stage or advan
 
 - **Mandatory Runtime Evidence:** `details.checks` MUST include the actual executed check (shell command, native tool action, or explicitly cited equivalent), its target surface and session/context, expected exit code/status/observable state, observed exit code/status, and observed output/observation snippets (DOM/AX tree, screenshot reference, HTTP response, stdout/stderr). For UI checks record the tool actions performed and their observations, not only a shell invocation. Fabricated, dry-run, or mock evidence is prohibited; unavailable native capability is reported honestly as `blocked`/`unexercised`, never as a fabricated visual pass. Shell remains the proof method for non-UI (CLI/API/test-suite) surfaces. Runtime UI proof is distinct from mockup acceptance: mockup acceptance proves the reviewed mockup matched pre-build, while the runtime probe proves the shipped surface works.
 - **Result Snapshot & Evidence Binding (before claiming complete):** Before claiming complete, record the `result` snapshot (post-change snapshot after verify; `baseline` is the pre-change snapshot) and bind every evidence entry with its `sha256` (64 lowercase hex of the evidence file bytes) and `revision` equal to `result.revision`. Verify evidence must be produced against `result.revision`; any edit after recording `result` invalidates completion (`result_changed`) and requires re-verify. Evidence references must be durable on every stage (`evidence_not_durable` rejected). The validator never evaluates the semantic truth of evidence; the parent must open the evidence.
-- **Verification Payload:** Preserve `verification_verdict`, `summary`, `checks` (each binding claim -> check -> actual), `regressions` (suite and observed counts), `convergence`, `coverage` (all scoped criteria, justified exclusions, denominator, verified criteria and unverified gaps), and `limitations`. Mark missing execution honestly; never substitute example values or stale results for current observations.
+- **Verification Payload:** Preserve `verification_verdict`, `summary`, `checks` (each binding claim -> check -> actual), `regressions` (suite and observed counts), `convergence`, `coverage` (all scoped criteria, justified exclusions, denominator, verified criteria and unverified gaps), `surface_session` (Rule 8 role-based session, or a scoped N/A reason), and `limitations`. Mark missing execution honestly; never substitute example values or stale results for current observations.
 - **Finding output contract:** Returns only prioritized, evidence-backed, actionable findings (each with impact/urgency rationale and dependency where relevant), or an explicit no-actionable-finding statement with its scoped N/A/proof. Implemented work is reported as an integration candidate plus the verification it still needs — never a fake `needs-fix`. The parent re-ranks in the [Ranked Result Triage queue](../../references/operations.md#ranked-result-triage); the verifier never self-approves or deploys.
 
 Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
@@ -253,6 +290,18 @@ Illustrative `details` only (not a complete handoff; wrap in the canonical envel
     "failed": 0,
     "skipped": 0
   },
+  "surface_session": {
+    "role": "PETUGAS_TPS",
+    "viewport": { "width": 1440, "height": 900 },
+    "legs": [
+      {
+        "name": "create deposit for today",
+        "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
+        "wire": "POST /api/v1/deposits -> 201",
+        "message": "Setoran berhasil disimpan."
+      }
+    ]
+  },
   "convergence": {
     "implemented_verified": ["AC-01", "AC-02"],
     "implemented_unverified": [],
@@ -285,7 +334,8 @@ Verification is complete when:
 5. Every criterion is mapped to an inspectable primary observation comparing expected versus actual outcomes.
 6. No dry-runs are recorded as deployment/migration proofs.
 7. **Refactor / upgrade proof (route-specific):** Refactor — characterization and suite green before and after with identical behavior; upgrade — full regression plus build pass with lockfile diff included.
-8. **Result snapshot (complete only):** Before claiming complete, `result.revision` (post-change snapshot) is recorded, every evidence entry carries `sha256` and `revision` equal to `result.revision`, `validate.py contract --stage complete` passes, and no code has been edited after recording `result` (any such edit requires re-verify).
+8. **UI-affecting work (Rule 8):** `details.surface_session` records the write leg, the read-back leg, the non-staff surface when one exists, and both viewports when layout is touched — every leg carries its wire outcome and the operator-visible message, or a scoped N/A reason. An unwalked leg is `unexercised` and blocks acceptance.
+9. **Result snapshot (complete only):** Before claiming complete, `result.revision` (post-change snapshot) is recorded, every evidence entry carries `sha256` and `revision` equal to `result.revision`, `validate.py contract --stage complete` passes, and no code has been edited after recording `result` (any such edit requires re-verify).
 
 - **Post-release closure evidence rule:** For post-release feedback or incident fixes, verify code correctness on the current revision as scoped proof, but separately distinguish deployed proof: post-release evidence (log/health observation plus artifact digest and window on the released surface) is required before any production-resolution claim, and local test/staging evidence is recorded as local-only proof with production resolution explicitly unexercised. A verifier `pass` proposes parent acceptance of scoped evidence only; it never closes an incident or authorizes publication, and maintenance/monitoring remains opt-in per `references/operations.md` §6 and the post-release closure loop.
 

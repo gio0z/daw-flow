@@ -23,7 +23,7 @@
 - **Validator CLI & Engine:** [`scripts/validate.py`](scripts/validate.py) (CLI dispatch only: argparse, dispatch, exit codes)
   - Runtime: Python 3.10+ standard library only (`argparse`, `hashlib`, `json`, `os`, `pathlib`, `re`, `sys`, `urllib.parse`).
   - Dependencies: Zero third-party runtime dependencies; strictly read-only filesystem access; no network, no Git CLI execution, no subshell spawning.
-  - Subcommands: `package` (package integrity & link resolution), `contract` (JSON task contract lifecycle validation), `docs`, `ledger`, `config`, `status` (read-only aggregate preflight; see `references/validation.md` §10).
+  - Subcommands: `package` (package integrity & link resolution), `contract` (JSON task contract lifecycle validation, including the UI `surface_session` completion gate), `docs`, `ledger`, `config`, `status` (read-only aggregate preflight; see `references/validation.md` §10), `flow` (§11), and `verify` (§13).
   - Flat module layout in `scripts/` (no subpackages):
     - `scripts/daw_common.py`: shared helpers (strict JSON, frontmatter, bounded paths, SHA-256, finding helpers, `output_result`).
     - `scripts/check_package.py`: package integrity and link resolution (`validate_package`).
@@ -32,10 +32,14 @@
     - `scripts/check_ledger.py`: spec-ledger validation (`ledger`).
     - `scripts/check_config.py`: DAW configuration block validation (`config`), including `daw_version`.
     - `scripts/check_status.py`: aggregate `status` preflight composition (owns no rules of its own).
+    - `scripts/check_flow.py`: adopted best-practice flow mapping (`flow`).
+    - `scripts/check_surface.py`: role-based UI surface-session validation (`verify`), also consumed by `contract` at `complete`.
+- **Ledger Derivation Tool (the only writer):** [`scripts/derive_ledger.py`](scripts/derive_ledger.py) projects `<spec_dir>/ledger.json` from existing doc-transition records. It is deliberately **not** part of the read-only validator: it needs `--write` to emit the ledger, refuses to run when any error finding exists, and never invents a `sha256` — it copies only hashes declared by records whose document bytes still match. Markdown specifications stay the single hand-authored source; the ledger is a verified projection of the review records, never a re-pin of edited bytes.
 - **Behavioral Evaluations & Benchmarks (Developer Tooling):** [`tools/evaluation/evaluate.py`](tools/evaluation/evaluate.py), [`tools/evaluation/wizard_bench.py`](tools/evaluation/wizard_bench.py), and evaluation guides in [`docs/evaluation/`](docs/evaluation/) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
 - **Test Suites & Fixtures:**
   - [`tests/test_validate.py`](tests/test_validate.py): Standard library `unittest` verifying package checks, contract schemas, boundary traversal prevention, duplicate-key rejection, and stage transitions.
   - [`tests/test_route.py`](tests/test_route.py): Standard library `unittest` verifying route calculations, schema constraints, path containment, high-risk flags, error envelopes, and `--check-suite`.
+  - [`tests/test_surface.py`](tests/test_surface.py): Standard library `unittest` verifying surface-session shape rules and the contract completion gate that consumes them.
   - [`tests/fixtures/wizard-bench`](tests/fixtures/wizard-bench): Evaluation benchmark scenario fixtures (bookmark manager, expense tracker, log analyzer).
   - Test Execution: `python3 -m unittest discover -s tests -p "test_*.py"` or isolated test runners (`pytest`).
 - **Operational & Schema References:**
@@ -61,7 +65,7 @@
 ## Operational Directives for Agents
 
 1. **Standard Library Exclusivity:** All modifications to `scripts/validate.py` and `scripts/route.py` must use Python standard library only. Never introduce third-party runtime package dependencies.
-2. **Read-Only Inspection Engine:** The validator and route engine are strictly read-only. They inspect file trees, read file bytes for SHA-256 computation, and parse JSON/Markdown. They never write files, mutates filesystem nodes, or executes subprocesses.
+2. **Read-Only Inspection Engine:** The validator and route engine are strictly read-only. They inspect file trees, read file bytes for SHA-256 computation, and parse JSON/Markdown. They never write files, mutates filesystem nodes, or executes subprocesses. The single exception in the suite is `scripts/derive_ledger.py`, a separate generator that writes only `<spec_dir>/ledger.json` and only under an explicit `--write`; it is never invoked by `validate.py` or `route.py`.
 3. **Suite Routing & Dispatch:** Routing is governed declaratively by `references/suite-manifest.json` via `scripts/route.py REQUEST`. Router skills dispatch to specialized modules (`skills/daw-*`) rather than running flat monolithic procedures.
 4. **Deep Module Boundaries:** Modules do not call root router or each other recursively; each finishes with a clean handoff back to the orchestrator.
 5. **Distribution & Symlinks:** In installed environments, sibling directories symlink into the bundled `skills/daw-*` directories. Standalone compatibility claims are rejected; clients must keep the suite together.

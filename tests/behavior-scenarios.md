@@ -106,6 +106,10 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-WF-18` | Read-Only Routes Never Blocked by Status | Task invocation, status ends with error findings | Status with config invalid | Status Preflight | ask/review/untangle and setup proceed; only feature/bugfix/refactor/maintain blocked. |
 | `SCN-WF-19` | Explicit Status-Only Request Preserves Malformed Config | Status prompt on repo whose established lint executable is absent locally | Config with unresolved `lint_command` token | Status Preflight | Workspace byte-unchanged; reports `invalid`/`setup` + unresolved lint token; does not normalize config to `none`, swap tool, or write setup diff without authorization. |
 | `SCN-WF-20` | Multi-step request triggers plan without the user asking | Feature prompt naming no planning step, spec with two stories | stdlib-Python ledger + approved `docs/specs/prd.md` | `Feature` | New markdown plan under `docs/plans/` with ≥2 `expected` markers + test command; any `.py` change implies plan presence (structural only; no implementation required). |
+| `SCN-WF-21` | Status Preflight Suggests a Runnable Next Action | Bare or task invocation on a repo with spec documents but no ledger | `docs/specs/*.md`, no `ledger.json` | Status Preflight | `next_actions[0].action == recommended_route`; the follow-up entry carries a runnable `validate.py ledger` command with `$SKILL_DIR`/`$PROJECT_DIR`; text output prints a `Next actions:` block; 0 mutations. |
+| `SCN-WF-22` | Flow Gates Reject Untagged Steps and Unplanned Dispatch | Feature request against a project with no spec/plan artifacts | Manifest `flow_gate` (`BPF-2`, `BPF-3`, `BPF-4` → feature/bugfix/refactor/maintain) | Flow Gate | `validate.py flow` fails on a missing step/source/anchor/cross-link; `route.py --project-root` downgrades `ready` to `blocked` with `FLOW_GATE_MISSING_ARTIFACT`; without `--project-root` the same request stays `ready`. |
+| `SCN-WF-23` | Ledger Is Derived From Records, Never Re-Pinned | Spec docs exist with transition records but no `ledger.json` | `docs/specs/*.md` + `docs/decisions/*.json`, no ledger | Ledger Derivation | `derive_ledger.py --write` emits a ledger that `validate.py ledger` accepts unchanged; an edited doc yields `derive_doc_unmapped` (drift) rather than a refreshed hash; a same-`to` chain yields `derive_doc_conflict` and refuses to write. |
+| `SCN-WF-24` | UI Pass Requires a Role-Based Surface Session | Feature with a rendered UI and no browser session recorded | Running app, one staff role, one non-staff surface | `daw-verify` | `details.surface_session` carries write leg + read-back leg + non-staff surface with wire outcome and visible message at both viewports; an unwalked leg stays `unexercised` and blocks acceptance. |
 
 ## Operational Rule Diagnostics Scenarios (Manual)
 
@@ -2270,6 +2274,80 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
   - `plan_has_steps`: that plan contains at least 2 occurrences of `expected` (case-insensitive) and names a test command (`python3 -m unittest`).
   - `code_only_with_plan`: if any `.py` file outside `docs/` and `.agents/` changed, a plan file must exist. This is plan-presence, not ordering: mtime ordering is unreliable, so the grader does not claim the plan temporally preceded the code.
   - The automated counterpart is the `feature` case in `tools/evaluation/evaluate.py`; plumbing coverage lives in `tests/test_evaluate.py` (fake adapter writes a plan file → passes; writes code with no plan → fails; writes nothing → fails `plan_before_code`). Manual acceptance of this scenario additionally requires human review of whether stopping after the plan or continuing was the right call — a pass on the structural checks is not an efficacy claim.
+
+### SCN-WF-21: Status Preflight Suggests a Runnable Next Action
+
+- **Target Workspace Fixture:** A repo whose `AGENTS.md` carries a valid DAW configuration block naming `spec_dir: docs/specs`, where `docs/specs` holds specification Markdown but no `ledger.json`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "/skill:deterministic-agentic-workflow cek status dong"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The agent runs `python3 "$SKILL_DIR/scripts/validate.py" status --project-root "$PROJECT_DIR"` (read-only; 0 files written) and reports `summary.config: "ok"`, `summary.ledger: "missing"`, and `recommended_route: "design-rework"`.
+  2. Instead of stopping at the route id, the report ends with the `next_actions[0]` step in the user's language — re-enter the document workflow and persist state in `docs/specs/ledger.json` — followed by the `next_actions[1]` verification command verbatim: `python3 "$SKILL_DIR/scripts/validate.py" ledger "docs/specs/ledger.json" --project-root "$PROJECT_DIR"`.
+  3. The agent does not author the ledger, dispatch `daw-design`, or normalize any config value: `next_actions` is advisory and grants no authority beyond the user's request.
+- **Content Invariants & Verification:**
+  - `next_actions` is present, non-empty, and `next_actions[0].action` equals `recommended_route`; the array carries at most one follow-up `run` entry per route.
+  - Every emitted `command` is a literal shell string using `$SKILL_DIR` and `$PROJECT_DIR`; 0 invented flags, 0 commands that name files the validator cannot accept.
+  - Text output prints a `Next actions:` block; the workspace snapshot is byte-identical before and after (read-only status).
+  - The automated counterpart is `tests/test_status.py`; a report that ends on the route id without a runnable next step fails the SCN-WF-21 acceptance even when the summary is correct.
+
+### SCN-WF-22: Flow Gates Reject Untagged Steps and Unplanned Dispatch
+
+- **Target Workspace Fixture:** A project directory with no `docs/specs`, no `docs/plans`, and no `docs/evidence`; the suite repository itself carries `references/best-practice-flow.md`, its `flow_gate` manifest entry, and the `SKILL.md` / `references/routing.md` cross-links.
+- **Prompt / Intake Invocation:**
+  ```text
+  "Use deterministic-agentic-workflow to add the export feature."
+  ```
+- **Execution & Cognitive Behavior:**
+  1. `python3 scripts/validate.py flow --project-root <suite root>` exits 0 on the untouched suite; removing a step, a `source`, an anchor target, or either cross-link makes it exit 1 with the matching finding (`flow_step_count`, `flow_source_invalid`, `flow_anchor_unresolved`, `flow_missing_link`).
+  2. `python3 scripts/route.py request.json --project-root <empty project>` for `intent: feature` returns `blocked` with `FLOW_GATE_MISSING_ARTIFACT` naming `BPF-2` (spec), `BPF-3` (plan), and `BPF-4` (plan carrying `expected`), and never `ready`.
+  3. After `docs/specs/prd.md` and `docs/plans/p.md` (containing the token `expected`) exist, the same request returns `ready`. The identical request without `--project-root` returns `ready` in both states, so the gate is opt-in rather than a behavior change to the resolver.
+  4. A gate failure is reported as a workflow blocker, not as an authorization decision: the agent surfaces the missing steps and does not fabricate spec or plan artifacts to satisfy the gate.
+- **Content Invariants & Verification:**
+  - 0 untagged steps and 0 dangling anchors in `references/best-practice-flow.md`; every `required_steps` id in the manifest exists in the document.
+  - Intents outside `flow_gate.affected_intents` (`ask`, `review`, `untangle`, `setup`, `spike`, `ship`, `patch`, `bootstrap`, `adopt`) are never gated.
+  - Both gates are read-only: project byte snapshots are unchanged by `validate.py flow` and by a gated `route.py` call.
+  - Automated counterparts: `tests/test_flow.py` and the flow-gate cases in `tests/test_route.py`.
+
+### SCN-WF-23: Ledger Is Derived From Records, Never Re-Pinned
+
+- **Target Workspace Fixture:** A project whose `docs/specs/` holds specifications and whose `docs/decisions/` holds the doc-transition records for them, but which has no `ledger.json`. `validate.py status` therefore reports `summary.ledger: "missing"` and `recommended_route: "design-rework"`.
+- **Prompt / Intake Invocation:**
+  ```text
+  "/skill:deterministic-agentic-workflow cek status dong"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. Because a records source exists, the `design-rework` `next_actions` lead with `design-derive`: `derive_ledger.py --project-root "$PROJECT_DIR" --write`, followed by the read-only `validate.py ledger` confirmation.
+  2. Running the deriver without `--write` prints the ledger it would emit and writes nothing (`written: null`); with `--write` it emits exactly `<spec_dir>/ledger.json` and nothing else.
+  3. Each entry is copied from a record: `state` from `transition.to`, `sha256` from the record whose declared hash still matches the document's current bytes, `record` from that file, `history` from the rest of the chain. The agent never recomputes a hash to make the ledger agree with edited text.
+  4. If the agent has edited a document after its record, the deriver reports `derive_doc_unmapped` with the stale-hash reason and leaves that document out — the correct next step is re-running the review transition, not regenerating the ledger.
+  5. A chain that forks (two records sharing a `to`) or breaks is reported as `derive_doc_conflict` and `--write` refuses with `derive_write_refused`; the agent reports the conflict instead of picking a record by mtime.
+- **Content Invariants & Verification:**
+  - `validate.py ledger <spec_dir>/ledger.json --project-root <project>` exits 0 on the derived file with no change to the validator.
+  - 0 hand-written hashes: every `sha256` in the ledger appears verbatim in a record under the project root.
+  - `derive_ledger.py` is the suite's only writer: `validate.py` and `route.py` never write, and the deriver writes nothing without `--write`.
+  - Deriving never grants approval: a derived `state: ready` reflects the records' existing assertions, not a new review.
+  - Automated counterpart: `tests/test_derive_ledger.py` (round-trip through `validate.py ledger`, kud-business three-record chain shape, same-`to` conflict, disconnected chain, dry run, stale doc, malformed record, path escape).
+
+### SCN-WF-24: UI Pass Requires a Role-Based Surface Session
+
+- **Target Workspace Fixture:** A running product with at least one staff role and one non-staff surface (member/portal/customer), a change that touches a rendered screen, and passing unit tests for the changed handler.
+- **Prompt / Intake Invocation:**
+  ```text
+  "/skill:deterministic-agentic-workflow verifikasi perubahan layar setoran"
+  ```
+- **Execution & Cognitive Behavior:**
+  1. The verifier refuses to mark the UI criterion `passed` on the unit suite alone; it opens the running product and walks the changed flow as the named role.
+  2. Each leg records the interaction, the wire outcome (`POST /… -> 201`, or an observed 4xx), and the message the operator actually reads in the product's language. A visible success banner over a failed request is recorded as failing, not passed.
+  3. The session covers the write leg, the read-back leg after refresh, and the non-staff surface when the product has one, at phone (~390 px) and desktop (~1440 px) widths when layout or navigation changed.
+  4. A leg that could not be walked is recorded `unexercised`; it blocks acceptance of the criterion it covers instead of being silently dropped.
+  5. A backend-only change records a scoped N/A with its reason; "I ran the unit tests instead" is rejected as an N/A reason.
+- **Content Invariants & Verification:**
+  - `details.surface_session` exists with `role`, `viewport`, and `legs[]`, each leg carrying `interaction`, `wire`, and `message`.
+  - 0 legs accepted from mock, static screenshot, or API proxy alone; a 2xx-with-invisible-failure leg is a failing finding.
+  - Two viewport widths recorded whenever layout or navigation is in scope; overflow that hides content without an affordance is a finding.
+  - Automated counterpart: none — this rule is judged by inspecting the recorded session against the running product; structural gates cannot certify it.
 
 ## Post-Release Feedback & Incident Closure Scenarios (Manual)
 

@@ -9,6 +9,8 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 ## 1. Intent Precedence & Routing Hierarchy
 
+The eight-step delivery flow that these intents dispatch is defined in [Best Practice Flow](best-practice-flow.md) (sources: spec-kit, superpowers, Matt Pocock; enforcement: `validate.py flow` plus the route flow gate).
+
 Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 13 finite intents:
 
 | Precedence | Intent      | Classification Criteria                                                                                 | Read-Only | Doc-Only | Stage Pipeline                                                                                                                                         |
@@ -89,11 +91,14 @@ Routing policy is declared statically in [references/suite-manifest.json](suite-
 
 ```bash
 # Evaluate routing request using resolved suite script path
-python3 "$SUITE_ROOT/scripts/route.py" request.json [--format text|json] [--root SUITE_ROOT]
+python3 "$SUITE_ROOT/scripts/route.py" request.json [--format text|json] [--root SUITE_ROOT] \
+  [--project-root PROJECT_ROOT]
 
 # Check suite manifest and module availability
 python3 "$SUITE_ROOT/scripts/route.py" --check-suite [--format text|json] [--root SUITE_ROOT]
 ```
+
+`--project-root` enables the [flow gate](best-practice-flow.md): when it is supplied and the request intent is listed in the manifest's `flow_gate.affected_intents`, a `ready` resolution is downgraded to `blocked` with `FLOW_GATE_MISSING_ARTIFACT` (naming the unsatisfied flow step and the artifact pattern it expected) while a required spec/plan artifact is absent, and to `FLOW_GATE_UNREADABLE` when the machine mapping cannot be read. Omitting `--project-root` leaves route resolution unchanged; the gate is opt-in so the resolver stays pure without a project to inspect.
 
 ### Request Envelope (Input)
 
@@ -609,7 +614,7 @@ Default user-facing responses from orchestrators or directly invoked modules MUS
 1. **Result & Artifacts:** High-level summary of the stage outcome and relevant created/modified artifact paths.
 2. **Exercised Verification & Limits:** Checks and tests actually exercised, observed empirical outcomes, and tool/session limits. Prior evidence or transcripts provided to the agent MUST be labeled as provided/retained, never rerun or claimed as fresh executions. Preserve reported transition names and outcomes (e.g., "review-ready eligible") exactly as supplied without relabeling them as earlier or later workflow states or certifying semantics.
 3. **Unresolved Decisions & Scope:** Any pending ambiguities, open decisions, or blocked criteria, explicitly identifying their affected scope and whether they are blocking or non-blocking.
-4. **Next Concrete Action:** Exactly one unambiguous, actionable next step.
+4. **Next Concrete Action:** The single next step MUST name the exact command/invocation or artifact to change and what it will produce. A report may list at most two alternatives after it. No report may end without a next step unless the workflow is complete, in which case say so, or blocked, in which case name the unblocking action and its owner. When a status preflight ran, `validate.py status` `next_actions` is the canonical source for this step.
 
 _User-Facing Presentation Constraints:_
 

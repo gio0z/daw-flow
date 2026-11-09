@@ -402,6 +402,15 @@ def output_result(result: dict[str, Any], fmt: str) -> None:
             print(f"Summary: {json.dumps(result['summary'], sort_keys=False)}")
         if "recommended_route" in result:
             print(f"Recommended route: {result['recommended_route']}")
+        if "next_actions" in result:
+            actions = result["next_actions"]
+            if actions:
+                print("Next actions:")
+                for entry in actions:
+                    mode = "blocking" if entry.get("blocking") else "non-blocking"
+                    print(f"  - {entry['action']} [{entry['kind']}, {mode}]: {entry['why']}")
+                    if entry.get("command"):
+                        print(f"        {entry['command']}")
         if result["findings"]:
             print("\nFindings:")
             for f in result["findings"]:

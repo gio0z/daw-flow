@@ -11,6 +11,11 @@ import re
 from typing import Any, Callable
 
 try:
+    from scripts.check_surface import (
+        SURFACE_UI,
+        validate_surface_declaration,
+        validate_surface_session,
+    )
     from scripts.daw_common import (
         CANONICAL_DOC_STEMS,
         SCHEMA_VERSION,
@@ -20,6 +25,11 @@ try:
         resolve_bounded_path,
     )
 except ImportError:
+    from check_surface import (  # type: ignore[import-not-found]
+        SURFACE_UI,
+        validate_surface_declaration,
+        validate_surface_session,
+    )
     from daw_common import (  # type: ignore[import-not-found]
         CANONICAL_DOC_STEMS,
         SCHEMA_VERSION,
@@ -373,7 +383,7 @@ def _check_result(
         if not isinstance(result_data, dict):
             add_error("invalid_result", "result", "Result must be an object if present.")
         else:
-            ALLOWED_RESULT_FIELDS = {"revision", "files"}
+            ALLOWED_RESULT_FIELDS = {"revision", "files", "surface_session"}
             has_unknown_res = False
             for rk in result_data.keys():
                 if rk not in ALLOWED_RESULT_FIELDS:
@@ -434,6 +444,31 @@ def _check_result(
     else:
         if stage == "complete":
             add_error("missing_result", "result", "Stage 'complete' requires a result object.")
+
+    declared_surface = contract_data.get("surface")
+    operation = contract_data.get("operation")
+    scope = operation.get("scope") if isinstance(operation, dict) else None
+    for finding in validate_surface_declaration(declared_surface, scope):
+        emit = add_error if finding["severity"] == "error" else add_warning
+        emit(finding["code"], finding["path"], finding["message"])
+
+    is_ui = declared_surface == SURFACE_UI
+    if is_ui:
+        session = result_data.get("surface_session") if isinstance(result_data, dict) else None
+        findings = validate_surface_session(
+            session,
+            prefix="result.surface_session",
+            enforce_passed=stage == "complete",
+            required=stage == "complete",
+        )
+        for finding in findings:
+            add_error(finding["code"], finding["path"], finding["message"])
+    elif isinstance(result_data, dict) and "surface_session" in result_data:
+        add_warning(
+            "surface_session_ignored",
+            "result.surface_session",
+            "surface_session is recorded but `surface` is not \"ui\"; declare the surface to have it enforced.",
+        )
 
     if result_revision is not None and baseline_revision is not None and result_revision == baseline_revision:
         add_error("result_revision_unchanged", "result.revision", "result.revision must differ from baseline.revision.")
@@ -564,6 +599,7 @@ def validate_contract(
         "approval",
         "evidence",
         "result",
+        "surface",
     }
     REQUIRED_TOP_FIELDS = {
         "schema_version",

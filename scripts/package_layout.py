@@ -16,6 +16,9 @@ OPERATIONAL_SCRIPTS = (
     "scripts/check_ledger.py",
     "scripts/check_config.py",
     "scripts/check_status.py",
+    "scripts/check_flow.py",
+    "scripts/check_surface.py",
+    "scripts/derive_ledger.py",
     "scripts/package_layout.py",
 )
 
