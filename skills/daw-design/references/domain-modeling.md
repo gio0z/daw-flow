@@ -74,3 +74,38 @@ When architectural constraints shift, **NEVER rewrite or delete past decision re
 
 - Historical ADRs document why a choice was sound under historical conditions.
 - Record changes in a new ADR that explicitly references the old one (`Supersedes: ADR-XXX`), updating the old record status to `Superseded`.
+
+---
+
+## 4. Decision Tickets & Frontier Questions
+
+Adopted from Matt Pocock's `wayfinder:map`: unresolved material decisions are tracked as **decision tickets** — child issues of a decision map, each holding exactly one question whose resolution is a _decision_, not a slice of build to execute. A decision ticket is distinct from an implementation ticket; the `decision` qualifier is what keeps it separate.
+
+### When to use
+
+Create a decision ticket when a material architectural or business choice is unresolved and blocks dependent scope:
+
+- The choice has no reasonable default and cannot be resolved from workspace evidence.
+- Downstream tasks depend on the outcome (e.g. storage model, auth boundary, API shape).
+- The choice is hard to reverse once implemented.
+
+### Decision ticket fields
+
+Each decision ticket carries:
+
+- **Question** — one material question, phrased as an either/or or bounded choice.
+- **Frontier position** — which upstream prerequisite it waits on (or "root" if none).
+- **Recommended option + rationale** — agent's grounded recommendation, never a false dichotomy.
+- **Triage role** — `needs-triage` (unasked), `ready-for-afk` (answered, safe to proceed), or `blocked` (depends on another open decision).
+- **Resolution** — once answered, the decision and its rationale; record it in the authoritative spec or ADR.
+
+### Frontier discipline
+
+- Decision tickets sit on the active dependency frontier: only unresolved material trade-offs whose prerequisites are settled.
+- Dependent decisions are sequenced one at a time; independent orthogonal decisions may be batched (max 5 per grilling round per [Shared Grilling Protocol](../../../references/grilling.md)).
+- Downstream numeric parameters, thresholds, or timeouts must not be recommended as fixed defaults before the upstream prerequisite decision resolves.
+- When an upstream input changes, reopen every dependent decision ticket and return it to the frontier.
+
+### Glossary & Avoid list
+
+The project glossary holds canonical domain terms with an `Avoid:` list of rejected aliases. During authoring, challenge conflicting or fuzzy terms that map to the same concept; preserve genuine terminology conflicts as unresolved decision tickets until a legitimate decision is reached. The glossary holds no implementation details (no DDL, function bodies, or file paths).

@@ -202,7 +202,9 @@ def is_valid_historical_suite(root: Path) -> bool:
 
     expected_modules, expected_routes = matched_profile
     for mod_name, mod_info in modules.items():
-        if not isinstance(mod_info, dict) or set(mod_info.keys()) != {"path", "description"}:
+        if not isinstance(mod_info, dict):
+            return False
+        if not {"path", "description"}.issubset(set(mod_info.keys())):
             return False
         if not isinstance(mod_info.get("path"), str) or not isinstance(mod_info.get("description"), str):
             return False
@@ -212,8 +214,17 @@ def is_valid_historical_suite(root: Path) -> bool:
         if not mod_file.is_file():
             return False
     for r_name, r_expected in expected_routes.items():
-        if routes.get(r_name) != r_expected:
+        route_actual = routes.get(r_name)
+        if not isinstance(route_actual, dict):
             return False
+        # Compare canonical keys only; ignore optional enterprise keys.
+        canonical_route_keys = {
+            "documentation_only", "read_only", "stages", "stages_clear", "stages_unclear",
+            "evaluates_workspace", "allow_unclear_requirements",
+        }
+        for ck in canonical_route_keys:
+            if ck in r_expected and route_actual.get(ck) != r_expected[ck]:
+                return False
     return True
 
 

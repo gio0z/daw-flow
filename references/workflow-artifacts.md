@@ -122,6 +122,8 @@ Read-only modules and reviewers never write progress records and never gain writ
 
 UI-affecting work requires an actual inspectable rendered visual mockup before UI implementation, derived from settled domain/flow and the existing design source. Prose, ASCII, or wireframe-only descriptions do not satisfy this requirement. An existing matching mockup may be reused. Mockup selection is an optional capability step inside the existing UI/design stage, not a new workflow stage; UI implementation follows visual review.
 
+Before the mockup/UI-build handoff, settle the **component source** once via the [canonical native clarification transport](grilling.md#native-interactive-clarification-transport-canonical-rule): reuse the project's own components/design system, reuse components the current session's design-component capability actually exposes (e.g. React Bits, MicroKit, Motion, lucide-react when callable), or let the design stage recommend after inspecting the stack. Record it in `details.component_source` (own/mcp/recommend/na, exact refs, whether a new dependency was authorized). The question is optional; a sensible default (recommend after inspection) is acceptable. Never install, fetch, or publish external components without authorization, and component-source selection never substitutes for the rendered mockup itself.
+
 ### Capability discovery & tool selection
 
 At the mockup step, discover which design capabilities are actually accessible to the agent in this session (callable tools, not merely installed software or vendor availability). No installation, account, or vendor dependency is mandated or prompted.
@@ -150,3 +152,90 @@ Preserve the default six baseline docs (blueprint, prd, frd, techstack, security
 - No new tools, runtime, storage daemon, crash recovery, or background enforcement. This is a procedural persistence contract; the parent holds workflow state.
 - Optional worker retention (continued completed-worker identity in the owning session) remains distinct from this durable-artifact contract. See [Persistent Worker Graphs](operations.md#persistent-worker-graphs-harness-native). This reference is required for multi-step work regardless of retention availability.
 - Chat payloads, native todo lists, or session memory alone cannot substitute for the saved plan or progress record for multi-step work.
+
+---
+
+## 7. Spec Quality Checklist — "Unit Tests for Requirements"
+
+Before a spec is handed to `daw-plan`, the authoring module produces a lightweight spec quality checklist at `<spec_dir>/<workflow-id>/checklists/requirements.md` (or a single checklist section inside a lean combined document). It is the spec's own acceptance gate: `[x]` means the requirements-quality criterion is satisfied, not that implementation is complete. The checklist is reviewer-owned; implementation must not silently self-approve it.
+
+Adopted from Spec Kit's `/speckit.checklist` and `/speckit.specify` quality validation:
+
+```markdown
+# Spec Quality Checklist — <workflow-id>
+
+**Purpose**: Validate specification completeness and quality before `__PLAN__`.
+**Feature**: <link to spec>
+**Constitution**: <link to references/constitution.md>
+
+## Content Quality
+
+- [ ] WHAT and WHY stated; no implementation details (languages, frameworks, APIs, DDL, file paths) leak into the spec
+- [ ] Focused on user value and business needs; written for the spec's target reader
+- [ ] All mandatory sections completed; no placeholder sections left as TBD
+
+## Requirement Completeness
+
+- [ ] No unresolved material unknowns beyond the allowed `[Open Question]` budget (max 3 per document)
+- [ ] Requirements are testable and unambiguous (EARS: observable condition/response/oracle)
+- [ ] Success criteria are measurable and technology-agnostic
+- [ ] All acceptance scenarios defined, including edge cases and negative/no-change cases
+- [ ] Scope explicitly bounded with an out-of-scope line
+- [ ] Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [ ] Every functional requirement maps to at least one acceptance criterion
+- [ ] User scenarios cover primary flows
+- [ ] Feature meets the measurable outcomes defined in Success Criteria
+- [ ] No implementation details leak into the specification
+
+### Done when
+
+All items `[x]`; any failing item returns the spec to `daw-design` for rework before `daw-plan` is dispatched.
+```
+
+A spec with unresolved checklist items is `blocked` at the `authoring-review` → planning boundary; `daw-plan` must not consume a spec whose checklist is incomplete.
+
+---
+
+## 8. Analyze — Read-Only Cross-Artifact Consistency Check
+
+Before `daw-build` consumes a plan, run a read-only consistency analysis across the spec, plan, and (where present) tasks. Adopted from Spec Kit's `/speckit.analyze`.
+
+`daw-plan`'s readiness self-check (Contract §F) performs this internally and records `details.readiness_self_check`. The analysis must surface:
+
+- A task with no matching requirement or acceptance criterion (orphan task)
+- A requirement or acceptance criterion with no mapping task (unmapped criterion)
+- A plan choice that contradicts the spec or the [constitution](constitution.md)
+- An interface consumed by a task that no earlier task produces (dangling interface)
+
+The analysis never edits files; it produces a report and optional remediations for the parent to approve. If it surfaces issues, return to the step that owns them: `/daw-design` for requirement problems, `daw-plan` for design problems, then re-run the self-check until clean. The analysis is read-only and adds no route stage.
+
+---
+
+## 9. Converge — Append-Only Gap Assessment After Implementation
+
+After `daw-implement` (the active route's build stage) has run against the current tasks, run a converge assessment. Adopted from Spec Kit's `/speckit.converge`.
+
+Converge assesses the codebase against the feature's spec, plan, and tasks to confirm nothing was missed. It is **append-only**: it never edits or deletes existing code or tasks; its only possible write is appending newly discovered gap tasks to the plan/task record.
+
+It resolves to one of two outcomes:
+
+- **Converged** — no gaps found. The task record is left byte-for-byte unchanged. Proceed to review or verification.
+- **Tasks appended** — gaps found. Converge appends them as new tasks under a Convergence section and reports how many. Re-run the build stage to complete them, then converge again. Each pass finds fewer items; repeat until it reports converged.
+
+Converge preserves existing task IDs and history; it never duplicates pending tasks or repeats identical missing work. It appends only genuine uncovered work inside accepted scope.
+
+---
+
+## 10. Feature Directory Convention
+
+When a project has no established spec directory convention, organize multi-step work under `<spec_dir>/<NNN>-<short-name>/`:
+
+- `<NNN>` — next available 3-digit number after scanning existing directories (sequential), or a `YYYYMMDD-HHMMSS` timestamp prefix when the project opts into timestamp numbering.
+- `<short-name>` — 2–4 word action-noun slug capturing the feature essence (e.g. `session-token-rotation`, `auth-refresh-endpoint`).
+
+Inside: `spec.md`, plus `plan.md`, `progress.md`, and `checklists/requirements.md` as needed. The spec directory name and any git branch name are independent; they may differ by design. The resolved feature directory path is persisted to `.specify/feature.json` (or the project's equivalent) so downstream commands locate it without relying on branch-name conventions.
+
+The DAW defaults (`docs/specs/<workflow-id>.md`, `docs/plans/<workflow-id>.md`, `docs/workflows/<workflow-id>.md`) remain the lean single-document alternative and are preferred for small, localized work. Use the feature directory form when the work spans multiple files, stories, or sessions.

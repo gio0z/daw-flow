@@ -53,9 +53,10 @@ The design module governs structural analysis, architectural evaluation, domain 
   - Read [Builder-Readiness Protocol](references/builder-readiness.md) ONLY before substantive design handoff (new services, modified data schemas, multi-module refactoring) to inspect material seams; skip for minimal, routine, or localized changes.
   - Read [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) ONLY when evaluating multi-module refactoring boundaries, decomposing tightly coupled components, or auditing proposed architecture for hidden links and surplus indirection; skip for routine or localized additions.
 - **Mandatory Governance Loading:**
-  - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
+  - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema), canonical routing (`../../references/routing.md` §5 & §6), and the project constitution (`../../references/constitution.md`). Reading governance documentation is not recursive router execution.
   - Before performing any state mutations or file writes, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
   - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Local specification authoring requires no production credentials.
+  - Every authored or updated specification must argue from the constitution and state which constitutional rules the phase touches; a phase that contradicts a rule is `blocked`, not a judgment call.
 
 ---
 
@@ -156,6 +157,11 @@ The design module governs structural analysis, architectural evaluation, domain 
 3. Classify open items into **Blocking Unknowns** (halt handoff; resolve or escalate) versus **Safe Reversible Choices** (document sensible default with rationale; proceed autonomously).
 4. Report structural readiness, not runtime proof: design status `pass` validates specification completeness, never runtime execution or deployment.
 5. If independent review is warranted for high-risk designs, recommend delegation to `daw-review` via the parent router; NEVER invoke other modules recursively.
+6. **Component Source Selection (UI-affecting work, optional):** When the design covers a visual UI, settle the component source once — using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule) — before UI build handoff, then record it in `details.component_source`:
+   - _Own components/design system:_ reuse the repository's existing components, tokens, and conventions; no new dependency.
+   - _Available MCP design components:_ reuse components the current session's design-component capability actually exposes (e.g. React Bits, MicroKit, Motion, lucide-react when actually callable). Discover the accessible toolset first; never assume availability or hardcode a library.
+   - _Recommend after inspection (default when no preference):_ choose after inspecting the existing stack and design system; record the recommendation and rationale.
+     The question is optional; a sensible default is acceptable when the user has no preference. Never install, fetch, or publish external components without authorization. A matching rendered mockup remains required per [Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na); component-source selection never substitutes for it.
 
 ### Step 7: Classify Author Decisions vs. Consequential Decisions
 
@@ -179,6 +185,7 @@ Preserve these module-specific fields under `details`, using empty collections o
 - `spike_recommendation`: present when a technical unknown should go to the `spike` route instead of further documents: `{question, rationale}`.
 - `domain_modeling`: `disambiguated_terms`, `adr_references`, and `convention_path`, respecting domain/ADR gates and repository conventions.
 - `builder_readiness`: `substantive_design`, `seams_checked`, `blocking_unknowns`, `safe_reversible_choices`, `mockup_readiness`, and `readiness_verdict`; disclose waived inspection for localized work. `mockup_readiness` is `{required: bool, status: "reviewed"|"na"|"blocked", ref: "path or null", req_ac_screen_ids: [...], states_viewports_focus: "...", capability: "actual available tool or null", blocks_ui_only: bool}` — `required: false` with scoped rationale for no-UI/small nonvisual reuse; `blocked` only when the affected UI scope lacks direction/capability.
+- `component_source`: `{required: bool, source: "own"|"mcp"|"recommend"|"na", refs: [...], new_dependency: bool, rationale: "..."}` — for UI-affecting work, records the settled component source (own design system, actually available MCP design components, or `recommend` after inspection); `required: false` with scoped rationale for no-UI work; `refs` lists exact component/tool references; `new_dependency` is `true` only when a new dependency was explicitly authorized.
 - `interface_contracts`: material consumer inputs/outputs and failure contracts, with provenance for unsettled proposals.
 - `consequential_decisions`: `requires_user_approval` and `items`, kept separate from routine author decisions and operational authorization.
 - `sync_impact_report`: `version_change`, `modified_principles`, `added_sections`, `removed_sections`, and `downstream_artifacts_to_sync` when governance or foundations change.
@@ -262,6 +269,7 @@ Before finalizing handoff from `daw-design`, verify:
 - [ ] Governance or principle changes include structured sync impact reporting with downstream artifacts flagged for synchronization.
 - [ ] Feature requirements structured as prioritized, independently testable user journeys (P1, P2...) with EARS oracles per [EARS Semantic Guidance](../../references/document-quality.md#acceptance-criteria-ears); authoritative spec persisted before tactical planning per [Workflow Artifacts](../../references/workflow-artifacts.md).
 - [ ] Canonical shared delivery contract (`references/document-quality.md#feature-delivery-contract` sections A, B, and C) satisfied.
+- [ ] Constitution compliance: specification argues from `../../references/constitution.md`; each touched rule named and confirmed unviolated; any contradiction exits `blocked` instead of a judgment call.
 - [ ] No recursive module dispatch attempted; independent review recommendations directed to parent router.
 
 ---
@@ -287,5 +295,6 @@ _Reference Links:_
 - [Shared Grilling Protocol](../../references/grilling.md)
 - [Domain Modeling Protocol](references/domain-modeling.md)
 - [Builder-Readiness Protocol](references/builder-readiness.md)
+- [Project Constitution](../../references/constitution.md)
 - [Shared Routing Contract](../../references/routing.md)
 - [Parent Specification](../../SKILL.md)

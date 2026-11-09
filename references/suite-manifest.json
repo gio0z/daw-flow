@@ -4,51 +4,75 @@
   "modules": {
     "daw-design": {
       "path": "skills/daw-design/SKILL.md",
-      "description": "System architecture, technical requirements & specification design"
+      "description": "System architecture, technical requirements & specification design",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-plan": {
       "path": "skills/daw-plan/SKILL.md",
-      "description": "Structured task planning, phase breakdowns & risk assessment"
+      "description": "Structured task planning, phase breakdowns & risk assessment",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-ship": {
       "path": "skills/daw-ship/SKILL.md",
-      "description": "Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness"
+      "description": "Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-debug": {
       "path": "skills/daw-debug/SKILL.md",
-      "description": "Root cause analysis, reproduction & failure diagnostics"
+      "description": "Root cause analysis, reproduction & failure diagnostics",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-build": {
       "path": "skills/daw-build/SKILL.md",
-      "description": "Implementation, code editing & minimal change construction"
+      "description": "Implementation, code editing & minimal change construction",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-review": {
       "path": "skills/daw-review/SKILL.md",
-      "description": "Two-stage code review, boundary compliance & security audit"
+      "description": "Two-stage code review, boundary compliance & security audit",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-verify": {
       "path": "skills/daw-verify/SKILL.md",
-      "description": "Verification, testing, behavioral validation & evidence checks"
+      "description": "Verification, testing, behavioral validation & evidence checks",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-workspace": {
       "path": "skills/daw-workspace/SKILL.md",
-      "description": "Isolated workspace/worktree setup & lifecycle management"
+      "description": "Isolated workspace/worktree setup & lifecycle management",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-ask": {
       "path": "skills/daw-ask/SKILL.md",
-      "description": "Read-only advisory, guidance & architecture consultation"
+      "description": "Read-only advisory, guidance & architecture consultation",
+      "maturity": "stable",
+      "bucket": "engineering"
     },
     "daw-setup": {
       "path": "skills/daw-setup/SKILL.md",
-      "description": "Interactive configuration setup, tool command discovery & project conventions"
+      "description": "Interactive configuration setup, tool command discovery & project conventions",
+      "maturity": "stable",
+      "bucket": "productivity"
     },
     "daw-wizard": {
       "path": "skills/daw-wizard/SKILL.md",
-      "description": "Interactive greenfield requirements interview, architecture scoping & specification generation"
+      "description": "Interactive greenfield requirements interview, architecture scoping & specification generation",
+      "maturity": "stable",
+      "bucket": "productivity"
     },
     "daw-untangle": {
       "path": "skills/daw-untangle/SKILL.md",
-      "description": "Read-only structural analysis, change coupling & boundary investigation"
+      "description": "Read-only structural analysis, change coupling & boundary investigation",
+      "maturity": "stable",
+      "bucket": "engineering"
     }
   },
   "routes": {
@@ -57,14 +81,20 @@
       "read_only": false,
       "stages": ["daw-wizard", "daw-design", "daw-plan"],
       "allow_unclear_requirements": true,
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {}
     },
     "adopt": {
       "documentation_only": true,
       "read_only": false,
       "stages": ["daw-design", "daw-plan"],
       "allow_unclear_requirements": true,
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {}
     },
     "feature": {
       "documentation_only": false,
@@ -77,7 +107,26 @@
         "daw-review",
         "daw-verify"
       ],
-      "evaluates_workspace": true
+      "evaluates_workspace": true,
+      "conditional_stages": [
+        {
+          "stage": "daw-design",
+          "if": "requirements == 'unclear'",
+          "insert_before": "daw-plan"
+        },
+        {
+          "stage": "daw-review",
+          "if": "risk == 'high'",
+          "insert_before": "daw-build",
+          "duplicate_allowed": true
+        }
+      ],
+      "parallel_groups": [["daw-review", "daw-verify"]],
+      "extension_hooks": {
+        "before_plan": [],
+        "after_build": [],
+        "before_verify": []
+      }
     },
     "bugfix": {
       "documentation_only": false,
@@ -89,38 +138,66 @@
         "daw-review",
         "daw-verify"
       ],
-      "evaluates_workspace": true
+      "evaluates_workspace": true,
+      "conditional_stages": [],
+      "parallel_groups": [["daw-review", "daw-verify"]],
+      "extension_hooks": {
+        "before_debug": [],
+        "after_build": [],
+        "before_verify": []
+      }
     },
     "patch": {
       "documentation_only": false,
       "read_only": false,
       "stages": ["daw-build", "daw-verify"],
-      "evaluates_workspace": true
+      "evaluates_workspace": true,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {
+        "before_build": [],
+        "after_verify": []
+      }
     },
     "review": {
       "documentation_only": false,
       "read_only": true,
       "stages": ["daw-review"],
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {
+        "before_review": [],
+        "after_review": []
+      }
     },
     "untangle": {
       "documentation_only": false,
       "read_only": true,
       "stages": ["daw-untangle"],
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {}
     },
     "ask": {
       "documentation_only": false,
       "read_only": true,
       "stages": ["daw-ask"],
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {}
     },
     "setup": {
       "documentation_only": true,
       "read_only": false,
       "stages": ["daw-setup"],
       "allow_unclear_requirements": true,
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {}
     },
     "refactor": {
       "documentation_only": false,
@@ -132,25 +209,50 @@
         "daw-review",
         "daw-verify"
       ],
-      "evaluates_workspace": true
+      "evaluates_workspace": true,
+      "conditional_stages": [],
+      "parallel_groups": [["daw-review", "daw-verify"]],
+      "extension_hooks": {
+        "before_untangle": [],
+        "after_build": [],
+        "before_verify": []
+      }
     },
     "maintain": {
       "documentation_only": false,
       "read_only": false,
       "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
-      "evaluates_workspace": true
+      "evaluates_workspace": true,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {
+        "before_plan": [],
+        "after_build": [],
+        "before_verify": []
+      }
     },
     "spike": {
       "documentation_only": false,
       "read_only": false,
       "stages": ["daw-workspace", "daw-build", "daw-ask"],
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {
+        "after_build": []
+      }
     },
     "ship": {
       "documentation_only": false,
       "read_only": false,
       "stages": ["daw-ship"],
-      "evaluates_workspace": false
+      "evaluates_workspace": false,
+      "conditional_stages": [],
+      "parallel_groups": [],
+      "extension_hooks": {
+        "before_ship": [],
+        "after_ship": []
+      }
     }
   }
 }

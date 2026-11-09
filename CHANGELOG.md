@@ -2,6 +2,30 @@
 
 Convention: every entry with breaking or newly-enforced rules MUST include a `### Project migration` subsection (artifact, finding code or `manual`, fix route).
 
+## Unreleased — Enterprise Router, Native Clarification & Component Source
+
+### Added
+
+- `references/constitution.md`: project principles every later phase is evaluated against. `daw-design` loads it in mandatory governance and exits `blocked` on a contradiction; its exit criteria include constitution compliance.
+- Router (`scripts/route.py` + `references/suite-manifest.json`): routes now support `conditional_stages` (condition-guarded stage insertion with `insert_before`/`insert_after`/`duplicate_allowed`), `parallel_groups` (declared concurrent pairs), and `extension_hooks` (declared hook points), all validated declaratively. Modules carry `maturity` (`stable|beta|deprecated|experimental`) and `bucket`; a `deprecated` module in an active route blocks it, an `experimental` one warns.
+- Router `--session-start`: bare invocation analyzes project artifacts (config block, specs, plans, workflows, evidence) and proposes an entry route (`setup`/`ship`/`verify`/`build`/`plan`/`bootstrap`).
+- `tools/evaluation/route_eval.py` + `route_eval_fixture.json`: stdlib route-eval harness asserting expected status/stages/constraints across scenarios.
+- `workflow-artifacts.md` §7–§10: spec quality checklist ("unit tests for requirements"), read-only analyze step, append-only converge step, and feature-directory convention.
+- `daw-wizard` / `daw-design`: optional **component source** question (own design system vs. actually-available MCP design components vs. recommend-after-inspection), asked via the native clarification transport and recorded in `details.component_source`.
+
+### Changed
+
+- Native interactive clarification is enforced across the suite: when a harness exposes a native question tool, posing a material decision only as plain chat text is a transport violation (root `SKILL.md`, `daw-ask`, `daw-wizard`, `daw-design`, `daw-setup`, `daw-untangle`, `daw-workspace`, and `operations.md` §2 fail-closed approval).
+- `daw-plan` tasks carry an `interfaces` block (`consumes`/`produces` exact signatures).
+
+### Project migration
+
+For projects that last passed 0.5.0 (`daw_version: 0.5.0`):
+
+- Clarification — agents must use the harness's native question/approval tool when one is exposed; plain-chat material questions are no longer valid (manual: rerun the decision through the native tool); fix route: none.
+- Routes — new optional manifest keys (`conditional_stages`, `parallel_groups`, `extension_hooks`, module `maturity`/`bucket`) are additive; existing manifests remain valid (manual: none); fix route: none.
+- Constitution — a project may add `references/constitution.md`; a phase that contradicts it now blocks (manual: reconcile the offending artifact first); fix route: `daw-design`.
+
 ## Unreleased — Executable Specs & Plans, Status Advisory, Setup Command Preservation
 
 ### Changed

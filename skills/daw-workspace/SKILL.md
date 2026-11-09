@@ -84,7 +84,7 @@ Identify:
 
 - Pre-existing uncommitted modifications belong to the user.
 - **NEVER** run `git reset --hard`, `git checkout -- .`, `git clean -fd`, or `git stash` without explicit user permission.
-- If uncommitted changes conflict with planned work, stop and request clarification or use an isolated worktree if permitted.
+- If uncommitted changes conflict with planned work, stop and request clarification using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule) (actually exposed tool/schema only; never invent one; unanswered remains unresolved, never consent) or use an isolated worktree if permitted.
 
 ### Principle 3: Worktree Isolation Rules
 

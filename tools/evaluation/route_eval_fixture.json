@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "name": "feature clear low in-place",
+      "request": {
+        "schema_version": 1,
+        "intent": "feature",
+        "requirements": "clear",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false,
+        "contains_reason": "Route resolved successfully"
+      }
+    },
+    {
+      "name": "feature unclear high isolated (conditional stages + parallel)",
+      "request": {
+        "schema_version": 1,
+        "intent": "feature",
+        "requirements": "unclear",
+        "risk": "high",
+        "workspace": "isolated"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": [
+          "daw-workspace",
+          "daw-design",
+          "daw-plan",
+          "daw-review",
+          "daw-build",
+          "daw-review",
+          "daw-verify"
+        ],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": true,
+        "authorization_granted": false,
+        "contains_reason": "Conditional stage",
+        "contains_blocker_code": null
+      }
+    },
+    {
+      "name": "patch unclear requirements blocked",
+      "request": {
+        "schema_version": 1,
+        "intent": "patch",
+        "requirements": "unclear",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "needs-input",
+        "stages": [],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false,
+        "contains_blocker_code": "REQUIREMENTS_UNCLEAR"
+      }
+    },
+    {
+      "name": "bugfix low in-place",
+      "request": {
+        "schema_version": 1,
+        "intent": "bugfix",
+        "requirements": "clear",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": [
+          "daw-debug",
+          "daw-plan",
+          "daw-build",
+          "daw-review",
+          "daw-verify"
+        ],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false
+      }
+    },
+    {
+      "name": "review read-only ignores risk",
+      "request": {
+        "schema_version": 1,
+        "intent": "review",
+        "requirements": "clear",
+        "risk": "unknown",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": ["daw-review"],
+        "read_only": true,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false,
+        "contains_reason": "ignores risk classification"
+      }
+    },
+    {
+      "name": "spike unknown requirements allowed",
+      "request": {
+        "schema_version": 1,
+        "intent": "spike",
+        "requirements": "unknown",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": ["daw-workspace", "daw-build", "daw-ask"],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false
+      }
+    },
+    {
+      "name": "invalid JSON schema version",
+      "request": {
+        "schema_version": 99,
+        "intent": "feature",
+        "requirements": "clear",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "error",
+        "stages": [],
+        "read_only": false,
+        "documentation_only": false,
+        "interactive_approval_required": false,
+        "authorization_granted": false,
+        "contains_reason": "Request validation failed"
+      }
+    },
+    {
+      "name": "setup unclear requirements",
+      "request": {
+        "schema_version": 1,
+        "intent": "setup",
+        "requirements": "unclear",
+        "risk": "low",
+        "workspace": "in-place"
+      },
+      "expected": {
+        "status": "ready",
+        "stages": ["daw-setup"],
+        "read_only": false,
+        "documentation_only": true,
+        "interactive_approval_required": false,
+        "authorization_granted": false
+      }
+    }
+  ]
+}

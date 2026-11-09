@@ -231,12 +231,24 @@ def _validate_module_entries(modules: Any) -> list[dict[str, str]]:
         if not isinstance(mod_info, dict):
             findings.append({"code": "MANIFEST_MODULE_NOT_OBJECT", "message": f"Module entry '{mod_name}' must be an object."})
             continue
-        if set(mod_info.keys()) != {"path", "description"}:
-            findings.append({"code": "MANIFEST_MODULE_UNKNOWN_KEYS", "message": f"Module entry '{mod_name}' has invalid keys."})
+        required_mod_keys = {"path", "description"}
+        optional_mod_keys = {"maturity", "bucket"}
+        allowed_mod_keys = required_mod_keys | optional_mod_keys
+        if not required_mod_keys.issubset(set(mod_info.keys())):
+            findings.append({"code": "MANIFEST_MODULE_MISSING_KEYS", "message": f"Module entry '{mod_name}' missing required keys: path, description."})
+        unknown_mod_keys = set(mod_info.keys()) - allowed_mod_keys
+        if unknown_mod_keys:
+            findings.append({"code": "MANIFEST_MODULE_UNKNOWN_KEYS", "message": f"Module entry '{mod_name}' has unknown keys."})
         if not isinstance(mod_info.get("path"), str):
             findings.append({"code": "MANIFEST_MODULE_PATH_INVALID", "message": f"Module '{mod_name}' path must be string."})
         if not isinstance(mod_info.get("description"), str):
             findings.append({"code": "MANIFEST_MODULE_DESCRIPTION_INVALID", "message": f"Module '{mod_name}' description must be string."})
+        maturity = mod_info.get("maturity", "stable")
+        if maturity not in ("stable", "beta", "deprecated", "experimental"):
+            findings.append({"code": "MANIFEST_MODULE_MATURITY_INVALID", "message": f"Module '{mod_name}' maturity must be one of: stable, beta, deprecated, experimental."})
+        bucket = mod_info.get("bucket", "engineering")
+        if bucket not in ("engineering", "productivity", "misc", "in-progress", "deprecated"):
+            findings.append({"code": "MANIFEST_MODULE_BUCKET_INVALID", "message": f"Module '{mod_name}' bucket must be one of: engineering, productivity, misc, in-progress, deprecated."})
 
     return findings
 
@@ -282,23 +294,69 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
         if r_def.get("evaluates_workspace") is not expected_ws:
             findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' evaluates_workspace must be {expected_ws}."})
 
+        # Allow optional enterprise fields alongside canonical keys (defined before use).
+        optional_route_keys = {"conditional_stages", "parallel_groups", "extension_hooks"}
+
         # Stages invariants
         expected_stage_spec = CANONICAL_ROUTE_STAGES[r_name]
         if r_name == "feature":
             if r_def.get("stages_clear") != expected_stage_spec["stages_clear"] or r_def.get("stages_unclear") != expected_stage_spec["stages_unclear"]:
                 findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": "Route 'feature' stages do not match canonical specification."})
-            if set(r_def.keys()) != {"documentation_only", "read_only", "stages_clear", "stages_unclear", "evaluates_workspace"}:
+            expected_feature_keys = {"documentation_only", "read_only", "stages_clear", "stages_unclear", "evaluates_workspace"} | optional_route_keys
+            if set(r_def.keys()) != expected_feature_keys:
                 findings.append({"code": "MANIFEST_ROUTE_SHAPE_INVALID", "message": "Route 'feature' contains unexpected or missing keys."})
+            allowed_route_keys = expected_feature_keys
         else:
             if r_def.get("stages") != expected_stage_spec:
                 findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' stages must match canonical {expected_stage_spec}."})
-            expected_keys = {"documentation_only", "read_only", "stages", "evaluates_workspace"}
+            expected_keys = {"documentation_only", "read_only", "stages", "evaluates_workspace"} | optional_route_keys
             if r_name in ("bootstrap", "adopt", "setup"):
                 expected_keys.add("allow_unclear_requirements")
                 if r_def.get("allow_unclear_requirements") is not True:
                     findings.append({"code": "MANIFEST_ROUTE_INVARIANT_VIOLATION", "message": f"Route '{r_name}' allow_unclear_requirements must be True."})
-            if set(r_def.keys()) != expected_keys:
-                findings.append({"code": "MANIFEST_ROUTE_SHAPE_INVALID", "message": f"Route '{r_name}' contains unexpected or missing keys."})
+            allowed_route_keys = expected_keys
+
+        unknown_route_keys = set(r_def.keys()) - allowed_route_keys
+        if unknown_route_keys:
+            findings.append({"code": "MANIFEST_ROUTE_SHAPE_INVALID", "message": f"Route '{r_name}' contains unexpected or missing keys."})
+
+        # Validate conditional_stages: list of {stage, if, insert_before?, insert_after?, duplicate_allowed?}
+        cond_stages = r_def.get("conditional_stages", [])
+        if not isinstance(cond_stages, list):
+            findings.append({"code": "MANIFEST_ROUTE_CONDITIONAL_INVALID", "message": f"Route '{r_name}' conditional_stages must be a list."})
+        else:
+            for i, cs in enumerate(cond_stages):
+                if not isinstance(cs, dict):
+                    findings.append({"code": "MANIFEST_ROUTE_CONDITIONAL_INVALID", "message": f"Route '{r_name}' conditional_stages[{i}] must be an object."})
+                    continue
+                if not isinstance(cs.get("stage"), str) or not cs.get("stage"):
+                    findings.append({"code": "MANIFEST_ROUTE_CONDITIONAL_INVALID", "message": f"Route '{r_name}' conditional_stages[{i}] stage must be a non-empty string."})
+                if not isinstance(cs.get("if"), str) or not cs.get("if"):
+                    findings.append({"code": "MANIFEST_ROUTE_CONDITIONAL_INVALID", "message": f"Route '{r_name}' conditional_stages[{i}] if must be a non-empty string."})
+                if cs.get("duplicate_allowed") is not None and not isinstance(cs.get("duplicate_allowed"), bool):
+                    findings.append({"code": "MANIFEST_ROUTE_CONDITIONAL_INVALID", "message": f"Route '{r_name}' conditional_stages[{i}] duplicate_allowed must be boolean."})
+
+        # Validate parallel_groups: list of [stage, stage] with disjoint module names.
+        par_groups = r_def.get("parallel_groups", [])
+        if not isinstance(par_groups, list):
+            findings.append({"code": "MANIFEST_ROUTE_PARALLEL_INVALID", "message": f"Route '{r_name}' parallel_groups must be a list."})
+        else:
+            for i, pg in enumerate(par_groups):
+                if not isinstance(pg, list) or len(pg) != 2:
+                    findings.append({"code": "MANIFEST_ROUTE_PARALLEL_INVALID", "message": f"Route '{r_name}' parallel_groups[{i}] must be a pair of stage names."})
+                elif pg[0] == pg[1]:
+                    findings.append({"code": "MANIFEST_ROUTE_PARALLEL_INVALID", "message": f"Route '{r_name}' parallel_groups[{i}] stages must be distinct."})
+
+        # Validate extension_hooks: dict of hook_point -> [hook_id, ...].
+        ext_hooks = r_def.get("extension_hooks", {})
+        if not isinstance(ext_hooks, dict):
+            findings.append({"code": "MANIFEST_ROUTE_HOOKS_INVALID", "message": f"Route '{r_name}' extension_hooks must be an object."})
+        else:
+            for hp, hook_ids in ext_hooks.items():
+                if not isinstance(hp, str):
+                    findings.append({"code": "MANIFEST_ROUTE_HOOKS_INVALID", "message": f"Route '{r_name}' extension_hooks point must be string."})
+                if not isinstance(hook_ids, list):
+                    findings.append({"code": "MANIFEST_ROUTE_HOOKS_INVALID", "message": f"Route '{r_name}' extension_hooks[{hp}] must be a list of hook IDs."})
 
     return findings
 
@@ -403,6 +461,47 @@ def validate_request(req_data: Any) -> Tuple[dict[str, Any] | None, list[dict[st
         return None, blockers
 
     return req_data, []
+
+
+def _eval_condition(cond_expr: str, ctx: dict[str, Any]) -> bool:
+    """Evaluate a simple boolean condition expression against request context.
+
+    Supports: ==, !=, and, or, not, parentheses, string literals (single-quoted),
+    and context variable references (intent, requirements, risk, workspace).
+    Intentionally restricted: no function calls, no attribute access, no imports.
+    """
+    if not isinstance(cond_expr, str) or not cond_expr.strip():
+        return False
+
+    expr = cond_expr.strip()
+
+    safe_ctx = {k: v for k, v in ctx.items() if isinstance(v, str)}
+
+    import re as _re
+
+    if not _re.match(r"^[A-Za-z0-9_' \.\!\=\>\<\(\)\n\r\t]+$", expr):
+        return False
+    if "." in expr:
+        return False
+
+    normalized = expr.replace(" and ", " AND ").replace(" or ", " OR ").replace(" not ", " NOT ")
+
+    def _replace_var(m: _re.Match[str]) -> str:
+        name = m.group(0)
+        if name in ("AND", "OR", "NOT", "True", "False", "None"):
+            return name
+        if name in safe_ctx:
+            return repr(safe_ctx[name])
+        return name
+
+    normalized = _re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\b", _replace_var, normalized)
+    normalized = normalized.replace(" AND ", " and ").replace(" OR ", " or ").replace(" NOT ", " not ")
+
+    try:
+        result = eval(normalized, {"__builtins__": {}}, {})
+        return bool(result)
+    except Exception:
+        return False
 
 
 def resolve_route(
@@ -513,8 +612,80 @@ def resolve_route(
     else:
         stages = list(route_def.get("stages", []))
 
+    # --- Enterprise: conditional stage resolution ---
+    cond_stages = route_def.get("conditional_stages", [])
+    if isinstance(cond_stages, list):
+        for cs in cond_stages:
+            if not isinstance(cs, dict):
+                continue
+            cond_expr = cs.get("if", "")
+            stage_name = cs.get("stage", "")
+            duplicate_allowed = bool(cs.get("duplicate_allowed", False))
+            insert_before = cs.get("insert_before")
+            insert_after = cs.get("insert_after")
+
+            # Evaluate simple condition expressions against request data.
+            cond_met = _eval_condition(cond_expr, {
+                "intent": intent,
+                "requirements": requirements,
+                "risk": risk,
+                "workspace": workspace,
+            })
+            if not cond_met:
+                continue
+
+            if stage_name in stages and not duplicate_allowed:
+                reasons.append(f"Conditional stage '{stage_name}' already present; skipping duplicate.")
+                continue
+
+            if insert_before and insert_before in stages:
+                idx = stages.index(insert_before)
+                stages.insert(idx, stage_name)
+                reasons.append(f"Conditional stage '{stage_name}' inserted before '{insert_before}' (condition: {cond_expr}).")
+            elif insert_after and insert_after in stages:
+                idx = stages.index(insert_after) + 1
+                stages.insert(idx, stage_name)
+                reasons.append(f"Conditional stage '{stage_name}' inserted after '{insert_after}' (condition: {cond_expr}).")
+            else:
+                stages.append(stage_name)
+                reasons.append(f"Conditional stage '{stage_name}' appended (condition: {cond_expr}).")
+
+    # --- Enterprise: parallel group validation ---
+    par_groups = route_def.get("parallel_groups", [])
+    if isinstance(par_groups, list):
+        for pg in par_groups:
+            if isinstance(pg, list) and len(pg) == 2 and pg[0] != pg[1]:
+                if pg[0] in stages and pg[1] in stages:
+                    reasons.append(f"Parallel group [{pg[0]}, {pg[1]}]: both stages present; may execute concurrently if disjoint.")
+
     if prepend_workspace:
         stages = ["daw-workspace"] + [s for s in stages if s != "daw-workspace"]
+
+    # --- Enterprise: module maturity check ---
+    maturity_findings = []
+    modules = manifest.get("modules", {})
+    for stage in stages:
+        mod_info = modules.get(stage)
+        if isinstance(mod_info, dict):
+            maturity = mod_info.get("maturity", "stable")
+            bucket = mod_info.get("bucket", "engineering")
+            if maturity == "deprecated":
+                maturity_findings.append({
+                    "code": "MODULE_DEPRECATED",
+                    "message": f"Module '{stage}' is deprecated; avoid in active route.",
+                })
+            elif maturity == "experimental":
+                reasons.append(f"Module '{stage}' is experimental ({bucket}); use with caution.")
+    if maturity_findings:
+        return create_response(
+            status="blocked",
+            stages=stages,
+            reasons=reasons + ["Route blocked due to deprecated module(s)."],
+            blockers=maturity_findings,
+            read_only=read_only,
+            documentation_only=documentation_only,
+            interactive_approval_required=interactive_approval_required,
+        )
 
     if intent == "spike":
         reasons.append("Spike output is throwaway: findings return through daw-ask; production code re-enters feature/refactor.")
@@ -522,6 +693,13 @@ def resolve_route(
         reasons.append("Refactor must preserve observable behavior: characterization tests precede structural edits.")
     elif intent == "ship":
         reasons.append("Ship prepares integration only: push, merge, tag, and publish each need point-of-risk authorization.")
+
+    # --- Enterprise: extension hook declaration ---
+    ext_hooks = route_def.get("extension_hooks", {})
+    if isinstance(ext_hooks, dict):
+        for hp, hook_ids in ext_hooks.items():
+            if isinstance(hook_ids, list) and hook_ids:
+                reasons.append(f"Extension hook '{hp}': {len(hook_ids)} hook(s) declared.")
 
     reasons.append("Route resolved successfully.")
     return create_response(
@@ -533,6 +711,111 @@ def resolve_route(
         documentation_only=documentation_only,
         interactive_approval_required=interactive_approval_required,
     )
+
+
+def _session_start_resolve(root: pathlib.Path) -> dict[str, Any]:
+    """Analyze project context for bare invocation and suggest an initial route.
+
+    Detection is read-only and heuristic: inspects for DAW artifacts (config block,
+    specs, plans, workflows, evidence) to recommend the most appropriate entry point.
+    Never mutates files; returns a suggested intent plus rationale.
+    """
+    reasons: list[str] = []
+    blockers: list[dict[str, str]] = []
+
+    # Detect existing DAW configuration block.
+    has_config_block = False
+    for agent_file in ("AGENTS.md", "CLAUDE.md"):
+        af = root / agent_file
+        if af.is_file():
+            try:
+                content = af.read_text(encoding="utf-8")
+                if "<!-- daw-config:start -->" in content:
+                    has_config_block = True
+                    reasons.append(f"DAW configuration block found in {agent_file}.")
+                    break
+            except (OSError, UnicodeDecodeError):
+                pass
+
+    # Detect DAW artifact directories.
+    spec_dir = root / "docs" / "specs"
+    plan_dir = root / "docs" / "plans"
+    workflow_dir = root / "docs" / "workflows"
+    evidence_dir = root / "docs" / "evidence"
+
+    has_specs = spec_dir.is_dir() and any(spec_dir.iterdir())
+    has_plans = plan_dir.is_dir() and any(plan_dir.iterdir())
+    has_workflows = workflow_dir.is_dir() and any(workflow_dir.iterdir())
+    has_evidence = evidence_dir.is_dir() and any(evidence_dir.iterdir())
+
+    # Suggest intent based on artifact maturity.
+    if not has_config_block:
+        suggested_intent = "setup"
+        reasons.append("No DAW configuration block found: recommend setup to initialize project conventions.")
+    elif has_evidence:
+        suggested_intent = "ship"
+        reasons.append("Task evidence contracts detected: recommend ship for integration and delivery.")
+    elif has_workflows:
+        suggested_intent = "verify"
+        reasons.append("Workflow progress record detected: recommend verify to resume and confirm completion.")
+    elif has_plans:
+        suggested_intent = "build"
+        reasons.append("Plan artifacts detected: recommend build route for implementation.")
+    elif has_specs:
+        suggested_intent = "plan"
+        reasons.append("Specification artifacts detected: recommend plan for tactical decomposition.")
+    else:
+        suggested_intent = "bootstrap"
+        reasons.append("No DAW artifacts found: recommend bootstrap for greenfield specification.")
+
+    # Build a sample request to validate the suggested intent is routable.
+    sample_req = {
+        "schema_version": 1,
+        "intent": suggested_intent,
+        "requirements": "clear",
+        "risk": "low",
+        "workspace": "in-place",
+    }
+
+    # Adjust for intents with special requirements.
+    if suggested_intent == "bootstrap":
+        sample_req["requirements"] = "unclear"
+    if suggested_intent in ("setup", "adopt"):
+        sample_req["requirements"] = "unclear"
+
+    # Resolve the suggested route to validate it.
+    resolved = resolve_route(sample_req, root=root)
+
+    if resolved["status"] == "ready":
+        return create_response(
+            status="ready",
+            stages=resolved["stages"],
+            reasons=reasons + resolved["reasons"],
+            blockers=[],
+            read_only=resolved["constraints"]["read_only"],
+            documentation_only=resolved["constraints"]["documentation_only"],
+            interactive_approval_required=resolved["constraints"]["interactive_approval_required"],
+        )
+    elif resolved["status"] == "needs-input":
+        return create_response(
+            status="needs-input",
+            stages=[],
+            reasons=reasons + resolved["reasons"],
+            blockers=resolved["blockers"],
+            read_only=resolved["constraints"]["read_only"],
+            documentation_only=resolved["constraints"]["documentation_only"],
+            interactive_approval_required=resolved["constraints"]["interactive_approval_required"],
+        )
+    else:
+        return create_response(
+            status="blocked",
+            stages=[],
+            reasons=reasons + resolved["reasons"],
+            blockers=resolved["blockers"],
+            read_only=resolved["constraints"]["read_only"],
+            documentation_only=resolved["constraints"]["documentation_only"],
+            interactive_approval_required=resolved["constraints"]["interactive_approval_required"],
+        )
 
 
 def format_text_output(result: dict[str, Any]) -> str:
@@ -562,6 +845,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check-suite", action="store_true", help="Validate suite manifest and module paths across workspace")
     parser.add_argument("--format", choices=["json", "text"], default="json", help="Output format (default: json)")
     parser.add_argument("--root", help="Explicit suite root directory")
+    parser.add_argument(
+        "--session-start",
+        action="store_true",
+        help="Bare invocation: analyze project context and suggest an initial route.",
+    )
 
     args = parser.parse_args(argv)
     root = find_suite_root(args.root)
@@ -594,6 +882,18 @@ def main(argv: list[str] | None = None) -> int:
 
         print(json.dumps(res, indent=2) if args.format == "json" else format_text_output(res))
         return exit_code
+
+    # Mode 3: Session Start — bare invocation, analyze project context and suggest route.
+    if args.session_start:
+        res = _session_start_resolve(root)
+        print(json.dumps(res, indent=2) if args.format == "json" else format_text_output(res))
+        status = res["status"]
+        if status == "ready":
+            return 0
+        elif status in ("needs-input", "blocked"):
+            return 1
+        else:
+            return 2
 
     # Mode 2: Request Route
     if not args.request:

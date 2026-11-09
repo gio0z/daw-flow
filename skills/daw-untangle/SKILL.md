@@ -285,7 +285,7 @@ Before finalizing an untangle run, verify the following exit criteria:
 ## 6. Stop / Replan Triggers
 
 - **Action / Implementation Intent Expressed:** If the operator requests immediate code refactoring during an untangle consultation, halt read-only mode and output an advisory handoff to `daw-plan` or `daw-design`. Do not begin editing files inside `daw-untangle`.
-- **Scope Ambiguity / Unbounded Workspace:** If the requested boundary is completely undefined and cannot be inferred, ask one focused scoping question to establish the authorized target area.
+- **Scope Ambiguity / Unbounded Workspace:** If the requested boundary is completely undefined and cannot be inferred, ask one focused scoping question to establish the authorized target area using the [canonical native clarification transport](../../references/grilling.md#native-interactive-clarification-transport-canonical-rule): use the actually exposed harness tool/schema; never invent one; cancellation or an unanswered question remains unresolved, never consent; plain-text fallback is permitted only when no native interactive question tool is exposed or available.
 - **Uninspected External Consumers:** If code intelligence reveals that a target subsystem is exposed as an external library API with unknown third-party callers, record the boundary as an explicit unknown under `details.unknowns` and mark `status: "blocked"` if safe refactoring cannot be formulated without external requirements.
 
 ---
