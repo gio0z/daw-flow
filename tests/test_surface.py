@@ -131,6 +131,27 @@ class TestVerifyCLI(SurfaceTestBase):
         self.assertEqual(code, 1)
         self.assertIn("surface_leg_wire_undetermined", [f["code"] for f in payload["findings"]])
 
+    def test_bare_number_is_not_a_wire_outcome(self) -> None:
+        session = valid_session()
+        session["legs"][0]["wire"] = "viewport 390"
+        self.write_session(session)
+
+        code, payload = self.run_verify("surface-session.json")
+
+        self.assertEqual(code, 1)
+        self.assertIn("surface_leg_wire_undetermined", [f["code"] for f in payload["findings"]])
+
+    def test_wire_accepts_method_and_exit_outcomes(self) -> None:
+        for wire in ("POST /x -> 201", "POST /x 201", "exit 0"):
+            with self.subTest(wire=wire):
+                session = valid_session()
+                session["legs"][0]["wire"] = wire
+                self.write_session(session)
+
+                code, payload = self.run_verify("surface-session.json")
+
+                self.assertEqual(code, 0, payload)
+
     def test_blank_message_fails(self) -> None:
         session = valid_session()
         session["legs"][1]["message"] = "   "
@@ -264,6 +285,24 @@ class TestContractCompletionGate(SurfaceTestBase):
         self.assertEqual(code, 0, payload)
         self.assertIn("surface_declaration_inferred", [f["code"] for f in payload["findings"]])
         self.assertIn("surface_session_ignored", [f["code"] for f in payload["findings"]])
+        self.assertNotIn("surface_declaration_mismatch", [f["code"] for f in payload["findings"]])
+
+    def test_non_ui_declaration_over_ui_scope_is_rejected(self) -> None:
+        contract = self.build_contract(None)
+        contract["surface"] = "non-ui"
+        code, payload = self.run_contract(contract)
+
+        self.assertEqual(code, 1)
+        self.assertIn("surface_declaration_mismatch", [f["code"] for f in payload["findings"]])
+
+    def test_non_ui_declaration_over_non_ui_scope_passes(self) -> None:
+        contract = self.build_contract(None)
+        contract["surface"] = "non-ui"
+        contract["operation"]["scope"] = ["scripts/foo.py"]
+        code, payload = self.run_contract(contract)
+
+        self.assertEqual(code, 0, payload)
+        self.assertNotIn("surface_declaration_mismatch", [f["code"] for f in payload["findings"]])
 
     def test_invalid_surface_value_is_rejected(self) -> None:
         contract = self.build_contract(valid_session())

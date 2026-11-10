@@ -98,7 +98,7 @@ def _status_ledger(root: pathlib.Path, spec_dir: str | None, findings: list[dict
         return "not_applicable"
     ledger_path = spec_path / "ledger.json"
     if not ledger_path.is_file():
-        if any(p.name != "ledger.json" for p in spec_path.glob("*.md")):
+        if any(spec_path.glob("*.md")):
             findings.append(
                 make_warning(
                     "status_ledger_missing",
@@ -119,23 +119,33 @@ def _status_ledger(root: pathlib.Path, spec_dir: str | None, findings: list[dict
 
 
 def _status_plans(root: pathlib.Path, spec_dir: str | None) -> str:
-    """Report whether a saved plan exists for an already-specified project.
+    """Report whether a saved plan satisfies the route gate's BPF-4 requirement.
 
-    The route flow gate blocks feature/bugfix/refactor/maintain when no saved
-    plan exists, so a status that says "none" while that gate blocks would send
-    two different answers to the operator.
+    The route flow gate blocks feature/bugfix/refactor/maintain unless a
+    `docs/plans/*.md` file contains the literal token `expected`; a status that
+    answered `ok` for any plan file would send two different answers to the
+    operator.
     """
     if not spec_dir:
         return "not_applicable"
     spec_path, err = resolve_bounded_path(root, spec_dir)
     if err or spec_path is None or not spec_path.is_dir():
         return "not_applicable"
-    if not any(path.name != "ledger.json" for path in spec_path.glob("*.md")):
+    if not any(spec_path.glob("*.md")):
         return "not_applicable"
     plan_dir, plan_err = resolve_bounded_path(root, "docs/plans")
     if plan_err or plan_dir is None or not plan_dir.is_dir():
         return "missing"
-    return "ok" if any(plan_dir.glob("*.md")) else "missing"
+    for matched in sorted(plan_dir.glob("*.md")):
+        if not matched.is_file():
+            continue
+        try:
+            text = matched.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if "expected" in text:
+            return "ok"
+    return "missing"
 
 
 def _status_tasks(root: pathlib.Path, findings: list[dict[str, str]]) -> tuple[dict[str, int], str | None]:
@@ -186,9 +196,15 @@ def _recommended_route(config: str, ledger: str, plans: str, tasks: dict[str, in
     return "none"
 
 
-def _area_blocking(findings: list[dict[str, str]], prefix: str) -> bool:
+def _area_blocking(findings: list[dict[str, str]], area: str) -> bool:
+    """True when an error-severity finding names the area or one of its sub-paths.
+
+    A bare area path ("config", "ledger") counts as part of the area, as do
+    prefixed ("config:...", "ledger:...") and contract ("contract[...]:...") paths.
+    """
+    prefixes = (area, f"{area}:", f"{area}[")
     return any(
-        f.get("severity") == "error" and str(f.get("path", "")).startswith(prefix) for f in findings
+        f.get("severity") == "error" and str(f.get("path", "")).startswith(prefixes) for f in findings
     )
 
 
@@ -204,7 +220,7 @@ def _next_actions(
 ) -> list[dict[str, Any]]:
     route = _recommended_route(config, ledger, plans, tasks)
     if route == "setup":
-        blocking = _area_blocking(findings, "config:")
+        blocking = _area_blocking(findings, "config")
         return [
             {
                 "action": "setup",
@@ -228,7 +244,7 @@ def _next_actions(
             },
         ]
     if route == "upgrade-recheck":
-        blocking = _area_blocking(findings, "config:")
+        blocking = _area_blocking(findings, "config")
         return [
             {
                 "action": "upgrade-recheck",
@@ -249,7 +265,7 @@ def _next_actions(
             },
         ]
     if route == "design-rework":
-        blocking = _area_blocking(findings, "ledger:")
+        blocking = _area_blocking(findings, "ledger")
         spec = spec_dir or "docs/specs"
         verify_entry = {
             "action": "design-rework-verify",
@@ -319,7 +335,7 @@ def _next_actions(
             },
         ]
     if route == "verify":
-        blocking = _area_blocking(findings, "contract[")
+        blocking = _area_blocking(findings, "contract")
         n = tasks["complete_invalid"]
         contract = first_failing or ""
         return [

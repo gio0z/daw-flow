@@ -215,17 +215,17 @@ Task contracts represent deterministic boundaries between planning and execution
 
 ### Root Object
 
-| Field                 | Type    | Required | Description                                                                                                                                        |
-| --------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema_version`      | integer | Yes      | Must be exactly `1`.                                                                                                                               |
-| `objective`           | string  | Yes      | Non-blank description of the task objective.                                                                                                       |
-| `baseline`            | object  | Yes      | Pre-change snapshot (`baseline` = pre-change snapshot) of relevant files and revision context.                                                     |
-| `documents`           | array   | Yes      | Array of 14-doc specification records (can be empty for routine patches).                                                                          |
-| `acceptance_criteria` | array   | Yes      | Non-empty array of verifiable criteria.                                                                                                            |
-| `operation`           | object  | Yes      | The planned state mutation operation.                                                                                                              |
-| `approval`            | object  | No       | Captured user approval reference (mandatory for high-risk operations at `execute` and `complete`).                                                 |
-| `evidence`            | array   | No       | Verification records mapped to Acceptance Criteria (mandatory at `complete`).                                                                      |
-| `result`              | object  | No       | Post-change snapshot (`result` = post-change snapshot), recorded after verify: forbidden at `plan`, optional at `execute`, required at `complete`. |
+| Field                 | Type    | Required | Description                                                                                                                                                                                                    |
+| --------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`      | integer | Yes      | Must be exactly `1`.                                                                                                                                                                                           |
+| `objective`           | string  | Yes      | Non-blank description of the task objective.                                                                                                                                                                   |
+| `baseline`            | object  | Yes      | Pre-change snapshot (`baseline` = pre-change snapshot) of relevant files and revision context.                                                                                                                 |
+| `documents`           | array   | Yes      | Array of 14-doc specification records (can be empty for routine patches).                                                                                                                                      |
+| `acceptance_criteria` | array   | Yes      | Non-empty array of verifiable criteria.                                                                                                                                                                        |
+| `operation`           | object  | Yes      | The planned state mutation operation.                                                                                                                                                                          |
+| `approval`            | object  | No       | Captured user approval reference (mandatory for high-risk operations at `execute` and `complete`).                                                                                                             |
+| `evidence`            | array   | No       | Verification records mapped to Acceptance Criteria (mandatory at `complete`).                                                                                                                                  |
+| `result`              | object  | No       | Post-change snapshot (`result` = post-change snapshot), recorded after verify: forbidden at `plan`, optional at `execute`, required at `complete`.                                                             |
 | `surface`             | string  | No       | Optional classification `"ui"` or `"non-ui"`. Declaring `"ui"` makes the role-based surface session mandatory at `complete`; when omitted, a UI-shaped `operation.scope` emits `surface_declaration_inferred`. |
 
 ---
@@ -645,7 +645,7 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
 
 ### Summary & recommended_route Precedence
 
-`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `summary.plans` is `ok` when `docs/plans/*.md` exists for a project whose `spec_dir` already holds specification Markdown, `missing` when specifications exist without any saved plan, and `not_applicable` when no specifications exist yet. It exists because the route flow gate blocks `feature`/`bugfix`/`refactor`/`maintain` without a saved plan; a status that answered `none` there would contradict the gate.
+`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `summary.plans` is `ok` when a regular `docs/plans/*.md` file contains the literal token `expected` for a project whose `spec_dir` already holds specification Markdown, `missing` when specifications exist without such a plan, and `not_applicable` when no specifications exist yet. It exists because the route flow gate blocks `feature`/`bugfix`/`refactor`/`maintain` without a saved plan; a status that answered `none` there would contradict the gate.
 
 `recommended_route` resolves in this precedence order:
 
@@ -794,11 +794,12 @@ Arguments: `--project-root ROOT` (required), `--spec-dir REL` (default: the proj
 1. A record is **usable** only when it parses as strict JSON, carries `transition.to` in {`intake`, `authoring`, `review`, `rework`, `ready`}, and lists `documents[]` entries with a string `path` and a 64-hex `sha256`. Otherwise `derive_record_malformed` (warning) and it is skipped.
 2. A record is a **candidate** for a document only when its declared `sha256` equals the SHA-256 of the document's current bytes. A hash is never recomputed into the ledger.
 3. Several candidates for one document are resolved by their **transition chain**: candidates are keyed by `to`; the terminal candidate is the one whose `to` is no other candidate's `from`; exactly one terminal wins, others become `history`. Two candidates sharing a `to`, zero/multiple terminals, or a disconnected chain produce `derive_doc_conflict` (error) — the tool never guesses from file mtimes.
-4. No candidate → `derive_doc_unmapped` (warning) with either `no record names this document` or `every record's sha256 is stale for the current bytes — re-run the review transition`. A document edited after its record therefore reports drift instead of being silently re-pinned.
+4. No candidate → `derive_doc_unmapped` (warning) with `every record's sha256 is stale for the current bytes — re-run the review transition`. A document edited after its record therefore reports drift instead of being silently re-pinned. A spec document no record names at all is the separate error `derive_doc_untracked` (rule 8).
 5. A declared path missing from disk → `derive_doc_missing` (warning). Paths escaping the project root are rejected at resolution time.
 6. `--write` refuses whenever an error finding exists (`derive_write_refused`, exit 1), so a conflicted project is reported, never half-written.
-7. **The derived payload is validated before it is written.** The tool runs the existing ledger validator on the ledger it is about to emit and re-raises any error as `derive_ledger_invalid` (`ledger:<original path>`). A record that satisfied an older contract — a string `reviewer` where the current schema requires `{id, kind, author_id}`, or a `sources[].path` under `tmp/` — therefore makes derivation *fail loudly* instead of emitting a ledger that the very next command rejects. Migrate the record or re-run the review transition; never "fix" the ledger.
-Also warning-level: `derive_records_dir_missing` (no records source exists) and `derive_record_not_durable` (a record lives under an ephemeral path).
+7. **The derived payload is validated before it is written.** The tool runs the existing ledger validator on the ledger it is about to emit and re-raises any error as `derive_ledger_invalid` (`ledger:<original path>`). A record that satisfied an older contract — a string `reviewer` where the current schema requires `{id, kind, author_id}`, or a `sources[].path` under `tmp/` — therefore makes derivation _fail loudly_ instead of emitting a ledger that the very next command rejects. Migrate the record or re-run the review transition; never "fix" the ledger. The docs validation (`validate_docs`) runs only for `state: ready` records; records in other states are not re-validated against the current contract.
+8. A spec document in `<spec_dir>` with no doc-transition record — one no record names and no candidate derives — errors `derive_doc_untracked`, and the write is refused with it, so the derived ledger can never silently omit a spec.
+   Also warning-level: `derive_records_dir_missing` (no records source exists) and `derive_record_not_durable` (a record lives under an ephemeral path).
 
 ### Output Envelope
 
@@ -814,7 +815,8 @@ Also warning-level: `derive_records_dir_missing` (no records source exists) and 
   "findings": [],
   "limitations": [
     "Projects only what existing records declare; it never invents a state, a reviewer, or a hash.",
-    "Requires at least one doc-transition record per document; a project with specs but no records stays underived."
+    "Requires at least one doc-transition record per document; a project with specs but no records stays underived.",
+    "Oversize records (over 1 MiB) and non-UTF-8 files are reported unread rather than parsed partially."
   ]
 }
 ```
@@ -835,7 +837,7 @@ The enforceable half of `daw-verify` Rule 8. A UI-affecting change must record o
 python3 "$SKILL_DIR/scripts/validate.py" verify surface-session.json --project-root "$PROJECT_DIR" --stage complete --format json
 ```
 
-Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage execute|complete` (default `complete`; `execute` validates shape only, so a partially walked session can be recorded in flight), `--format text|json`. Exit codes match §1.
+Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage execute|complete` (default `complete`; `execute` validates shape only, so a partially walked session can be recorded in flight), `--format text|json`. The session file path itself must resolve inside the project root; a path escaping it (e.g. `../../`) exits `2` with an error message. Exit codes match §1.
 
 ### Session Schema
 
@@ -843,8 +845,8 @@ Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage exe
 {
   "role": "PETUGAS_TPS",
   "viewports": [
-    {"width": 390, "height": 844},
-    {"width": 1440, "height": 900}
+    { "width": 390, "height": 844 },
+    { "width": 1440, "height": 900 }
   ],
   "legs": [
     {
@@ -877,7 +879,7 @@ Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage exe
 - `surface_leg_field_missing`: blank `name`, `interaction`, `wire`, or `message` — the message is what the operator actually reads.
 - `surface_leg_wire_undetermined`: `wire` names no HTTP status, no `exit N`, and no `-> N`, so the outcome is unproven.
 - `surface_leg_status_invalid`, `surface_leg_not_passed`: status outside `passed`/`failing`/`unexercised`, or any non-`passed` status at `complete`.
-- `surface_declaration_invalid`, `surface_declaration_inferred`, `surface_session_ignored` (contract check only): an unknown `surface` value, a UI-shaped scope without the declaration (warning), or a recorded session that no declaration enforces (warning).
+- `surface_declaration_invalid`, `surface_declaration_mismatch`, `surface_declaration_inferred`, `surface_session_ignored` (contract check only): an unknown `surface` value, a `surface: "non-ui"` declaration over a UI-shaped scope, a UI-shaped scope without the declaration (warning), or a recorded session that no declaration enforces (warning). The session is enforced only when `surface` is declared `"ui"`.
 
 ### Output Envelope
 

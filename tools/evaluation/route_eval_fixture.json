@@ -12,6 +12,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": ["daw-plan", "daw-build", "daw-review", "daw-verify"],
         "read_only": false,
         "documentation_only": false,
@@ -31,6 +32,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": [
           "daw-workspace",
           "daw-design",
@@ -59,6 +61,7 @@
       },
       "expected": {
         "status": "needs-input",
+        "exit_code": 1,
         "stages": [],
         "read_only": false,
         "documentation_only": false,
@@ -78,6 +81,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": [
           "daw-debug",
           "daw-plan",
@@ -102,6 +106,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": ["daw-review"],
         "read_only": true,
         "documentation_only": false,
@@ -121,6 +126,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": ["daw-workspace", "daw-build", "daw-ask"],
         "read_only": false,
         "documentation_only": false,
@@ -139,6 +145,7 @@
       },
       "expected": {
         "status": "error",
+        "exit_code": 2,
         "stages": [],
         "read_only": false,
         "documentation_only": false,
@@ -158,6 +165,7 @@
       },
       "expected": {
         "status": "ready",
+        "exit_code": 0,
         "stages": ["daw-setup"],
         "read_only": false,
         "documentation_only": true,

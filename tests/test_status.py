@@ -150,6 +150,8 @@ class TestStatus(StatusTestBase):
         self.assertTrue(actions)
         self.assertEqual(actions[0]["action"], data["recommended_route"])
         self.assertIn("validate.py\" config", actions[1]["command"])
+        self.assertTrue(actions[0]["blocking"])
+        self.assertTrue(actions[1]["blocking"])
 
 
     def test_stale_version_recommends_upgrade_recheck(self) -> None:
@@ -176,6 +178,23 @@ class TestStatus(StatusTestBase):
         self.assertIsInstance(actions, list)
         self.assertTrue(actions)
         self.assertEqual(actions[0]["action"], data["recommended_route"])
+
+    def test_missing_ledger_warning_does_not_block(self) -> None:
+        self.write_config()
+        (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
+        _, data = self.run_status()
+        self.assertEqual(data["summary"]["ledger"], "missing")
+        self.assertEqual(data["recommended_route"], "design-rework")
+        self.assertFalse(data["next_actions"][0]["blocking"])
+
+    def test_invalid_ledger_blocks_design_rework(self) -> None:
+        self.write_config()
+        (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
+        (self.root / "docs" / "specs" / "ledger.json").write_text("{ not strict json", encoding="utf-8")
+        _, data = self.run_status()
+        self.assertEqual(data["summary"]["ledger"], "invalid")
+        self.assertEqual(data["recommended_route"], "design-rework")
+        self.assertTrue(data["next_actions"][0]["blocking"])
 
 
     def test_code_edited_after_verify_recommends_verify(self) -> None:
@@ -253,7 +272,9 @@ class TestStatus(StatusTestBase):
         self.write_config()
         (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
         (self.root / "docs" / "plans").mkdir(parents=True)
-        (self.root / "docs" / "plans" / "wf.md").write_text("# Plan\n", encoding="utf-8")
+        (self.root / "docs" / "plans" / "wf.md").write_text(
+            "# Plan\n\n- [ ] step: edit file, expected: tests pass\n", encoding="utf-8"
+        )
         (self.root / "docs" / "specs" / "ledger.json").write_text(
             json.dumps(_ledger_with_review(self.root, "docs/specs/prd.md")), encoding="utf-8"
         )
@@ -274,6 +295,63 @@ class TestStatus(StatusTestBase):
 
         self.assertEqual(data["summary"]["plans"], "ok", data)
         self.assertEqual(data["recommended_route"], "none")
+
+    def test_plan_without_expected_token_reports_missing(self) -> None:
+        self.write_config()
+        (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
+        (self.root / "docs" / "specs" / "ledger.json").write_text(
+            json.dumps(_ledger_with_review(self.root, "docs/specs/prd.md")), encoding="utf-8"
+        )
+        (self.root / "docs" / "plans").mkdir(parents=True)
+        (self.root / "docs" / "plans" / "wf.md").write_text("# Plan\n\n- step\n", encoding="utf-8")
+        _, data = self.run_status()
+        self.assertEqual(data["summary"]["plans"], "missing", data)
+        self.assertEqual(data["recommended_route"], "plan")
+
+        # The route flow gate agrees: BPF-4 requires the literal token `expected`.
+        request = self.root / "request.json"
+        request.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "intent": "feature",
+                    "requirements": "clear",
+                    "risk": "low",
+                    "workspace": "in-place",
+                }
+            ),
+            encoding="utf-8",
+        )
+        res = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "route.py"),
+                str(request),
+                "--project-root",
+                str(self.root),
+                "--format",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        routed = json.loads(res.stdout)
+        self.assertEqual(routed["status"], "blocked", routed)
+        self.assertIn(
+            "FLOW_GATE_MISSING_ARTIFACT",
+            [blocker["code"] for blocker in routed["blockers"]],
+        )
+
+    def test_plan_directory_does_not_satisfy_plans(self) -> None:
+        self.write_config()
+        (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
+        (self.root / "docs" / "specs" / "ledger.json").write_text(
+            json.dumps(_ledger_with_review(self.root, "docs/specs/prd.md")), encoding="utf-8"
+        )
+        (self.root / "docs" / "plans" / "dir.md").mkdir(parents=True)
+        _, data = self.run_status()
+        self.assertEqual(data["summary"]["plans"], "missing", data)
+        self.assertEqual(data["recommended_route"], "plan")
 
     def test_missing_ledger_outranks_missing_plan(self) -> None:
         self.write_config()

@@ -15,9 +15,15 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-ROUTE_SCRIPT = REPO_ROOT / "scripts" / "route.py"
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# Maps route.py response status to the exit code it must terminate with.
+STATUS_EXIT_CODES = {"ready": 0, "needs-input": 1, "blocked": 1, "error": 2}
 
 FIXTURE_SCHEMA = {
     "schema_version": 1,
@@ -33,6 +39,7 @@ FIXTURE_SCHEMA = {
             },
             "expected": {
                 "status": "ready|needs-input|blocked|error",
+                "exit_code": "int (0=ready, 1=needs-input/blocked, 2=error)",
                 "stages": ["list", "of", "stage", "names"],
                 "read_only": bool,
                 "documentation_only": bool,
@@ -46,14 +53,22 @@ FIXTURE_SCHEMA = {
 }
 
 
-def run_route(request: dict, root: pathlib.Path) -> dict:
-    """Invoke route.py with a JSON request file and return parsed output."""
+def run_route(request: dict, root: pathlib.Path) -> tuple[int, Any]:
+    """Invoke <root>/scripts/route.py with a JSON request file.
+
+    Returns (process exit code, parsed JSON envelope). The root selects the
+    suite under test; it is passed through to route.py via --root so a stale
+    or wrong suite cannot be validated by accident.
+    """
+    script = root / "scripts" / "route.py"
+    if not script.is_file():
+        raise RuntimeError(f"route.py not found under suite root: {script}")
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
         json.dump(request, tf)
         path = pathlib.Path(tf.name)
     try:
         result = subprocess.run(
-            [sys.executable, str(ROUTE_SCRIPT), str(path), "--format", "json"],
+            [sys.executable, str(script), str(path), "--format", "json", "--root", str(root)],
             capture_output=True,
             text=True,
             timeout=30,
@@ -64,7 +79,13 @@ def run_route(request: dict, root: pathlib.Path) -> dict:
         raise RuntimeError(
             f"route.py exited {result.returncode}: {result.stderr.strip()}"
         )
-    return json.loads(result.stdout)
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"route.py emitted unparseable JSON (exit {result.returncode}): {exc}"
+        ) from exc
+    return result.returncode, output
 
 
 def load_fixture(path: pathlib.Path) -> dict:
@@ -84,9 +105,22 @@ def check_scenario(scenario: dict, root: pathlib.Path) -> list[str]:
     expected = scenario.get("expected", {})
 
     try:
-        result = run_route(request, root)
+        exit_code, result = run_route(request, root)
     except Exception as exc:  # noqa: BLE001
         return [f"{name}: route invocation failed: {exc}"]
+
+    if not isinstance(result, dict):
+        return [f"{name}: route.py emitted a non-object JSON envelope"]
+
+    # Exit-code check: an explicit expectation wins; otherwise derive the
+    # expected exit code from the status.
+    expected_exit = expected.get("exit_code")
+    if expected_exit is None and expected.get("status") in STATUS_EXIT_CODES:
+        expected_exit = STATUS_EXIT_CODES[expected["status"]]
+    if expected_exit is not None and exit_code != expected_exit:
+        failures.append(
+            f"{name}: expected exit code {expected_exit}, got {exit_code}"
+        )
 
     # Status check.
     exp_status = expected.get("status")

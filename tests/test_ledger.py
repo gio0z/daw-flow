@@ -176,6 +176,16 @@ class TestLedgerFindings(LedgerTestBase):
         codes = [f["code"] for f in json.loads(res.stdout)["findings"]]
         self.assertIn("evidence_not_durable", codes)
 
+    def test_non_string_record_rejected(self) -> None:
+        self.write_ready_record()
+        entry = self.valid_entry()
+        entry["record"] = 123
+        ledger_path = self.write_ledger([entry])
+        res = self.run_ledger(ledger_path)
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        codes = [f["code"] for f in json.loads(res.stdout)["findings"]]
+        self.assertIn("invalid_record", codes)
+
     def _write_two_doc_record(self) -> str:
         prd_rel = "docs/specs/prd.md"
         prd_path = self.proj_root / prd_rel

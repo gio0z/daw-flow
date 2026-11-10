@@ -40,10 +40,17 @@ elif action == "status-delete-config":
     (root / "AGENTS.md").unlink()
 elif action == "status-artifact":
     (root / "side-effect.txt").write_text("side effect")
+elif action == "status-envelop":
+    validate = root / ".agents" / "skills" / "deterministic-agentic-workflow" / "scripts" / "validate.py"
+    validate.write_text('print("[valid JSON but not an object]")\\n')
 elif action == "feature-plan":
     plan = root / "docs" / "plans" / "ledger-plan.md"
     plan.parent.mkdir(parents=True, exist_ok=True)
     plan.write_text("# Plan\\n\\nExpected: duplicate raises. Expected: session isolation. Verify with python3 -m unittest.\\n")
+elif action == "feature-fake-plan":
+    doc = root / "docs" / "specs" / "explanation.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("# Explanation\\n\\nExpected: duplicate raises. Expected: session isolation. Verify with python3 -m unittest.\\n")
 elif action == "feature-code-no-plan":
     (root / "ledger.py").write_text("# premature code\\n")
 elif action == "fail":
@@ -300,6 +307,34 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertEqual(by_name["plan_before_code"]["status"], "fail")
         self.assertEqual(by_name["code_only_with_plan"]["status"], "pass")
 
+    def test_feature_plan_stem_must_be_a_boundary_not_a_substring(self):
+        """`plan` inside a non-plan stem (explanation/planet) must not satisfy plan_before_code."""
+        for filename in ("explanation.md", "planet.md"):
+            with self.subTest(filename=filename):
+                output = self.root / f"evidence-fake-plan-{filename}"
+                result, summary, _ = self.evaluate("feature-fake-plan", case="feature", output=output)
+                self.assertEqual(result.returncode, 1)
+                run = summary["results"][0]
+                self.assertEqual(run["status"], "artifact_checks_failed")
+                by_name = {c["name"]: c for c in run["checks"]}
+                self.assertEqual(by_name["plan_before_code"]["status"], "fail")
+                self.assertEqual(by_name["plan_before_code"]["plan_files"], [])
+
+    def test_status_grader_survives_non_dict_json_envelope(self):
+        """A valid-JSON non-object status envelope must fail the check, not crash the runner.
+
+        The fake agent overwrites the staged suite's validate.py so that
+        `validate.py status` prints a bare JSON array — valid JSON, but not an
+        object envelope. Before the fix this raised AttributeError inside
+        grade() and the runner died before writing summary.json.
+        """
+        result, summary, _ = self.evaluate("status-envelop", case="status")
+        self.assertEqual(result.returncode, 1)
+        run = summary["results"][0]
+        self.assertEqual(run["status"], "artifact_checks_failed")
+        check = {c["name"]: c for c in run["checks"]}["status_structure"]
+        self.assertEqual(check["status"], "fail")
+
 
     def test_runner_cli_help_works_from_arbitrary_cwd(self):
         res = subprocess.run(
@@ -312,6 +347,42 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertIn("--agent-command", res.stdout)
         self.assertIn("--output-dir", res.stdout)
+
+
+class ValidateVerifyPathTests(unittest.TestCase):
+    """Regression: `validate.py verify` must bound its FILE argument to --project-root.
+
+    Lives here because tests/test_validate.py is owned by another slice; these
+    cover the evaluate-suite CLI surfaces only indirectly via subprocess.
+    """
+
+    def test_verify_rejects_relative_path_outside_project_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / "project"
+            root.mkdir()
+            outside = pathlib.Path(tmp) / "outside-secret.txt"
+            outside.write_text("secret bytes that must not be read\n", encoding="utf-8")
+            res = subprocess.run(
+                [sys.executable, str(REPO_ROOT / "scripts/validate.py"), "verify",
+                 "../outside-secret.txt", "--project-root", str(root)],
+                text=True, capture_output=True, timeout=10,
+            )
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("project root", res.stderr)
+        self.assertNotIn("parsing session JSON", res.stderr)
+
+    def test_verify_still_reads_bounded_session_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "session.json").write_text("{not json", encoding="utf-8")
+            res = subprocess.run(
+                [sys.executable, str(REPO_ROOT / "scripts/validate.py"), "verify",
+                 "session.json", "--project-root", str(root)],
+                text=True, capture_output=True, timeout=10,
+            )
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("parsing session JSON", res.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

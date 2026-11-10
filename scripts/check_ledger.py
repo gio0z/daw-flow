@@ -132,6 +132,10 @@ def validate_ledger(
         state = entry.get("state")
         expected_sha = entry.get("sha256")
         record_path_str = entry.get("record")
+        if "record" in entry and (not isinstance(record_path_str, str) or not record_path_str.strip()):
+            findings.append(
+                _error("invalid_record", f"{label}.record", "record must be a non-empty string.")
+            )
 
         if not isinstance(doc_path_str, str) or not doc_path_str.strip():
             findings.append(_error("invalid_path", f"{label}.path", "Document path must be a non-empty string."))

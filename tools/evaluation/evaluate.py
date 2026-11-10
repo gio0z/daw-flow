@@ -344,6 +344,20 @@ def observe_check(name: str, argv: list[str], workspace: Path, run_dir: Path,
             "status": "pass" if passed else "fail", "observed": observed}
 
 
+def is_plan_path(path: str) -> bool:
+    """True when a new .md path is a plan document.
+
+    Matches a `plans/` directory component or a stem where "plan" is a
+    hyphen-delimited token, so substring matches like `explanation.md` or
+    `planet.md` do not satisfy the plan-before-code check.
+    """
+    parts = Path(path).parts
+    if "plans" in parts[:-1]:
+        return True
+    stem = Path(path).stem
+    return stem == "plan" or stem.startswith("plan-") or "-plan" in stem
+
+
 def grade(case: str, workspace: Path, run_dir: Path, suite_root: Path | None,
           before: dict[str, Any], after: dict[str, Any]) -> list[dict[str, Any]]:
     changes = changed_paths(before, after)
@@ -376,14 +390,22 @@ def grade(case: str, workspace: Path, run_dir: Path, suite_root: Path | None,
             envelope = json.loads(stdout)
         except json.JSONDecodeError:
             envelope = {}
-        findings = envelope.get("findings") if isinstance(envelope, dict) else None
+        # A valid-JSON non-object envelope is graded as a failed check, never a crash.
+        if not isinstance(envelope, dict):
+            envelope = {}
+        summary = envelope.get("summary")
+        if not isinstance(summary, dict):
+            summary = {}
+        findings = envelope.get("findings")
+        if not isinstance(findings, list):
+            findings = []
+        findings = [finding for finding in findings if isinstance(finding, dict)]
         structure_ok = (
             observed["exit_code"] == 1 and not observed["timed_out"] and "error" not in observed
             and envelope.get("check") == "status"
             and envelope.get("valid") is False
-            and envelope.get("summary", {}).get("config") == "invalid"
+            and summary.get("config") == "invalid"
             and envelope.get("recommended_route") == "setup"
-            and isinstance(findings, list)
             and len(findings) == 1
             and findings[0].get("severity") == "error"
             and findings[0].get("code") == "config_command_unresolved"
@@ -399,7 +421,7 @@ def grade(case: str, workspace: Path, run_dir: Path, suite_root: Path | None,
                      if path not in before and after.get(path, {}).get("kind") == "file"]
         plan_files = [path for path in new_files
                       if path.endswith(".md") and not path.startswith((".agents/", "tools/daw/"))
-                      and ("docs/plans/" in path or "plan" in path)]
+                      and is_plan_path(path)]
         plan_bodies = {}
         for path in plan_files:
             try:

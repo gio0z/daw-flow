@@ -110,11 +110,6 @@
       "evaluates_workspace": true,
       "conditional_stages": [
         {
-          "stage": "daw-design",
-          "if": "requirements == 'unclear'",
-          "insert_before": "daw-plan"
-        },
-        {
           "stage": "daw-review",
           "if": "risk == 'high'",
           "insert_before": "daw-build",

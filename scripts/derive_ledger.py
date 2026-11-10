@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import sys
 from typing import Any
@@ -141,7 +142,10 @@ def _load_record(
         findings.append(make_warning("derive_record_malformed", rel, "Record root must be an object."))
         return None
     transition = data.get("transition")
-    state = transition.get("to") if isinstance(transition, dict) else None
+    if not isinstance(transition, dict):
+        # Not a doc-transition record (for example a task contract); skip it silently.
+        return None
+    state = transition.get("to")
     if not isinstance(state, str) or state not in LEDGER_STATES:
         findings.append(
             make_warning("derive_record_malformed", rel, "Record transition.to is missing or not a ledger state.")
@@ -155,16 +159,24 @@ def _load_record(
     return data
 
 
-def _record_declarations(data: dict[str, Any]) -> list[tuple[str, str]]:
+def _record_declarations(
+    data: dict[str, Any], findings: list[dict[str, str]], rel: str
+) -> list[tuple[str, str]]:
     """Return usable (document path, declared sha256) pairs from one record."""
     pairs: list[tuple[str, str]] = []
     for entry in data.get("documents") or []:
-        if not isinstance(entry, dict):
-            continue
-        path = entry.get("path")
-        sha = entry.get("sha256")
+        path = entry.get("path") if isinstance(entry, dict) else None
+        sha = entry.get("sha256") if isinstance(entry, dict) else None
         if isinstance(path, str) and path.strip() and _hex64(sha):
             pairs.append((path, sha))
+            continue
+        findings.append(
+            make_warning(
+                "derive_record_malformed",
+                rel,
+                "Record documents[] entry must be an object with a string path and a 64-hex sha256.",
+            )
+        )
     return pairs
 
 
@@ -198,6 +210,21 @@ def _resolve_chain(
         )
         return None
     winner = terminal[0]
+    on_path: set[int] = set()
+    current: dict[str, str] | None = winner
+    while current is not None and id(current) not in on_path:
+        on_path.add(id(current))
+        current = by_to.get(current["from"]) if current.get("from") else None
+    if current is not None or len(on_path) != len(candidates):
+        pairs = ", ".join(f"{c.get('from') or '?'}->{c['to']}" for c in candidates)
+        findings.append(
+            make_error(
+                "derive_doc_conflict",
+                path,
+                f"Transition chain is not one connected path ending at the terminal record ({pairs}).",
+            )
+        )
+        return None
     entry: dict[str, Any] = {
         "path": path,
         "state": winner["to"],
@@ -253,7 +280,7 @@ def derive_ledger(
         rel = path.relative_to(root).as_posix()
         transition = data["transition"]
         from_state = transition.get("from") if isinstance(transition.get("from"), str) else None
-        for doc_path, declared in _record_declarations(data):
+        for doc_path, declared in _record_declarations(data, findings, rel):
             mentioned.add(doc_path)
             doc_resolved, err = resolve_bounded_path(root, doc_path)
             if err or doc_resolved is None:
@@ -291,18 +318,39 @@ def derive_ledger(
             continue
         group = candidates.get(doc_path)
         if not group:
-            reason = (
-                "no record names this document"
-                if doc_path not in mentioned
-                else "every record's sha256 is stale for the current bytes — re-run the review transition"
+            findings.append(
+                make_warning(
+                    "derive_doc_unmapped",
+                    doc_path,
+                    "every record's sha256 is stale for the current bytes — re-run the review transition",
+                )
             )
-            findings.append(make_warning("derive_doc_unmapped", doc_path, reason))
             unmapped.append(doc_path)
             continue
         entry = _resolve_chain(doc_path, group, findings)
         if entry is not None:
             entries.append(entry)
 
+    spec_dir_resolved, spec_dir_err = resolve_bounded_path(root, resolved_spec_dir)
+    if spec_dir_err or spec_dir_resolved is None or not spec_dir_resolved.is_dir():
+        spec_dir_resolved = None
+    if spec_dir_resolved is not None:
+        tracked = {os.path.normpath(p).replace("\\", "/") for p in mentioned}
+        derived = {os.path.normpath(e["path"]).replace("\\", "/") for e in entries}
+        for spec_path in sorted(spec_dir_resolved.glob("*.md")):
+            if not spec_path.is_file() or spec_path.name == LEDGER_FILENAME:
+                continue
+            rel_spec = spec_path.relative_to(root).as_posix()
+            norm_spec = os.path.normpath(rel_spec).replace("\\", "/")
+            if norm_spec in tracked or norm_spec in derived:
+                continue
+            findings.append(
+                make_error(
+                    "derive_doc_untracked",
+                    rel_spec,
+                    "Spec document has no doc-transition record; the derived ledger would omit it.",
+                )
+            )
     for entry in entries:
         if not is_durable_evidence_path(entry["record"]):
             findings.append(
@@ -333,15 +381,24 @@ def derive_ledger(
             if err or ledger_path is None:
                 findings.append(make_error("derive_write_refused", ledger_rel, f"Ledger path is unsafe ({err})."))
             else:
-                try:
-                    ledger_path.parent.mkdir(parents=True, exist_ok=True)
-                    ledger_path.write_text(
-                        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+                if (root / ledger_rel).is_symlink():
+                    findings.append(
+                        make_error(
+                            "derive_write_refused",
+                            ledger_rel,
+                            "Ledger path is a symlink; refusing to follow it.",
+                        )
                     )
-                except OSError:
-                    findings.append(make_error("derive_write_refused", ledger_rel, "Failed to write ledger."))
                 else:
-                    written = ledger_rel
+                    try:
+                        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+                        ledger_path.write_text(
+                            json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+                        )
+                    except OSError:
+                        findings.append(make_error("derive_write_refused", ledger_rel, "Failed to write ledger."))
+                    else:
+                        written = ledger_rel
 
     return {
         "valid": not has_errors(findings),

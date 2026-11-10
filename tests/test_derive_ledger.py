@@ -151,6 +151,94 @@ class TestDeriveLedger(DeriveLedgerTestBase):
         self.assertEqual(code, 1)
         self.assertIn("derive_doc_conflict", [f["code"] for f in result["findings"]])
 
+    def test_single_terminal_disconnected_chain_refuses_write(self) -> None:
+        doc = self.write_doc("docs/specs/prd.md")
+        current = _sha(doc)
+        self.write_record("a-intake.json", to="authoring", from_state="intake", docs=[("docs/specs/prd.md", current)])
+        self.write_record("b-review.json", to="rework", from_state="review", docs=[("docs/specs/prd.md", current)])
+        self.write_record("c-rework.json", to="review", from_state="rework", docs=[("docs/specs/prd.md", current)])
+
+        code, result = self.run_derive("--write")
+
+        self.assertEqual(code, 1)
+        codes = [f["code"] for f in result["findings"]]
+        self.assertIn("derive_doc_conflict", codes)
+        self.assertIn("derive_write_refused", codes)
+        self.assertIsNone(result["written"])
+        self.assertFalse((self.root / "docs" / "specs" / "ledger.json").exists())
+
+    def test_symlink_ledger_path_is_never_followed(self) -> None:
+        doc = self.write_doc("docs/specs/prd.md")
+        self.write_record("r1.json", to="review", docs=[("docs/specs/prd.md", _sha(doc))])
+        target = self.root / "docs" / "decisions" / "victim.json"
+        target.write_text('{"keep": true}\n', encoding="utf-8")
+        ledger_path = self.root / "docs" / "specs" / "ledger.json"
+        ledger_path.symlink_to(target)
+
+        code, result = self.run_derive("--write")
+
+        self.assertEqual(code, 1)
+        self.assertIn("derive_write_refused", [f["code"] for f in result["findings"]])
+        self.assertIsNone(result["written"])
+        self.assertTrue(ledger_path.is_symlink())
+        self.assertEqual(json.loads(target.read_text(encoding="utf-8")), {"keep": True})
+
+    def test_untracked_spec_refuses_write(self) -> None:
+        tracked = self.write_doc("docs/specs/prd.md")
+        self.write_doc("docs/specs/frd.md")
+        self.write_record("r1.json", to="review", docs=[("docs/specs/prd.md", _sha(tracked))])
+
+        code, result = self.run_derive("--write")
+
+        self.assertEqual(code, 1)
+        codes = [f["code"] for f in result["findings"]]
+        self.assertIn("derive_doc_untracked", codes)
+        self.assertIn("derive_write_refused", codes)
+        untracked = [f["path"] for f in result["findings"] if f["code"] == "derive_doc_untracked"]
+        self.assertEqual(untracked, ["docs/specs/frd.md"])
+        self.assertIsNone(result["written"])
+        self.assertFalse((self.root / "docs" / "specs" / "ledger.json").exists())
+
+    def test_task_contract_is_skipped_silently(self) -> None:
+        doc = self.write_doc("docs/specs/prd.md")
+        self.write_record("r1.json", to="review", docs=[("docs/specs/prd.md", _sha(doc))])
+        contract = self.root / "docs" / "evidence" / "t1" / "contract.json"
+        contract.parent.mkdir(parents=True, exist_ok=True)
+        contract.write_text(
+            json.dumps({"schema_version": 1, "objective": "task contract", "baseline": {}}),
+            encoding="utf-8",
+        )
+
+        code, result = self.run_derive("--write")
+
+        self.assertEqual(code, 0, result)
+        self.assertNotIn("derive_record_malformed", [f["code"] for f in result["findings"]])
+        self.assertEqual(result["documents"], 1)
+
+    def test_malformed_document_entries_warn(self) -> None:
+        doc = self.write_doc("docs/specs/prd.md")
+        payload = {
+            "schema_version": 1,
+            "transition": {"from": "rework", "to": "review"},
+            "objective": "test",
+            "scope": "test",
+            "reviewer": {"id": "reviewer-1", "kind": "agent", "author_id": "author-1"},
+            "documents": [
+                {"path": "docs/specs/prd.md", "kind": "spec", "sha256": _sha(doc)},
+                {"path": 123, "sha256": "0" * 64},
+                "not-an-object",
+                {"path": "docs/specs/other.md", "sha256": "not-a-sha"},
+            ],
+        }
+        (self.root / "docs" / "decisions" / "r1.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        code, result = self.run_derive("--write")
+
+        self.assertEqual(code, 0, result)
+        malformed = [f for f in result["findings"] if f["code"] == "derive_record_malformed"]
+        self.assertEqual(len(malformed), 3, result["findings"])
+        self.assertEqual(result["documents"], 1)
+
     def test_dry_run_writes_nothing(self) -> None:
         doc = self.write_doc("docs/specs/prd.md")
         self.write_record("r1.json", to="review", docs=[("docs/specs/prd.md", _sha(doc))])

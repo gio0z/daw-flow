@@ -23,9 +23,13 @@ LEG_STATUSES = ("passed", "failing", "unexercised")
 PHONE_MAX_WIDTH = 480
 DESKTOP_MIN_WIDTH = 1024
 
-# A wire outcome must name a concrete result: an HTTP status, a process exit
-# code, or an explicit -> N. A bare endpoint path proves nothing.
-_WIRE_OUTCOME = re.compile(r"(\b[1-5]\d\d\b)|(\bexit\s+\d+\b)|(->\s*\d+)")
+# A wire outcome must name a concrete result: an HTTP status following a method
+# (or an explicit -> N), or a process exit code. A bare number proves nothing.
+_WIRE_OUTCOME = re.compile(
+    r"(\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\S+\s+[1-5]\d\d\b)"
+    r"|(\bexit\s+\d+\b)"
+    r"|(->\s*\d+)"
+)
 
 _UI_SCOPE_PREFIXES = (
     "frontend/",
@@ -267,5 +271,13 @@ def validate_surface_declaration(
     if not isinstance(declared, str) or declared not in SURFACES:
         findings.append(
             _error("surface_declaration_invalid", "surface", f"surface must be one of {list(SURFACES)}.")
+        )
+    elif declared == SURFACE_NON_UI and infer_ui_scope(scope):
+        findings.append(
+            _error(
+                "surface_declaration_mismatch",
+                "surface",
+                "The write scope looks like a rendered surface but `surface` is \"non-ui\"; declare \"ui\" and record the surface session, or narrow the scope.",
+            )
         )
     return findings

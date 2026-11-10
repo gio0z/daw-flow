@@ -222,19 +222,36 @@ Scoped N/A is allowed for: backend-only changes with no rendered surface, flows 
 Record the session as `details.surface_session`:
 
 ```json
-{"role": "PETUGAS_TPS",
- "viewport": {"width": 1440, "height": 900},
- "legs": [
-   {"name": "create deposit for today",
-    "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
-    "wire": "POST /api/v1/deposits -> 201",
-    "message": "Setoran berhasil disimpan."}
- ]}
+{
+  "role": "PETUGAS_TPS",
+  "viewports": [
+    { "width": 390, "height": 844 },
+    { "width": 1440, "height": 900 }
+  ],
+  "legs": [
+    {
+      "kind": "write",
+      "name": "create deposit for today",
+      "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
+      "wire": "POST /api/v1/deposits -> 201",
+      "message": "Setoran berhasil disimpan.",
+      "status": "passed"
+    },
+    {
+      "kind": "read_back",
+      "name": "reopen the deposits screen",
+      "interaction": "reload and read the saved row",
+      "wire": "GET /api/v1/deposits?date=2026-11-09 -> 200",
+      "message": "1 setoran hari ini",
+      "status": "passed"
+    }
+  ]
+}
 ```
 
 A leg that was never walked stays `unexercised` and blocks acceptance of the UI criterion it covers.
 
-**Mechanical enforcement:** `python3 "$SUITE_ROOT/scripts/validate.py" verify surface-session.json --project-root <project> --stage complete` checks the parts a machine can decide — role, both viewports, a `write` and a `read_back` leg, a wire outcome with a concrete status/exit, a non-blank operator message, and `passed` status on every leg. Declaring `surface: "ui"` in the task contract makes the same check mandatory at `contract --stage complete` (`surface_session_missing`, `surface_leg_not_passed`). Passing it never replaces the parent's inspection of the recorded observations.
+**Mechanical enforcement:** `python3 "$SUITE_ROOT/scripts/validate.py" verify surface-session.json --project-root <project> --stage complete` checks the parts a machine can decide — role, both viewports, a `write` and a `read_back` leg, a wire outcome with a concrete status/exit, a non-blank operator message, and `passed` status on every leg. Declaring `surface: "ui"` in the task contract makes the same check mandatory at `contract --stage complete` (`surface_session_missing`, `surface_leg_not_passed`). Declaring `surface: "non-ui"` over a UI-shaped `operation.scope` is rejected with `surface_declaration_mismatch`; the session is enforced only when `surface` is declared `"ui"`. Passing it never replaces the parent's inspection of the recorded observations.
 
 ---
 
@@ -292,13 +309,26 @@ Illustrative `details` only (not a complete handoff; wrap in the canonical envel
   },
   "surface_session": {
     "role": "PETUGAS_TPS",
-    "viewport": { "width": 1440, "height": 900 },
+    "viewports": [
+      { "width": 390, "height": 844 },
+      { "width": 1440, "height": 900 }
+    ],
     "legs": [
       {
+        "kind": "write",
         "name": "create deposit for today",
         "interaction": "fill ID/date/volume/fat/SNF, click Simpan setoran",
         "wire": "POST /api/v1/deposits -> 201",
-        "message": "Setoran berhasil disimpan."
+        "message": "Setoran berhasil disimpan.",
+        "status": "passed"
+      },
+      {
+        "kind": "read_back",
+        "name": "reopen the deposits screen",
+        "interaction": "reload and read the saved row",
+        "wire": "GET /api/v1/deposits?date=2026-11-09 -> 200",
+        "message": "1 setoran hari ini",
+        "status": "passed"
       }
     ]
   },

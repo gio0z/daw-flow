@@ -45,6 +45,7 @@ _MANIFEST_PATH = "references/suite-manifest.json"
 _FLOW_SCHEMA_VERSION = 1
 _EXPECTED_STEP_COUNT = 8
 _ALLOWED_SOURCES = frozenset({"spec-kit", "superpowers", "pocock", "original"})
+_REQUIRED_CROSS_LINKS = ("SKILL.md", "references/routing.md")
 _JSON_PARSE_ERRORS = (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError)
 
 # Local bounded-input guard: daw_common does not expose a shared constant.
@@ -134,12 +135,13 @@ def _parse_flow_mapping(
 
 
 def _validate_mapping_fields(root: pathlib.Path, mapping: dict[str, Any], findings: list[dict[str, str]]) -> int:
-    if mapping.get("flow_schema_version") != _FLOW_SCHEMA_VERSION:
+    version = mapping.get("flow_schema_version")
+    if isinstance(version, bool) or not isinstance(version, int) or version != _FLOW_SCHEMA_VERSION:
         findings.append(
             make_error(
                 "flow_schema_version_invalid",
                 "flow_schema_version",
-                f"flow_schema_version must be {_FLOW_SCHEMA_VERSION}.",
+                f"flow_schema_version must be integer {_FLOW_SCHEMA_VERSION}.",
             )
         )
     steps = mapping.get("steps")
@@ -154,6 +156,7 @@ def _validate_mapping_fields(root: pathlib.Path, mapping: dict[str, Any], findin
         )
         return count
     step_ids = _validate_steps(root, steps, findings)
+    _validate_artifact_steps(mapping.get("artifact_steps"), step_ids, findings)
     _validate_cross_links(root, mapping.get("cross_links"), findings)
     return len(steps)
 
@@ -177,13 +180,13 @@ def _validate_steps(root: pathlib.Path, steps: list[Any], findings: list[dict[st
                     f"Step id must be {expected_id!r} at index {index}.",
                 )
             )
-        if step_id in seen:
-            findings.append(
-                make_error("flow_duplicate_step", f"steps[{index}].id", f"Duplicate step id {step_id!r}.")
-            )
-        elif isinstance(step_id, str):
-            seen.add(step_id)
         if isinstance(step_id, str):
+            if step_id in seen:
+                findings.append(
+                    make_error("flow_duplicate_step", f"steps[{index}].id", f"Duplicate step id {step_id!r}.")
+                )
+            else:
+                seen.add(step_id)
             known.add(step_id)
         for field in ("name", "anchor"):
             value = step.get(field)
@@ -203,7 +206,8 @@ def _validate_steps(root: pathlib.Path, steps: list[Any], findings: list[dict[st
                     "Step field 'mandatory' must be true.",
                 )
             )
-        if step.get("source") not in _ALLOWED_SOURCES:
+        source = step.get("source")
+        if not isinstance(source, str) or source not in _ALLOWED_SOURCES:
             findings.append(
                 make_error(
                     "flow_source_invalid",
@@ -215,6 +219,71 @@ def _validate_steps(root: pathlib.Path, steps: list[Any], findings: list[dict[st
         if isinstance(anchor, str) and anchor.strip():
             _validate_anchor(root, anchor, index, findings)
     return known
+
+
+def _validate_artifact_steps(
+    artifact_steps: Any, step_ids: set[str], findings: list[dict[str, str]]
+) -> None:
+    """Validate artifact_steps entries against the known step ids."""
+    if not isinstance(artifact_steps, list):
+        findings.append(
+            make_error(
+                "flow_artifact_step_invalid",
+                "artifact_steps",
+                "artifact_steps must be an array of objects.",
+            )
+        )
+        return
+    for index, entry in enumerate(artifact_steps):
+        label = f"artifact_steps[{index}]"
+        if not isinstance(entry, dict):
+            findings.append(
+                make_error(
+                    "flow_artifact_step_invalid",
+                    label,
+                    "Each artifact_steps entry must be a JSON object.",
+                )
+            )
+            continue
+        step = entry.get("step")
+        if not isinstance(step, str) or not step.strip():
+            findings.append(
+                make_error(
+                    "flow_artifact_step_invalid",
+                    f"{label}.step",
+                    "artifact_steps[].step must be a non-blank string.",
+                )
+            )
+        elif step not in step_ids:
+            findings.append(
+                make_error(
+                    "flow_artifact_step_unknown",
+                    f"{label}.step",
+                    f"Unknown artifact step {step!r}.",
+                )
+            )
+        patterns = entry.get("patterns")
+        if (
+            not isinstance(patterns, list)
+            or not patterns
+            or not all(isinstance(pattern, str) and pattern.strip() for pattern in patterns)
+        ):
+            findings.append(
+                make_error(
+                    "flow_artifact_step_invalid",
+                    f"{label}.patterns",
+                    "artifact_steps[].patterns must be a non-empty array of non-blank strings.",
+                )
+            )
+        require_text = entry.get("require_text")
+        if require_text is not None and (not isinstance(require_text, str) or not require_text.strip()):
+            findings.append(
+                make_error(
+                    "flow_artifact_step_invalid",
+                    f"{label}.require_text",
+                    "artifact_steps[].require_text must be a non-empty string or null.",
+                )
+            )
 
 
 def _validate_anchor(root: pathlib.Path, anchor: str, index: int, findings: list[dict[str, str]]) -> None:
@@ -300,9 +369,20 @@ def _validate_cross_links(root: pathlib.Path, cross_links: Any, findings: list[d
                     f"Cross-link {entry!r} does not mention best-practice-flow.md.",
                 )
             )
+    for required in _REQUIRED_CROSS_LINKS:
+        if required not in cross_links:
+            findings.append(
+                make_error(
+                    "flow_missing_link",
+                    required,
+                    f"cross_links must include {required!r}.",
+                )
+            )
 
 
-def _validate_manifest(root: pathlib.Path, step_ids: set[str], findings: list[dict[str, str]]) -> None:
+def _validate_manifest(
+    root: pathlib.Path, step_ids: set[str], artifact_steps: Any, findings: list[dict[str, str]]
+) -> None:
     manifest, err = resolve_bounded_path(root, _MANIFEST_PATH)
     if manifest is None or err is not None:
         findings.append(make_error("flow_manifest_gate_missing", "flow_gate", f"Manifest path is unsafe ({err})."))
@@ -333,19 +413,49 @@ def _validate_manifest(root: pathlib.Path, step_ids: set[str], findings: list[di
         findings.append(
             make_error("flow_manifest_gate_missing", "flow_gate", "flow_gate.document must be a non-empty string.")
         )
+    elif document != _FLOW_DOC_PATH:
+        findings.append(
+            make_error(
+                "flow_gate_document_mismatch",
+                "flow_gate.document",
+                f"flow_gate.document must be {_FLOW_DOC_PATH!r} so both gates read the same document.",
+            )
+        )
     required_steps = gate.get("required_steps")
     if not isinstance(required_steps, list) or not required_steps:
         findings.append(
             make_error("flow_manifest_gate_missing", "flow_gate", "flow_gate.required_steps must be a non-empty array.")
         )
     else:
+        checked_steps = {
+            entry.get("step")
+            for entry in artifact_steps
+            if isinstance(entry, dict) and isinstance(entry.get("step"), str)
+        }
         for entry in required_steps:
+            if not isinstance(entry, str):
+                findings.append(
+                    make_error(
+                        "flow_gate_step_unknown",
+                        "flow_gate.required_steps",
+                        "flow_gate.required_steps entries must be strings.",
+                    )
+                )
+                continue
             if entry not in step_ids:
                 findings.append(
                     make_error(
                         "flow_gate_step_unknown",
                         "flow_gate.required_steps",
                         f"Unknown flow gate step {entry!r}.",
+                    )
+                )
+            elif entry not in checked_steps:
+                findings.append(
+                    make_error(
+                        "flow_artifact_step_missing",
+                        "flow_gate.required_steps",
+                        f"Required flow gate step {entry!r} has no artifact_steps entry.",
                     )
                 )
     affected = gate.get("affected_intents")
@@ -357,6 +467,15 @@ def _validate_manifest(root: pathlib.Path, step_ids: set[str], findings: list[di
         routes = data.get("routes")
         route_keys = set(routes) if isinstance(routes, dict) else set()
         for entry in affected:
+            if not isinstance(entry, str):
+                findings.append(
+                    make_error(
+                        "flow_gate_intent_unknown",
+                        "flow_gate.affected_intents",
+                        "flow_gate.affected_intents entries must be strings.",
+                    )
+                )
+                continue
             if entry not in route_keys:
                 findings.append(
                     make_error(
@@ -379,5 +498,5 @@ def validate_flow(project_root: pathlib.Path) -> dict[str, Any]:
             if isinstance(step, dict) and isinstance(step.get("id"), str)
         }
     if mapping is not None:
-        _validate_manifest(root, step_ids, findings)
+        _validate_manifest(root, step_ids, mapping.get("artifact_steps"), findings)
     return _envelope(steps_count, findings)

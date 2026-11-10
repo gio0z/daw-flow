@@ -367,9 +367,16 @@ def main() -> None:
             sys.stderr.write("Error: Project root is not a directory.\n")
             sys.exit(2)
 
-        session_file = pathlib.Path(args.file)
+        raw_session_str = str(args.file)
+        session_file = pathlib.Path(raw_session_str)
         if not session_file.is_absolute():
-            session_file = proj_root / session_file
+            bounded_session, bound_err = resolve_bounded_path(proj_root, raw_session_str)
+            if bound_err or bounded_session is None:
+                sys.stderr.write(
+                    f"Error: Session file path is not bounded by the project root: {raw_session_str}\n"
+                )
+                sys.exit(2)
+            session_file = bounded_session
         try:
             if not session_file.is_file():
                 sys.stderr.write("Error: Session file does not exist or is not a file.\n")

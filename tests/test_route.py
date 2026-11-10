@@ -788,6 +788,223 @@ class TestRouteSuite(unittest.TestCase):
             data = json.loads(proc.stdout)
             self.assertEqual(data["status"], "ready")
 
+    def _write_manifest(self, data: dict) -> None:
+        manifest_file = self.suite_root / "references" / "suite-manifest.json"
+        manifest_file.write_text(json.dumps(data), encoding="utf-8")
+
+    def _clean_manifest(self) -> dict:
+        return json.loads((REPO_ROOT / "references" / "suite-manifest.json").read_text(encoding="utf-8"))
+
+    def _run_session_start(self, project_root: pathlib.Path, cwd=None):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        cmd = [sys.executable, script_path, "--session-start", "--root", str(self.suite_root), "--project-root", str(project_root)]
+        return subprocess.run(cmd, capture_output=True, text=True)
+
+    def test_session_start_detects_project_artifacts(self):
+        # Config block + plans -> feature; suggestion resolves without REQUEST_INVALID_INTENT.
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            (project_root / "AGENTS.md").write_text(
+                "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", encoding="utf-8"
+            )
+            plans = project_root / "docs" / "plans"
+            plans.mkdir(parents=True)
+            (plans / "plan.md").write_text("# Plan\n", encoding="utf-8")
+            proc = self._run_session_start(project_root)
+            self.assertEqual(proc.returncode, 0, msg=proc.stdout + proc.stderr)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "ready")
+            self.assertEqual(data["stages"], ["daw-plan", "daw-build", "daw-review", "daw-verify"])
+            self.assertFalse(any(b["code"] == "REQUEST_INVALID_INTENT" for b in data["blockers"]))
+            self.assertTrue(any("recommend feature" in r for r in data["reasons"]))
+
+    def test_session_start_suggestion_mapping(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        cases = [
+            ("evidence", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/evidence/e.md": "evidence\n"}, ["daw-ship"]),
+            ("workflows", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/workflows/w.md": "# Workflow\n"}, ["daw-review"]),
+            ("specs", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/specs/prd.md": "# PRD\n"}, ["daw-plan", "daw-build", "daw-review", "daw-verify"]),
+            ("bootstrap", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n"}, ["daw-wizard", "daw-design", "daw-plan"]),
+            ("setup", {}, ["daw-setup"]),
+        ]
+        for name, files, expected_stages in cases:
+            with self.subTest(case=name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    project_root = pathlib.Path(tmp)
+                    for rel, content in files.items():
+                        target = project_root / rel
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(content, encoding="utf-8")
+                    cmd = [sys.executable, script_path, "--session-start", "--root", str(self.suite_root), "--project-root", str(project_root)]
+                    proc = subprocess.run(cmd, capture_output=True, text=True)
+                    self.assertEqual(proc.returncode, 0, msg=proc.stdout + proc.stderr)
+                    data = json.loads(proc.stdout)
+                    self.assertEqual(data["status"], "ready")
+                    self.assertEqual(data["stages"], expected_stages)
+                    self.assertFalse(any(b["code"] == "REQUEST_INVALID_INTENT" for b in data["blockers"]))
+
+    def test_session_start_uses_cwd_without_project_root_flag(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            (project_root / "AGENTS.md").write_text(
+                "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", encoding="utf-8"
+            )
+            (project_root / "docs" / "workflows").mkdir(parents=True)
+            (project_root / "docs" / "workflows" / "w.md").write_text("# Workflow\n", encoding="utf-8")
+            cmd = [sys.executable, script_path, "--session-start", "--root", str(self.suite_root)]
+            proc = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+            self.assertEqual(proc.returncode, 0, msg=proc.stdout + proc.stderr)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "ready")
+            self.assertEqual(data["stages"], ["daw-review"])
+
+    def test_feature_route_accepts_pre_enterprise_keys(self):
+        clean = self._clean_manifest()
+        data = json.loads(json.dumps(clean))
+        feature = data["routes"]["feature"]
+        for key in ("conditional_stages", "parallel_groups", "extension_hooks"):
+            feature.pop(key, None)
+        self._write_manifest(data)
+        self.assertEqual(route.check_suite(self.suite_root), [])
+
+        req = make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-plan", "daw-build", "daw-review", "daw-verify"])
+
+        # Unknown keys are still rejected.
+        data["routes"]["feature"]["unexpected_extra"] = True
+        self._write_manifest(data)
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_SHAPE_INVALID" for f in findings))
+
+        # Missing canonical keys are still rejected.
+        data = json.loads(json.dumps(clean))
+        data["routes"]["feature"].pop("evaluates_workspace")
+        self._write_manifest(data)
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_SHAPE_INVALID" for f in findings))
+
+    def test_conditional_stage_placement_validation(self):
+        clean = self._clean_manifest()
+        cases = [
+            ("insert_before_unknown", {"stage": "daw-review", "if": "risk == 'high'", "insert_before": "daw-nope"}),
+            ("insert_after_unknown", {"stage": "daw-review", "if": "risk == 'high'", "insert_after": "daw-nope"}),
+            ("both_placements", {"stage": "daw-review", "if": "risk == 'high'", "insert_before": "daw-build", "insert_after": "daw-verify"}),
+            ("unknown_stage", {"stage": "daw-nope", "if": "risk == 'high'", "insert_before": "daw-build"}),
+            ("insert_before_not_string", {"stage": "daw-review", "if": "risk == 'high'", "insert_before": ["daw-build"]}),
+        ]
+        for name, cs in cases:
+            with self.subTest(case=name):
+                data = json.loads(json.dumps(clean))
+                data["routes"]["bugfix"]["conditional_stages"] = [cs]
+                self._write_manifest(data)
+                findings = route.check_suite(self.suite_root)
+                self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_CONDITIONAL_INVALID" for f in findings), name)
+
+        # A well-formed conditional stage validates and resolves at runtime.
+        data = json.loads(json.dumps(clean))
+        data["routes"]["bugfix"]["conditional_stages"] = [
+            {"stage": "daw-ask", "if": "risk == 'high'", "insert_before": "daw-verify"}
+        ]
+        self._write_manifest(data)
+        self.assertEqual(route.check_suite(self.suite_root), [])
+        req = make_request(intent="bugfix", requirements="clear", risk="high", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["status"], "ready")
+        self.assertEqual(res["stages"], ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-ask", "daw-verify"])
+        req = make_request(intent="bugfix", requirements="clear", risk="low", workspace="in-place")
+        res = route.resolve_route(req, root=self.suite_root)
+        self.assertEqual(res["stages"], ["daw-debug", "daw-plan", "daw-build", "daw-review", "daw-verify"])
+
+    def test_condition_expression_grammar_validation(self):
+        clean = self._clean_manifest()
+        cases = [
+            ("risk == high", True),
+            ("risk == 'high'", False),
+            ("requirements == 'unclear' AND risk == 'high'", False),
+            ("requirements == 'unclear' OR risk == 'high'", False),
+            ("NOT risk == 'high'", False),
+            ("(requirements == 'unclear') AND (risk == 'high')", False),
+            ("risk != 'high'", False),
+            ("intent == 'ship' AND risk > 1", False),
+            ("risk == 'high' AND", True),
+            ("risk == 'high' unknown_token", True),
+            ("risk == ", True),
+            ("(risk == 'high'", True),
+            ("", True),
+        ]
+        for expr, should_fail in cases:
+            with self.subTest(expr=expr):
+                data = json.loads(json.dumps(clean))
+                data["routes"]["bugfix"]["conditional_stages"] = [
+                    {"stage": "daw-ask", "if": expr, "insert_before": "daw-verify"}
+                ]
+                self._write_manifest(data)
+                findings = route.check_suite(self.suite_root)
+                has_finding = any(
+                    f["code"] == "MANIFEST_ROUTE_CONDITIONAL_INVALID" and "if" in f["message"]
+                    for f in findings
+                )
+                self.assertEqual(has_finding, should_fail, expr)
+        # The unquoted-literal failure names the unknown identifier.
+        data = json.loads(json.dumps(clean))
+        data["routes"]["bugfix"]["conditional_stages"] = [
+            {"stage": "daw-ask", "if": "risk == high", "insert_before": "daw-verify"}
+        ]
+        self._write_manifest(data)
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any("Unknown identifier 'high'" in f["message"] for f in findings))
+
+    def test_parallel_groups_and_extension_hooks_validation(self):
+        clean = self._clean_manifest()
+        data = json.loads(json.dumps(clean))
+        data["routes"]["bugfix"]["parallel_groups"] = [["daw-build", "daw-nope"]]
+        self._write_manifest(data)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_PARALLEL_INVALID" for f in route.check_suite(self.suite_root)))
+
+        data = json.loads(json.dumps(clean))
+        data["routes"]["bugfix"]["parallel_groups"] = [["daw-build", 1]]
+        self._write_manifest(data)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_PARALLEL_INVALID" for f in route.check_suite(self.suite_root)))
+
+        data = json.loads(json.dumps(clean))
+        data["routes"]["bugfix"]["extension_hooks"] = {"after_build": [1]}
+        self._write_manifest(data)
+        self.assertTrue(any(f["code"] == "MANIFEST_ROUTE_HOOKS_INVALID" for f in route.check_suite(self.suite_root)))
+
+    def test_flow_gate_rejects_never_gated_intent(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        data = self._clean_manifest()
+        data["flow_gate"]["affected_intents"] = ["feature", "review"]
+        self._write_manifest(data)
+        findings = route.check_suite(self.suite_root)
+        self.assertTrue(any(f["code"] == "MANIFEST_FLOW_GATE_NEVER_GATED_INTENT" for f in findings))
+        cmd = [sys.executable, script_path, "--check-suite", "--root", str(self.suite_root)]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_flow_gate_unreadable_on_deeply_nested_mapping(self):
+        script_path = str(REPO_ROOT / "scripts" / "route.py")
+        flow_file = self.suite_root / "references" / "best-practice-flow.md"
+        deep_json = '{"steps": ' + "[" * 200000 + "]" * 200000 + "}"
+        flow_file.write_text("```json\n" + deep_json + "\n```\n", encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = pathlib.Path(tmp)
+            req_file = self.suite_root / "request.json"
+            req_file.write_text(
+                json.dumps(make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")),
+                encoding="utf-8",
+            )
+            cmd = [sys.executable, script_path, str(req_file), "--root", str(self.suite_root), "--project-root", str(project_root)]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertNotIn("Traceback", proc.stderr)
+            self.assertEqual(proc.returncode, 1)
+            data = json.loads(proc.stdout)
+            self.assertEqual(data["status"], "blocked")
+            self.assertTrue(any(b["code"] == "FLOW_GATE_UNREADABLE" for b in data["blockers"]))
+
 
 if __name__ == "__main__":
     unittest.main()
