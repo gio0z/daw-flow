@@ -156,12 +156,13 @@ The evidence file is the artifact a task contract's `evidence[]` entry points at
 
 ## 6. The AFK Loop
 
-`run.py run` is the unattended path: take the next ready task, hand it its context pack to an operator-supplied agent command, then verify it.
+`run.py run` is the unattended path: acquire the integration lock, repeatedly select the next batch of ready tasks, run each task in its own git worktree through the batch mechanism (§8), and integrate passing results through the same per-task or composite merge gate into `daw/integration`. Agents never execute in the user's working tree.
 
-- `--agent-command` is a JSON argv array. The runner substitutes `{prompt_file}`, `{workspace}`, and `{task_id}`; the prompt also arrives on stdin. The runner never discovers or enables an agent.
-- `--dry-run` prints the argv without executing it.
-- The loop stops at the first task whose agent or verification fails, and at `--max-tasks`.
-- A task is added to the accepted set only when both the agent and the verification succeeded.
+- `--agent-command` is a JSON argv array. The runner substitutes `{prompt_file}`, `{workspace}`, and `{task_id}` per member (with `{workspace}` pointing at each task's worktree); the prompt also arrives on stdin. The runner never discovers or enables an agent.
+- `--max-tasks` counts **tasks** processed in this invocation (default `1`). `--max-concurrency` bounds the size of each batch group (default: unlimited).
+- The accepted set is the union of `--accepted` / `--accepted-file` and the merged/accepted task ids recorded in the isolation state file (`--state`, defaulting to `docs/daw/evidence/runner/isolation.json`). Before executing batches, accepted ids with recorded merge commits are checked for ancestry on `daw/integration` (`batch_accepted_not_integrated` on mismatch).
+- A failed task (`red`, conflict, escape, or unintegrated) is recorded in `failed`, is never retried within the same invocation, and does not stop other ready tasks from proceeding. The loop ends with `stopped` set to `max_tasks`, `no_ready_task`, or `all_failed`, and exits `1` whenever `failed` is non-empty or error findings exist.
+- `--dry-run` computes and prints the planned batches, branches, and substituted argvs without touching disk or git.
 
 A passing verification is **evidence, not authorization**. It says the prescribed command exited `0` on this revision. It does not certify semantic correctness, and it grants no permission to merge, push, or deploy.
 
@@ -358,10 +359,10 @@ python3 "$SKILL_DIR/scripts/run.py" batch \
   --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
   --agent-command '["claude","-p","{prompt_file}"]' --max-concurrency 4
 
-# Unattended loop over ready tasks with an operator-supplied agent.
+# Unattended isolated batch loop over ready tasks with an operator-supplied agent.
 python3 "$SKILL_DIR/scripts/run.py" run \
   --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
-  --agent-command '["claude","-p","{prompt_file}"]' --max-tasks 5
+  --agent-command '["claude","-p","{prompt_file}"]' --max-tasks 5 --max-concurrency 2
 ```
 
 Every verb prints a JSON envelope with `findings` and `limitations`, and exits `0` on success, `1` on findings or a failed verification, `2` on a usage or environment error.
