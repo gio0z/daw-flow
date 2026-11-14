@@ -596,17 +596,58 @@ def ensure_integration_worktree(
     }
 
 
+def check_task_branch_tip(
+    repo: pathlib.Path,
+    task_id: str,
+    title: str,
+    require_tip: str,
+) -> None:
+    """Refuse a pre-existing task branch whose tip is not ``require_tip``."""
+    branch = branch_name_for(task_id, title)
+    if not branch_exists(repo, branch):
+        return
+    actual = branch_commit(repo, branch)
+    if actual != require_tip:
+        raise IsolationError(
+            f"The task branch {branch} is at {actual}, not at the batch's base "
+            f"{require_tip}. Its prior work would be merged unverified, so the "
+            f"batch is refused. Start clean with: python3 scripts/worktree.py "
+            f"remove --project-root {repo} --task {task_id} --delete-branch",
+            [
+                _error(
+                    "batch_stale_branch",
+                    str(task_id),
+                    f"The task branch {branch} is at {actual}, but the batch's base "
+                    f"commit is {require_tip}. Remove it and its worktree to start "
+                    f"clean: python3 scripts/worktree.py remove --project-root "
+                    f"{repo} --task {task_id} --delete-branch",
+                )
+            ],
+        )
+
+
 def ensure_task_worktree(
     repo: pathlib.Path,
     worktree_root: str,
     task_id: str,
     title: str,
     base_ref: str | None,
+    require_tip: str | None = None,
 ) -> dict[str, Any]:
-    """Create (or reuse) the branch and worktree that hold one task's work."""
+    """Create (or reuse) the branch and worktree that hold one task's work.
+
+    ``require_tip`` names the commit the branch must be at. When the branch
+    already exists at a different commit it carries a prior attempt's work:
+    reusing it would merge that work into the composite unverified, and
+    resetting it would destroy the attempt the operator may still want to
+    review. The branch is therefore refused, and the operator decides.
+    """
     branch = branch_name_for(task_id, title)
     rel = task_worktree_rel(worktree_root, task_id)
     path = repo / rel
+
+    if require_tip is not None:
+        check_task_branch_tip(repo, task_id, title, require_tip)
 
     existing = worktree_for_branch(repo, branch)
     if existing is not None:

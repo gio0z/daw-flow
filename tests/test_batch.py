@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Behavior tests for `scripts/batch.py`.
+"""Behavior tests for `scripts/batch.py` and the runner's `batch` verb.
 
-Two sections: write-set disjointness and batch selection, and the composite
-merge gate. The composite tests run against real git repositories — the gate
-only means something when git actually merges the members and the record's
-claims are checked against the history it produced.
+Three sections: write-set disjointness and batch selection, the composite
+merge gate, and the batch execution itself. The last two run against real git
+repositories — the gate only means something when git actually merges the
+members and the record's claims are checked against the history it produced,
+and the batch only means something when git actually merges the composite.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import pathlib
 import shutil
 import subprocess
@@ -18,6 +20,7 @@ import tempfile
 import unittest
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
+RUNNER = PROJECT_ROOT / "scripts" / "run.py"
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 try:
@@ -968,6 +971,560 @@ class CompositeGateHardeningTests(CompositeRepoBase):
         self.assertIn(
             "merge_not_verified", [f["code"] for f in caught.exception.findings]
         )
+
+
+# --------------------------------------------------------------------------
+# The `batch` verb
+# --------------------------------------------------------------------------
+
+BATCH_PLAN_TEMPLATE = """# Plan: batch test
+
+<!-- daw-task-manifest -->
+```json
+{
+  "schema_version": 1,
+  "workflow_id": "wf-batch",
+  "tasks": [
+    {
+      "task_id": "TASK-ALPHA",
+      "title": "Alpha change",
+      "autonomy": "afk",
+      "depends_on": [],
+      "parallel_safe": true,
+      "target_files": ["src/alpha.py"],
+      "acceptance_criteria": ["alpha is green"],
+      "verification_command": "python3 -c \\"import src.alpha; assert src.alpha.VALUE == 2\\"",
+      "expected_outcome": "0 exit code"
+    },
+    {
+      "task_id": "TASK-BETA",
+      "title": "Beta change",
+      "autonomy": "afk",
+      "depends_on": [],
+      "parallel_safe": true,
+      "target_files": ["src/beta.py"],
+      "acceptance_criteria": ["beta is green"],
+      "verification_command": "python3 -c \\"import src.beta; assert src.beta.VALUE == 2\\"",
+      "expected_outcome": "0 exit code"
+    }
+  ]
+}
+```
+"""
+
+#: A plan whose two tasks declare the same write set, so the runner must
+#: serialize them into separate batches.
+OVERLAPPING_PLAN_TEMPLATE = BATCH_PLAN_TEMPLATE.replace(
+    '"target_files": ["src/beta.py"]', '"target_files": ["src/alpha.py"]'
+)
+
+#: Disjoint declarations let these tasks run together; both edit different
+#: lines of an undeclared shared file so the composite can be verified.
+BREAKING_PLAN_TEMPLATE = """# Plan: batch test
+
+<!-- daw-task-manifest -->
+```json
+{
+  "schema_version": 1,
+  "workflow_id": "wf-batch",
+  "tasks": [
+    {
+      "task_id": "TASK-ALPHA",
+      "title": "Alpha change",
+      "autonomy": "afk",
+      "depends_on": [],
+      "parallel_safe": true,
+      "target_files": ["src/alpha.py"],
+      "acceptance_criteria": ["alpha is green"],
+      "verification_command": "python3 -c \\"import src.shared; assert src.shared.A == 2 and src.shared.B == 1\\"",
+      "expected_outcome": "0 exit code"
+    },
+    {
+      "task_id": "TASK-BETA",
+      "title": "Beta change",
+      "autonomy": "afk",
+      "depends_on": [],
+      "parallel_safe": true,
+      "target_files": ["src/beta.py"],
+      "acceptance_criteria": ["beta is green"],
+      "verification_command": "python3 -c \\"import src.shared; assert src.shared.A == 1 and src.shared.B == 2\\"",
+      "expected_outcome": "0 exit code"
+    }
+  ]
+}
+```
+"""
+
+#: Both members verify independently, but their commits edit the same line.
+CONFLICT_PLAN_TEMPLATE = BREAKING_PLAN_TEMPLATE.replace(
+    'assert src.shared.A == 1 and src.shared.B == 2',
+    'assert src.shared.A == 8 and src.shared.B == 1',
+)
+
+
+class BatchRepoBase(unittest.TestCase):
+    """A repository with two disjoint source files and the runner's plan."""
+
+    plan_template = BATCH_PLAN_TEMPLATE
+
+    def setUp(self) -> None:
+        if not GIT_AVAILABLE:
+            self.skipTest("git is not available")
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.root = pathlib.Path(self.temp_dir.name).resolve()
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        _git(self.repo, "init", "-q", ".")
+        _git(self.repo, "config", "user.email", "test@example.invalid")
+        _git(self.repo, "config", "user.name", "Batch Test")
+        (self.repo / ".gitignore").write_text(
+            ".worktrees/\n__pycache__/\n", encoding="utf-8"
+        )
+        source = self.repo / "src"
+        source.mkdir()
+        (source / "__init__.py").write_text("", encoding="utf-8")
+        (source / "alpha.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (source / "beta.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (source / "gamma.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (source / "shared.py").write_text(
+            "A = 1\n# -\n# -\n# -\n# -\nB = 1\n", encoding="utf-8"
+        )
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-qm", "init")
+
+        self.plan = self.repo / "docs" / "plans" / "wf.md"
+        self.plan.parent.mkdir(parents=True)
+        self.plan.write_text(self.plan_template, encoding="utf-8")
+
+        self.worktree_root = ".worktrees"
+
+    # -- agents -----------------------------------------------------------
+
+    def agent(self, name: str, body: str) -> pathlib.Path:
+        """Write an executable agent script and return its path."""
+        path = self.root / name
+        path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+        path.chmod(0o755)
+        return path
+
+    def writing_agent(self, task_id: str, relative: str, content: str) -> pathlib.Path:
+        """An agent that writes ``content`` into ``relative`` in its own cwd."""
+        return self.agent(
+            f"agent-{task_id}.sh",
+            f"printf '%s\\n' '{content}' > {relative}\n"
+            f"echo '{task_id}' > ran-{task_id}.txt\nexit 0",
+        )
+
+    def run_batch(
+        self,
+        agents: dict[str, pathlib.Path] | pathlib.Path | None = None,
+        extra: list[str] | None = None,
+    ) -> tuple[int, dict]:
+        """Drive ``run.py batch`` and return (exit code, envelope)."""
+        if isinstance(agents, pathlib.Path):
+            agent_command = json.dumps([str(agents), "{prompt_file}"])
+        elif agents is None:
+            agent_command = json.dumps(["/nonexistent/agent", "{prompt_file}"])
+        else:
+            # One command per task, selected by the runner through the
+            # {task_id} substitution.
+            agent_command = json.dumps(
+                [str(self.root / "agent.sh"), "{prompt_file}", "{task_id}"]
+            )
+        argv = [
+            sys.executable,
+            str(RUNNER),
+            "batch",
+            "--plan",
+            str(self.plan),
+            "--project-root",
+            str(self.repo),
+            "--agent-command",
+            agent_command,
+            "--format",
+            "json",
+            *(extra or []),
+        ]
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False)
+        try:
+            payload = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            payload = {"stdout": proc.stdout, "stderr": proc.stderr}
+        return proc.returncode, payload
+
+    # -- assertions -------------------------------------------------------
+
+    def integration_tree(self) -> str:
+        """The integration branch's tree listing, or "" when it has none."""
+        branches = _git(self.repo, "branch", "--list")
+        if worktree.INTEGRATION_BRANCH not in branches:
+            return ""
+        return _git(self.repo, "ls-tree", "-r", "--name-only", worktree.INTEGRATION_BRANCH)
+
+    def integration_content(self, relative: str) -> str:
+        return _git(self.repo, "show", f"{worktree.INTEGRATION_BRANCH}:{relative}")
+
+    def assert_integration_unchanged(self, commit: str) -> None:
+        self.assertEqual(
+            _git(self.repo, "rev-parse", worktree.INTEGRATION_BRANCH).strip(), commit
+        )
+
+    def findings(self, payload: dict) -> list[str]:
+        return [f["code"] for f in payload.get("findings", [])]
+
+    def batch_entry(self, payload: dict) -> dict:
+        batches = payload.get("batches") or []
+        self.assertTrue(batches, payload)
+        return batches[0]
+
+
+class BatchExecutionTests(BatchRepoBase):
+    """The `batch` verb, driven through the CLI against a real repository."""
+
+    def test_two_disjoint_tasks_are_batched_and_integrated_as_one_composite(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 0, payload)
+
+        entry = self.batch_entry(payload)
+        self.assertEqual(entry["members"], ["TASK-ALPHA", "TASK-BETA"])
+        self.assertEqual(entry["size"], 2)
+        self.assertTrue(entry["integrated"])
+        self.assertTrue(entry["composite_branch"])
+        self.assertTrue(entry["composite_commit"])
+
+        branches = _git(self.repo, "branch", "--list")
+        self.assertIn(entry["composite_branch"], branches)
+        self.assertIn("VALUE = 2", self.integration_content("src/alpha.py"))
+        self.assertIn("VALUE = 2", self.integration_content("src/beta.py"))
+
+    def test_each_member_runs_in_its_own_worktree(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 0, payload)
+
+        container = self.repo / self.worktree_root
+        markers = [
+            container / task_id / f"ran-{task_id}.txt"
+            for task_id in ("TASK-ALPHA", "TASK-BETA")
+        ]
+        self.assertTrue(all(marker.is_file() for marker in markers), markers)
+        # Composite and integration verification also run in worktrees; only
+        # the task-named worktrees prove where each agent ran.
+        parents = {marker.parent for marker in markers}
+        self.assertEqual(len(parents), 2, parents)
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            self.assertFalse(
+                (self.repo / f"ran-{task_id}.txt").exists(),
+                "the agent must not write into the main tree",
+            )
+
+    def test_the_broken_combination_is_refused_and_the_integration_branch_is_untouched(
+        self,
+    ) -> None:
+        self.plan.write_text(BREAKING_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 1\n# -\n# -\n# -\n# -\nB = 2"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        before = _git(self.repo, "rev-parse", "HEAD").strip()
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+        self.assertIn("batch_composite_verification_failed", self.findings(payload))
+
+        self.assert_integration_unchanged(before)
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD").strip(), before)
+        state = worktree.load_state(worktree.resolve_state_path(self.repo, None))
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            marker = worktree.batch_failure_marker(state, task_id)
+            self.assertIsNotNone(marker, task_id)
+            assert marker is not None
+            self.assertEqual(marker["member_exit_code"], 0)
+            self.assertNotEqual(marker["composite_exit_code"], 0)
+            self.assertTrue(marker["composite_record_path"])
+            self.assertTrue(marker["composite_record_sha256"])
+
+    def test_a_red_member_is_excluded_and_its_sibling_still_integrates(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        failing = self.agent("agent-fail.sh", "exit 1")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {failing}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+        self.assertIn("batch_task_agent_failed", self.findings(payload))
+
+        self.assertIn("TASK-BETA", payload.get("failed", []))
+        self.assertNotIn("TASK-BETA", payload.get("accepted", []))
+        # The healthy sibling, alpha, still integrated; beta was excluded.
+        self.assertIn("TASK-ALPHA", payload.get("accepted", []))
+        self.assertIn("VALUE = 2", self.integration_content("src/alpha.py"))
+        self.assertIn("VALUE = 1", self.integration_content("src/beta.py"))
+
+    def test_a_no_op_member_is_accepted_and_does_not_fail_the_batch(self) -> None:
+        # Two green members (alpha, gamma) force a composite so we can verify
+        # that the no-op member (beta) left no merge commit in its history.
+        manifest_data = json.loads(
+            BATCH_PLAN_TEMPLATE.split("```json\n", 1)[1].split("\n```", 1)[0]
+        )
+        manifest_data["tasks"][1]["verification_command"] = (
+            'python3 -c "import src.beta; assert src.beta.VALUE == 1"'
+        )
+        manifest_data["tasks"].append(
+            {
+                "task_id": "TASK-GAMMA",
+                "title": "Gamma change",
+                "autonomy": "afk",
+                "depends_on": [],
+                "parallel_safe": True,
+                "target_files": ["src/gamma.py"],
+                "acceptance_criteria": ["gamma is green"],
+                "verification_command": 'python3 -c "import src.gamma; assert src.gamma.VALUE == 2"',
+                "expected_outcome": "0 exit code",
+            }
+        )
+        self.plan.write_text(
+            f"# Plan: batch test\n\n<!-- daw-task-manifest -->\n```json\n{json.dumps(manifest_data, indent=2)}\n```\n",
+            encoding="utf-8",
+        )
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        noop = self.agent("agent-noop.sh", "exit 0")
+        gamma = self.writing_agent("TASK-GAMMA", "src/gamma.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\n"
+            f"if [ \"$2\" = 'TASK-BETA' ]; then exec {noop}; fi\n"
+            f"exec {gamma}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 0, payload)
+        self.assertIn("TASK-BETA", payload.get("accepted", []))
+        self.assertEqual(payload.get("failed", []), [])
+
+        # Only the two green members left merge commits in the composite's
+        # history; the no-op member left none.
+        entry = self.batch_entry(payload)
+        merges = _git(
+            self.repo,
+            "rev-list",
+            "--merges",
+            "--parents",
+            entry["composite_commit"],
+            "--not",
+            entry["base_commit"],
+        ).strip().splitlines()
+        self.assertEqual(len(merges), 2, merges)
+
+    def test_a_conflicting_member_fails_the_batch_with_the_integration_untouched(
+        self,
+    ) -> None:
+        self.plan.write_text(CONFLICT_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 8\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+        self.assertIn("batch_merge_conflict", self.findings(payload))
+        base = _git(self.repo, "rev-parse", "HEAD").strip()
+        self.assert_integration_unchanged(base)
+        state = worktree.load_state(worktree.resolve_state_path(self.repo, None))
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            marker = worktree.batch_failure_marker(state, task_id)
+            self.assertIsNotNone(marker, task_id)
+
+    def test_overlapping_declared_writes_are_serialized_and_reported(self) -> None:
+        self.plan.write_text(OVERLAPPING_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 0, payload)
+        self.assertIn("batch_write_set_overlap", self.findings(payload))
+        # Two separate batches, one member each.
+        self.assertEqual(len(payload["batches"]), 2, payload)
+        for entry in payload["batches"]:
+            self.assertEqual(entry["size"], 1, entry)
+
+    def test_a_pinned_task_that_is_not_ready_is_refused(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(
+            agents="per-task", extra=["--tasks", "TASK-NOT-READY"]
+        )
+        self.assertEqual(code, 2, payload)
+        self.assertIn("batch_task_not_ready", self.findings(payload))
+
+    def test_a_stale_task_branch_is_refused(self) -> None:
+        # Keep the untracked plan out of the stale-branch commit; switching back
+        # to the base branch would otherwise remove it from the working tree.
+        _git(self.repo, "add", "docs/plans/wf.md")
+        _git(self.repo, "commit", "-qm", "add batch plan")
+        # Pre-create the task's branch with a commit: its tip is no longer the
+        # batch's base, so the member's prior work is at risk.
+        _git(self.repo, "checkout", "-q", "-b", "daw/TASK-ALPHA-alpha-change")
+        (self.repo / "src" / "alpha.py").write_text("VALUE = 99\n", encoding="utf-8")
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-qm", "prior attempt")
+        tip = _git(self.repo, "rev-parse", "HEAD").strip()
+        _git(self.repo, "checkout", "-q", "-")
+
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 2, payload)
+        self.assertIn("batch_stale_branch", self.findings(payload))
+
+        message = next(
+            f["message"]
+            for f in payload["findings"]
+            if f["code"] == "batch_stale_branch"
+        )
+        self.assertIn("daw/TASK-ALPHA-alpha-change", message)
+        self.assertIn(tip, message)
+        self.assertIn("worktree.py remove", message)
+        self.assertFalse("daw/integration" in _git(self.repo, "branch", "--list"))
+
+    def test_a_member_writing_into_the_main_tree_fails_the_batch(self) -> None:
+        escaping = self.agent(
+            "agent-escape.sh", f"echo corrupted >> {self.repo / 'src' / 'alpha.py'}"
+        )
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {escaping}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+        self.assertIn("worktree_escape_detected", self.findings(payload))
+        base = _git(self.repo, "rev-parse", "HEAD").strip()
+        self.assert_integration_unchanged(base)
+
+    def test_a_member_writing_into_a_sibling_worktree_is_not_reported_as_an_escape(
+        self,
+    ) -> None:
+        # The escape check watches the main tree, not sibling worktrees. The
+        # corruption must surface as a merge conflict or a red composite
+        # instead — never as a false escape.
+        signal = self.root / "alpha-wrote-sibling"
+        sibling = self.agent(
+            "agent-sibling.sh",
+            f"printf 'CORRUPTED = True\\n' > {self.repo / self.worktree_root / 'TASK-BETA' / 'src' / 'alpha.py'}\n"
+            f"printf '%s\\n' 'VALUE = 2' > src/alpha.py\ntouch {signal}",
+        )
+        beta = self.agent(
+            "agent-TASK-BETA.sh",
+            f"while [ ! -f {signal} ]; do sleep 0.01; done\n"
+            "printf '%s\\n' 'VALUE = 2' > src/beta.py\nexit 0",
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {sibling}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertNotIn("worktree_escape_detected", self.findings(payload))
+        self.assertEqual(code, 1, payload)
+        self.assertIn("batch_merge_conflict", self.findings(payload))
+        self.assert_integration_unchanged(_git(self.repo, "rev-parse", "HEAD").strip())
+
+    def test_an_accepted_task_that_was_never_integrated_is_reported(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        # Seed an accepted task whose state entry names a commit that was never
+        # merged into the integration branch.
+        state_dir = self.repo / "docs" / "daw" / "evidence" / "runner"
+        state_dir.mkdir(parents=True)
+        (state_dir / "isolation.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "integration": {"branch": worktree.INTEGRATION_BRANCH},
+                    "tasks": {
+                        "TASK-BETA": {
+                            "branch": "daw/TASK-BETA-beta-change",
+                            "merged": True,
+                            "accepted": True,
+                            "merge_commit": "0" * 40,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        code, payload = self.run_batch(
+            agents="per-task", extra=["--accepted", "TASK-BETA"]
+        )
+        self.assertEqual(code, 2, payload)
+        self.assertIn("batch_accepted_not_integrated", self.findings(payload))
+
+    def test_an_accepted_task_without_a_state_entry_is_only_a_warning(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(
+            agents="per-task", extra=["--accepted", "TASK-BETA"]
+        )
+        self.assertEqual(code, 0, payload)
+        self.assertIn("batch_accepted_unverified", self.findings(payload))
+
+    def test_dry_run_creates_nothing(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task", extra=["--dry-run"])
+        self.assertEqual(code, 0, payload)
+        self.assertTrue(payload.get("dry_run"))
+
+        branches = _git(self.repo, "branch", "--list")
+        self.assertNotIn(worktree.INTEGRATION_BRANCH, branches)
+        self.assertNotIn("daw/TASK-ALPHA", branches)
+        self.assertNotIn("daw/TASK-BETA", branches)
+        self.assertFalse((self.repo / self.worktree_root).exists())
 
 
 if __name__ == "__main__":
