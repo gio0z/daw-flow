@@ -703,6 +703,30 @@ def _batch_failure_reason(task_id: str, marker: dict[str, Any]) -> str:
     return "; ".join(parts)
 
 
+def merge_branch_into_worktree(
+    repo: pathlib.Path,
+    worktree_rel: str,
+    branch: str,
+    message: str,
+) -> dict[str, Any]:
+    """Merge a branch into the integration worktree, aborting on conflict.
+
+    Returns {"merged": True, "merge_commit": <sha>, "message": message} on
+    success, or {"merged": False, "reason": <detail>} when the merge conflicted
+    and was aborted. The caller decides what a conflict means for it.
+    """
+    worktree_path = repo / worktree_rel
+    code, out, err = run_git(["merge", "--no-ff", "-m", message, branch], worktree_path)
+    if code != 0:
+        run_git(["merge", "--abort"], worktree_path)
+        return {"merged": False, "reason": (err.strip() or out.strip())}
+    return {
+        "merged": True,
+        "merge_commit": git_out(["rev-parse", "HEAD"], worktree_path),
+        "message": message,
+    }
+
+
 def merge_task_branch(
     repo: pathlib.Path,
     integration_worktree: str,
@@ -751,16 +775,15 @@ def merge_task_branch(
         )
 
     message = f"merge(task): {task_id} {title}"
-    code, out, err = run_git(["merge", "--no-ff", "-m", message, task_branch], worktree_path)
-    if code != 0:
-        run_git(["merge", "--abort"], worktree_path)
+    outcome = merge_branch_into_worktree(repo, integration_worktree, task_branch, message)
+    if not outcome["merged"]:
         raise IsolationError(
             f"Merging {task_branch} into {INTEGRATION_BRANCH} failed and was aborted: "
-            f"{(err.strip() or out.strip())}"
+            f"{outcome['reason']}"
         )
     return {
         "merged": True,
-        "merge_commit": git_out(["rev-parse", "HEAD"], worktree_path),
+        "merge_commit": outcome["merge_commit"],
         "message": message,
         "reason": reason,
     }
