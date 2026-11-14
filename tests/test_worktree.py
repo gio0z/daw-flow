@@ -544,6 +544,131 @@ class StateTests(IsolationRepoBase):
         )
 
 
+class StateMarkerTests(IsolationRepoBase):
+    """State entries for batch members, and the batch failure marker."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.state_path = self.repo / "docs" / "daw" / "evidence" / "runner" / "isolation.json"
+        self.state = worktree.load_state(self.state_path)
+
+    def marker(self, batch_id: str = "BATCH-01") -> dict[str, object]:
+        return {
+            "batch_id": batch_id,
+            "composite_branch": f"daw/composite/{batch_id}",
+            "composite_commit": "abc123",
+            "composite_record_path": f"docs/daw/evidence/{batch_id}/composite.json",
+            "composite_record_sha256": "deadbeef",
+            "member_exit_code": 0,
+            "composite_exit_code": 1,
+        }
+
+    def test_a_recorded_task_entry_survives_a_reload(self) -> None:
+        worktree.record_task_entry(
+            self.state_path,
+            self.state,
+            "TASK-01",
+            {
+                "branch": "daw/TASK-01-rotate-token",
+                "worktree_path": str(self.repo / ".worktrees" / "TASK-01"),
+                "worktree_rel": ".worktrees/TASK-01",
+                "merged": False,
+                "accepted": False,
+                "batch_id": "BATCH-01",
+                "commit": "abc123",
+            },
+        )
+        reloaded = worktree.load_state(self.state_path)
+        entry = reloaded["tasks"]["TASK-01"]
+        self.assertEqual(entry["branch"], "daw/TASK-01-rotate-token")
+        self.assertEqual(entry["worktree_rel"], ".worktrees/TASK-01")
+        self.assertIs(entry["merged"], False)
+        self.assertIs(entry["accepted"], False)
+        self.assertEqual(entry["batch_id"], "BATCH-01")
+        self.assertEqual(entry["commit"], "abc123")
+
+    def test_recording_an_entry_preserves_the_keys_it_does_not_overwrite(self) -> None:
+        worktree.record_task_entry(
+            self.state_path, self.state, "TASK-01", {"batch_id": "BATCH-01"}
+        )
+        worktree.record_task_entry(
+            self.state_path, self.state, "TASK-01", {"merged": True}
+        )
+        reloaded = worktree.load_state(self.state_path)
+        self.assertEqual(reloaded["tasks"]["TASK-01"]["batch_id"], "BATCH-01")
+        self.assertIs(reloaded["tasks"]["TASK-01"]["merged"], True)
+
+    def test_a_batch_failure_marker_is_readable_for_its_task(self) -> None:
+        marker = self.marker()
+        worktree.record_batch_failure(
+            self.state_path, self.state, "TASK-01", marker
+        )
+        reloaded = worktree.load_state(self.state_path)
+        self.assertEqual(worktree.batch_failure_marker(reloaded, "TASK-01"), marker)
+        self.assertIsNone(worktree.batch_failure_marker(reloaded, "TASK-02"))
+
+    def test_a_no_op_member_counts_as_accepted(self) -> None:
+        state = worktree.empty_state()
+        state["tasks"]["TASK-01"] = {"merged": False, "accepted": True}
+        state["tasks"]["TASK-02"] = {"merged": False}
+        self.assertEqual(worktree.accepted_task_ids(state), ["TASK-01"])
+
+    def test_clearing_the_marker_removes_it(self) -> None:
+        worktree.record_batch_failure(
+            self.state_path, self.state, "TASK-01", self.marker()
+        )
+        worktree.clear_batch_failure(self.state_path, self.state, "TASK-01")
+        reloaded = worktree.load_state(self.state_path)
+        self.assertIsNone(worktree.batch_failure_marker(reloaded, "TASK-01"))
+
+    def test_merge_refuses_a_member_of_a_failed_batch(self) -> None:
+        worktree.prepare_isolation(self.repo, ".worktrees", None, "TASK-01", "Rotate token")
+        task_worktree = self.repo / ".worktrees" / "TASK-01"
+        (task_worktree / "app.py").write_text("VALUE = 42\n", encoding="utf-8")
+        worktree.commit_task_work(task_worktree, "TASK-01", "Rotate token")
+        commit = worktree.branch_commit(self.repo, "daw/TASK-01-rotate-token")
+        self.evidence(
+            "TASK-01", exit_code=0, branch="daw/TASK-01-rotate-token", commit=commit
+        )
+        marker = self.marker()
+        worktree.record_batch_failure(self.state_path, self.state, "TASK-01", marker)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            worktree.merge_task_branch(
+                self.repo,
+                ".worktrees/_integration",
+                "daw/TASK-01-rotate-token",
+                "TASK-01",
+                "Rotate token",
+                project_root=self.repo,
+                evidence=worktree.latest_verification(self.repo, "TASK-01"),
+                state_path=self.state_path,
+            )
+        codes = [finding["code"] for finding in caught.exception.findings]
+        self.assertIn("merge_batch_failed", codes)
+        # A member's own green evidence is not evidence for the combination:
+        # the refusal must not be reported as a missing-verification problem.
+        self.assertNotIn("merge_not_verified", codes)
+        message = caught.exception.findings[0]["message"]
+        self.assertIn("BATCH-01", message)
+        self.assertIn(marker["composite_record_path"], message)
+
+    def test_remove_can_delete_the_branch(self) -> None:
+        worktree.prepare_isolation(self.repo, ".worktrees", None, "TASK-01", "Rotate token")
+        outcome = worktree.remove_task_worktree(
+            self.repo, ".worktrees/TASK-01", delete_branch=True
+        )
+        self.assertTrue(outcome["removed"])
+        self.assertFalse((self.repo / ".worktrees" / "TASK-01").is_dir())
+        self.assertFalse(worktree.branch_exists(self.repo, "daw/TASK-01-rotate-token"))
+
+    def test_remove_keeps_the_branch_by_default(self) -> None:
+        worktree.prepare_isolation(self.repo, ".worktrees", None, "TASK-01", "Rotate token")
+        outcome = worktree.remove_task_worktree(self.repo, ".worktrees/TASK-01")
+        self.assertTrue(outcome["removed"])
+        self.assertTrue(worktree.branch_exists(self.repo, "daw/TASK-01-rotate-token"))
+
+
 class CliTests(IsolationRepoBase):
     def run_cli(self, *args: str) -> tuple[int, dict]:
         proc = subprocess.run(
@@ -599,6 +724,81 @@ class CliTests(IsolationRepoBase):
         code, payload = self.run_cli("prepare", "--project-root", str(outside))
         self.assertEqual(code, 2)
         self.assertFalse(payload["valid"])
+
+    def test_the_merge_cli_refuses_a_member_of_a_failed_batch(self) -> None:
+        # The state file is named explicitly on both verbs: its default
+        # location follows whichever evidence directory the project keeps, and
+        # this test creates one of them itself.
+        self.run_cli(
+            "prepare",
+            "--project-root",
+            str(self.repo),
+            "--task",
+            "TASK-01",
+            "--title",
+            "Rotate token",
+            "--state",
+            "isolation.json",
+        )
+        task_worktree = self.repo / ".worktrees" / "TASK-01"
+        (task_worktree / "app.py").write_text("VALUE = 42\n", encoding="utf-8")
+        worktree.commit_task_work(task_worktree, "TASK-01", "Rotate token")
+        commit = worktree.branch_commit(self.repo, "daw/TASK-01-rotate-token")
+        self.evidence(
+            "TASK-01", exit_code=0, branch="daw/TASK-01-rotate-token", commit=commit
+        )
+        state_path = self.repo / "isolation.json"
+        state = worktree.load_state(state_path)
+        worktree.record_batch_failure(
+            state_path,
+            state,
+            "TASK-01",
+            {
+                "batch_id": "BATCH-01",
+                "composite_branch": "daw/composite/BATCH-01",
+                "composite_commit": "abc123",
+                "composite_record_path": "docs/daw/evidence/BATCH-01/composite.json",
+                "composite_record_sha256": "deadbeef",
+                "member_exit_code": 0,
+                "composite_exit_code": 1,
+            },
+        )
+
+        code, payload = self.run_cli(
+            "merge",
+            "--project-root",
+            str(self.repo),
+            "--task",
+            "TASK-01",
+            "--state",
+            "isolation.json",
+        )
+        self.assertEqual(code, 2, payload)
+        codes = [f["code"] for f in payload.get("findings", [])]
+        self.assertIn("merge_batch_failed", codes)
+        self.assertNotIn("merge_not_verified", codes)
+
+    def test_the_remove_cli_can_delete_the_branch(self) -> None:
+        self.run_cli(
+            "prepare",
+            "--project-root",
+            str(self.repo),
+            "--task",
+            "TASK-01",
+            "--title",
+            "Rotate token",
+        )
+        code, payload = self.run_cli(
+            "remove",
+            "--project-root",
+            str(self.repo),
+            "--task",
+            "TASK-01",
+            "--delete-branch",
+        )
+        self.assertEqual(code, 0, payload)
+        self.assertTrue(payload["removed"])
+        self.assertFalse(worktree.branch_exists(self.repo, "daw/TASK-01-rotate-token"))
 
 
 if __name__ == "__main__":

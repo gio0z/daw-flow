@@ -474,12 +474,76 @@ def save_state(state_path: pathlib.Path, state: dict[str, Any]) -> None:
 
 
 def accepted_task_ids(state: dict[str, Any]) -> list[str]:
-    """Task ids whose work is integrated (verified and merged)."""
+    """Task ids whose work is integrated (verified and merged).
+
+    A member that produced no commit of its own is accepted too: its work is
+    in the integration branch because it needed no work, not because a
+    merge landed a commit.
+    """
     return sorted(
         task_id
         for task_id, entry in state.get("tasks", {}).items()
-        if isinstance(entry, dict) and entry.get("merged") is True
+        if isinstance(entry, dict)
+        and (entry.get("merged") is True or entry.get("accepted") is True)
     )
+
+
+def _task_entry(state: dict[str, Any], task_id: str) -> dict[str, Any]:
+    """Return the task's state entry, creating it when it is absent."""
+    tasks = state.setdefault("tasks", {})
+    entry = tasks.get(task_id)
+    if not isinstance(entry, dict):
+        entry = {}
+        tasks[task_id] = entry
+    return entry
+
+
+def record_task_entry(
+    state_path: pathlib.Path,
+    state: dict[str, Any],
+    task_id: str,
+    entry: dict[str, Any],
+) -> None:
+    """Merge ``entry`` into the task's state entry and save the state file.
+
+    Existing keys are preserved unless ``entry`` overwrites them, so a caller
+    that records one fact about a task does not erase the others.
+    """
+    _task_entry(state, task_id).update(entry)
+    save_state(state_path, state)
+
+
+def record_batch_failure(
+    state_path: pathlib.Path,
+    state: dict[str, Any],
+    task_id: str,
+    marker: dict[str, Any],
+) -> None:
+    """Record that the batch this task belongs to was proven broken."""
+    _task_entry(state, task_id)["batch_failure"] = marker
+    save_state(state_path, state)
+
+
+def clear_batch_failure(
+    state_path: pathlib.Path, state: dict[str, Any], task_id: str
+) -> None:
+    """Remove a task's batch failure marker, if it has one."""
+    entry = state.get("tasks", {}).get(task_id)
+    if not isinstance(entry, dict) or "batch_failure" not in entry:
+        return
+    del entry["batch_failure"]
+    save_state(state_path, state)
+
+
+def batch_failure_marker(state: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    """Return the batch failure marker recorded for a task, or None."""
+    entry = state.get("tasks", {}).get(task_id)
+    if not isinstance(entry, dict):
+        return None
+    marker = entry.get("batch_failure")
+    if not isinstance(marker, dict):
+        return None
+    return marker
 
 
 # --------------------------------------------------------------------------
@@ -610,6 +674,35 @@ def commit_task_work(
     }
 
 
+def _batch_failure_reason(task_id: str, marker: dict[str, Any]) -> str:
+    """Explain why a member of a failed batch cannot be merged.
+
+    The message names what was proven red: the batch, the composite record
+    that holds the proof, and the exit codes the member and the composite
+    produced. An operator reading it can see exactly what failed and decide
+    deliberately instead of being told only that a merge was refused.
+    """
+    batch_id = marker.get("batch_id", "unknown batch")
+    record_path = marker.get("composite_record_path", "no composite record")
+    member_exit = marker.get("member_exit_code")
+    composite_exit = marker.get("composite_exit_code")
+    parts = [
+        f"task {task_id} is a member of batch {batch_id}, whose combination was "
+        f"proven broken (composite record: {record_path}; "
+        f"member exit code: {member_exit}; composite exit code: {composite_exit})"
+    ]
+    composite_branch = marker.get("composite_branch")
+    composite_commit = marker.get("composite_commit")
+    if composite_branch:
+        commit = f" at {composite_commit}" if composite_commit else ""
+        parts.append(f"the composite was {composite_branch}{commit}")
+    parts.append(
+        "the member's own green verification is not evidence for the combination; "
+        "re-run the member in a later batch, or fix it and merge the new commit"
+    )
+    return "; ".join(parts)
+
+
 def merge_task_branch(
     repo: pathlib.Path,
     integration_worktree: str,
@@ -618,6 +711,7 @@ def merge_task_branch(
     title: str,
     project_root: pathlib.Path | None = None,
     evidence: dict[str, Any] | None = None,
+    state_path: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Merge a task branch into the integration branch, aborting on conflict.
 
@@ -625,12 +719,28 @@ def merge_task_branch(
     when its verification evidence is green *at the commit being merged*. The
     gate is enforced for every entry point, so a caller cannot bypass it by
     calling this function directly.
+
+    A member of a batch whose combination was proven broken is refused even
+    when its own evidence is green. That check comes first: individual
+    greenness is not evidence for the combination.
     """
     if is_protected_branch(task_branch):
         raise IsolationError(f"Refusing to merge protected branch {task_branch}.")
     worktree_path = repo / integration_worktree
     if not worktree_path.is_dir():
         raise IsolationError(f"Integration worktree is missing: {worktree_path}")
+
+    resolved_state = state_path
+    if resolved_state is None and project_root is not None:
+        resolved_state = resolve_state_path(project_root, None)
+    if resolved_state is not None:
+        marker = batch_failure_marker(load_state(resolved_state), task_id)
+        if marker is not None:
+            reason = _batch_failure_reason(task_id, marker)
+            raise IsolationError(
+                f"Task {task_id} is not mergeable: {reason}.",
+                [_error("merge_batch_failed", str(task_id), reason)],
+            )
 
     commit = branch_commit(repo, task_branch)
     ok, reason = verification_supports_merge(evidence, task_branch, commit)
@@ -656,15 +766,45 @@ def merge_task_branch(
     }
 
 
-def remove_task_worktree(repo: pathlib.Path, worktree_rel: str) -> dict[str, Any]:
-    """Remove a task worktree. The branch is kept; deleting it is not this tool's job."""
+def remove_task_worktree(
+    repo: pathlib.Path, worktree_rel: str, delete_branch: bool = False
+) -> dict[str, Any]:
+    """Remove a task worktree, optionally deleting the branch that owned it.
+
+    The branch is kept by default: deleting it is not this tool's job. The
+    branch is resolved before the worktree is removed, because removing the
+    worktree unregisters git's association between the two.
+    """
     path = repo / worktree_rel
     if not path.is_dir():
         return {"removed": False, "reason": "worktree does not exist"}
+    branch: str | None = None
+    if delete_branch:
+        for registered in list_worktrees(repo):
+            registered_path = registered.get("path")
+            if not isinstance(registered_path, str):
+                continue
+            if pathlib.Path(registered_path).resolve() == path.resolve():
+                candidate = registered.get("branch")
+                if isinstance(candidate, str) and candidate:
+                    branch = candidate
+                break
+        if branch is not None and worktree_for_branch(repo, branch) is None:
+            # The registration is stale: the branch owns no live worktree.
+            branch = None
     code, _, err = run_git(["worktree", "remove", worktree_rel], repo)
     if code != 0:
         raise IsolationError(f"Worktree {worktree_rel} cannot be removed: {err.strip()}")
-    return {"removed": True}
+    result: dict[str, Any] = {"removed": True}
+    if delete_branch:
+        if branch and branch_exists(repo, branch):
+            code, _, err = run_git(["branch", "-D", branch], repo)
+            if code != 0:
+                raise IsolationError(f"Branch {branch} cannot be deleted: {err.strip()}")
+            result["branch_deleted"] = branch
+        else:
+            result["branch_deleted"] = None
+    return result
 
 
 # --------------------------------------------------------------------------
@@ -1194,6 +1334,7 @@ def command_merge(args: argparse.Namespace) -> int:
             args.title or task_id,
             project_root=project_root,
             evidence=evidence,
+            state_path=state_path,
         )
         reason = outcome.get("reason", "")
         entry["merged"] = True
@@ -1232,7 +1373,7 @@ def command_remove(args: argparse.Namespace) -> int:
     if not isinstance(entry, dict):
         raise IsolationError(f"No isolation record for task {task_id}.")
     rel = entry.get("worktree_rel") or task_worktree_rel(args.worktree_root, task_id)
-    outcome = remove_task_worktree(repo, rel)
+    outcome = remove_task_worktree(repo, rel, delete_branch=args.delete_branch)
     print(json.dumps({"task_id": task_id, "worktree_rel": rel, **outcome}, indent=2))
     return 0
 
@@ -1308,6 +1449,11 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser = subparsers.add_parser("remove", help="Remove a task worktree.")
     add_common(remove_parser)
     remove_parser.add_argument("--task", required=True, help="Task id whose worktree to remove.")
+    remove_parser.add_argument(
+        "--delete-branch",
+        action="store_true",
+        help="Also delete the branch that owned the worktree. The branch is kept by default.",
+    )
     remove_parser.set_defaults(func=command_remove)
 
     return parser
