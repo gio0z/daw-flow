@@ -248,6 +248,75 @@ class TreeStateTests(IsolationRepoBase):
         )
         self.assertEqual(escaped, [])
 
+    def test_a_deleted_path_has_an_empty_digest(self) -> None:
+        (self.repo / "app.py").unlink()
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("app.py", state)
+        self.assertEqual(state["app.py"], "")
+
+    def test_a_renamed_path_is_reported_by_its_destination(self) -> None:
+        _git(self.repo, "mv", "app.py", "renamed.py")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("renamed.py", state)
+        self.assertEqual(
+            state["renamed.py"],
+            hashlib.sha256(b"VALUE = 1\n").hexdigest(),
+        )
+
+    def test_a_path_with_a_space_is_recorded_verbatim(self) -> None:
+        (self.repo / "spaced name.py").write_text("x = 1\n", encoding="utf-8")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("spaced name.py", state)
+        self.assertEqual(
+            state["spaced name.py"],
+            hashlib.sha256(b"x = 1\n").hexdigest(),
+        )
+
+    def test_a_path_with_a_tab_is_recorded_verbatim(self) -> None:
+        (self.repo / "tab\tname.py").write_text("x = 1\n", encoding="utf-8")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("tab\tname.py", state)
+        self.assertEqual(
+            state["tab\tname.py"],
+            hashlib.sha256(b"x = 1\n").hexdigest(),
+        )
+
+    def test_a_non_ascii_path_is_recorded_verbatim(self) -> None:
+        (self.repo / "café.py").write_text("x = 1\n", encoding="utf-8")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("café.py", state)
+        self.assertEqual(
+            state["café.py"],
+            hashlib.sha256(b"x = 1\n").hexdigest(),
+        )
+
+    def test_a_path_that_disappears_from_the_after_map_is_an_escape(self) -> None:
+        (self.repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+        before = worktree.snapshot_tree_state(self.repo)
+        # The agent reverts the user's uncommitted work: nothing dirty is
+        # left behind, so only the before-map can show what was destroyed.
+        (self.repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+        after = worktree.snapshot_tree_state(self.repo)
+        self.assertNotIn("app.py", after)
+        self.assertEqual(worktree.escape_paths(before, after), ["app.py"])
+
+    def test_a_runner_owned_path_that_disappears_is_not_an_escape(self) -> None:
+        before = {"docs/daw/evidence/runner/context-TASK-01.md": "hash"}
+        after: dict[str, str] = {}
+        escaped = worktree.escape_paths(
+            before,
+            after,
+            owned_prefixes=["docs/daw/evidence"],
+        )
+        self.assertEqual(escaped, [])
+
+    def test_a_failing_git_status_raises(self) -> None:
+        outside = pathlib.Path(self.temp_dir.name).resolve().parent / "not-a-repo"
+        outside.mkdir(exist_ok=True)
+        self.addCleanup(outside.rmdir)
+        with self.assertRaises(worktree.IsolationError):
+            worktree.snapshot_tree_state(outside)
+
 
 class PrepareTests(IsolationRepoBase):
     def test_prepare_creates_integration_and_task_worktrees(self) -> None:

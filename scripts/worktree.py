@@ -280,21 +280,39 @@ def worktree_is_clean(path: pathlib.Path) -> bool:
     return not out.strip()
 
 
-def dirty_paths(path: pathlib.Path) -> list[str]:
-    """List the paths git reports as modified in a working tree."""
-    code, out, _ = run_git(["status", "--porcelain"], path)
+def _status_paths(repo: pathlib.Path) -> list[str]:
+    """Return the dirty paths git reports, as literal filesystem paths.
+
+    ``--porcelain=v1 -z`` separates the records with NUL bytes and never
+    quotes a path, so the bytes after the status columns are the path
+    itself. The text form would quote a path containing a space or a
+    non-ASCII character, and the quoted form would have to be decoded
+    before it could be opened; here it is already literal.
+    """
+    code, out, err = run_git(["status", "--porcelain=v1", "-z", "-uall"], repo)
     if code != 0:
-        return []
-    entries: list[str] = []
-    for line in out.splitlines():
-        if not line.strip():
+        raise IsolationError(f"git status failed in {repo}: {err.strip() or out.strip()}")
+    records = [record for record in out.split("\0") if record]
+    paths: list[str] = []
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        # Porcelain v1: two status columns then a space then the path.
+        if len(record) < 4:
             continue
-        # Porcelain format: two status columns then the path.
-        entry = line[3:].strip() if len(line) > 3 else ""
-        if " -> " in entry:
-            entry = entry.split(" -> ", 1)[1]
-        entries.append(entry.strip('"'))
-    return entries
+        status = record[:2]
+        relative = record[3:]
+        if not relative:
+            continue
+        if "R" in status or "C" in status:
+            # A rename or copy record names the destination in the status
+            # record and the source in the next one. The destination is the
+            # path that exists on disk, so the source record is consumed
+            # and skipped.
+            index += 1
+        paths.append(relative)
+    return paths
 
 
 def snapshot_tree_state(repo: pathlib.Path) -> dict[str, str]:
@@ -303,21 +321,12 @@ def snapshot_tree_state(repo: pathlib.Path) -> dict[str, str]:
     The value is the empty string for a path that does not exist (a deleted
     file). Untracked directories are expanded into their individual files
     (``-uall``) so a runner artifact is never mistaken for a new directory.
+
+    A failing ``git status`` raises: a detection tool that cannot see the
+    tree must not report the tree as clean.
     """
-    code, out, _ = run_git(["status", "--porcelain", "-uall"], repo)
-    if code != 0:
-        return {}
     state: dict[str, str] = {}
-    for line in out.splitlines():
-        if not line.strip():
-            continue
-        # Porcelain format: two status columns then the path.
-        entry = line[3:].strip() if len(line) > 3 else ""
-        if " -> " in entry:
-            entry = entry.split(" -> ", 1)[1]
-        relative = entry.strip('"')
-        if not relative:
-            continue
+    for relative in _status_paths(repo):
         target = repo / relative
         try:
             state[relative] = compute_sha256(target)
@@ -333,11 +342,18 @@ def escape_paths(
     owned_prefixes: Sequence[str] = (),
     owned_paths: Sequence[str] = (),
 ) -> list[str]:
-    """Return the paths that changed or appeared, excluding runner-owned paths.
+    """Return the paths that changed, appeared, or disappeared, minus owned ones.
 
-    A path is an escape when it is absent from ``before`` or when its content
-    hash differs. Comparing hashes (not path sets) is what catches a path that
+    A path is an escape when it is absent from ``before``, when its content
+    hash differs, or when it was present in ``before`` and is gone from
+    ``after``. Comparing hashes (not path sets) is what catches a path that
     was already dirty before the run and was modified further by an agent.
+
+    The third clause catches the reverse: an agent that deletes or reverts a
+    path the user had already modified leaves nothing dirty behind, so the
+    after-map alone cannot show that the user's uncommitted work was
+    destroyed. A missing escape is the dangerous direction, so the
+    disappearance is reported too.
 
     ``owned_prefixes`` are repository-relative directory prefixes; a path under
     one of them is runner-owned. ``owned_paths`` are exact repository-relative
@@ -360,6 +376,10 @@ def escape_paths(
             continue
         if relative not in before or before[relative] != digest:
             escaped.append(relative)
+    for relative in before:
+        if relative in after or owned(relative):
+            continue
+        escaped.append(relative)
     return sorted(escaped)
 
 

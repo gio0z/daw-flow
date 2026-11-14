@@ -183,7 +183,7 @@ The order is fixed and mechanical:
 - A worktree container git would track. The container must be ignored; `--add-ignore` appends the pattern to the **repository-local** exclude file (`git rev-parse --git-path info/exclude`). The project's own `.gitignore` and global git configuration are never modified.
 - A merge without green evidence, or with evidence produced on a different branch or at a different commit.
 - A merge into a protected branch (`main`, `master`, `develop`, `release/*`).
-- A task whose agent wrote into the project's main working tree. The main working tree is snapshotted before the agent runs and compared after; any new dirty path there is reported as `worktree_escape_detected` and the task is not merged.
+- A task whose agent wrote into the project's main working tree. The main working tree is snapshotted before the agent runs and compared after; a path that appears, whose content hash changes, or that was dirty before the run and is gone afterwards is reported as `worktree_escape_detected` and the task is not merged.
 
 ### What isolation does and does not guarantee
 

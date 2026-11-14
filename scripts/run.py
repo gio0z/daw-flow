@@ -472,26 +472,39 @@ def resolve_work_dir(project_root: pathlib.Path, raw: str | None) -> pathlib.Pat
     With no explicit path it sits under the project's evidence directory, so
     the runner's own writes land beside the evidence they produce and are
     recognised as runner-owned by the escape check.
+
+    An explicit path must stay under the project root. A directory outside it
+    could never be expressed as a repository-relative path, so the escape
+    check could not recognise the runner's own writes there and would report
+    them as an escape; refusing the path is clearer than that.
     """
     if not raw:
         return artifact_dir(project_root, "evidence") / "runner"
     candidate = pathlib.Path(raw)
     if not candidate.is_absolute():
         candidate = project_root / candidate
+    try:
+        candidate.resolve().relative_to(project_root.resolve())
+    except (ValueError, OSError):
+        raise RunnerError(
+            f"Work directory must be inside the project root: {candidate}"
+        ) from None
     return candidate
 
 
 def repo_relative(project_root: pathlib.Path, target: pathlib.Path) -> str:
     """Return ``target`` as a repository-relative, forward-slash path.
 
-    The escape check compares paths in the same form ``git status --porcelain``
-    reports, so a runner-owned path must be spelled the same way on both sides
-    of the comparison.
+    The escape check compares paths in the same form ``git status
+    --porcelain=v1`` reports, so a runner-owned path must be spelled the same
+    way on both sides of the comparison. Only a path under the project root
+    can be owned: a path outside it has no repository-relative spelling, so
+    it is never treated as runner-owned.
     """
     try:
         relative = target.resolve().relative_to(project_root.resolve())
     except (ValueError, OSError):
-        return target.as_posix()
+        return ""
     return relative.as_posix()
 
 

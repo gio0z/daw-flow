@@ -187,6 +187,31 @@ class IsolateTests(IsolatedRunBase):
         codes = [f["code"] for f in payload["findings"]]
         self.assertIn("worktree_escape_detected", codes)
 
+    def test_an_agent_reverting_an_already_dirty_path_is_detected(self) -> None:
+        # The agent restores the path to its committed state, so nothing dirty
+        # is left in the after-map. Only the before-map can show that the
+        # user's uncommitted work was destroyed.
+        (self.repo / "app.py").write_text("def ok():\n    return True\n# dirty\n", encoding="utf-8")
+        revert_agent = self.root / "revert.sh"
+        revert_agent.write_text(
+            f"#!/bin/sh\ngit -C {self.repo} checkout -- app.py\nexit 0\n", encoding="utf-8"
+        )
+        revert_agent.chmod(0o755)
+        code, payload = self.isolate(agent=revert_agent)
+        self.assertEqual(code, 2, payload)
+        codes = [f["code"] for f in payload["findings"]]
+        self.assertIn("worktree_escape_detected", codes)
+
+    def test_a_work_dir_outside_the_project_root_is_refused(self) -> None:
+        # A work directory outside the project root has no repository-relative
+        # spelling, so the escape check could not recognise the runner's own
+        # writes there. It is refused rather than silently mis-owned.
+        outside = self.root / "outside"
+        code, payload = self.isolate(extra=["--work-dir", str(outside)])
+        self.assertEqual(code, 2, payload)
+        codes = [f["code"] for f in payload["findings"]]
+        self.assertIn("runner_error", codes)
+
     def test_the_users_working_tree_is_never_modified(self) -> None:
         before = (self.repo / "app.py").read_text(encoding="utf-8")
         self.isolate()
