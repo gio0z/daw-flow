@@ -633,7 +633,7 @@ If the config parsed a `spec_dir`: when `<spec_dir>/ledger.json` exists the ledg
 
 ### Task-Contract Discovery
 
-Task contracts follow the convention path `docs/evidence/<task-id>/contract.json` (globbed one level under the root):
+Task contracts follow the convention path `docs/daw/evidence/<task-id>/contract.json` (globbed one level under the root):
 
 - A contract carrying a `result` key is validated at stage `complete` and counted `complete_valid` (no error findings) or `complete_invalid` (any error finding).
 - A contract without a `result` key is `in_progress`: it is not validated; each emits one warning `status_task_in_progress` (path = the contract path).
@@ -641,11 +641,11 @@ Task contracts follow the convention path `docs/evidence/<task-id>/contract.json
 
 ### Finding Path Prefixes
 
-Sub-findings propagate with the owning check prefixed to `path`: `config:`, `ledger:`, or `contract[<relpath>]:` (e.g. `contract[docs/evidence/t1/contract.json]:result.files[0].path`).
+Sub-findings propagate with the owning check prefixed to `path`: `config:`, `ledger:`, or `contract[<relpath>]:` (e.g. `contract[docs/daw/evidence/t1/contract.json]:result.files[0].path`).
 
 ### Summary & recommended_route Precedence
 
-`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `summary.plans` is `ok` when a regular `docs/plans/*.md` file contains the literal token `expected` for a project whose `spec_dir` already holds specification Markdown, `missing` when specifications exist without such a plan, and `not_applicable` when no specifications exist yet. It exists because the route flow gate blocks `feature`/`bugfix`/`refactor`/`maintain` without a saved plan; a status that answered `none` there would contradict the gate.
+`summary.tasks` counts are `{ "complete_valid", "complete_invalid", "in_progress" }`. `summary.plans` is `ok` when a regular `docs/daw/plans/*.md` file contains the literal token `expected` for a project whose `spec_dir` already holds specification Markdown, `missing` when specifications exist without such a plan, and `not_applicable` when no specifications exist yet. It exists because the route flow gate blocks `feature`/`bugfix`/`refactor`/`maintain` without a saved plan; a status that answered `none` there would contradict the gate.
 
 `recommended_route` resolves in this precedence order:
 
@@ -677,7 +677,7 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
    - `{"action":"verify-run","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" contract \"<first failing contract relpath>\" --stage complete --project-root \"$PROJECT_DIR\"","why":"After the fix, run this to reproduce or clear the failing contract validation.","blocking":true}`
      (first failing contract in sorted glob order, including contracts that are malformed JSON.)
 5. `plans` is `missing` -> `plan`
-   - `{"action":"plan","kind":"author","command":null,"why":"Specifications exist but no saved plan does; the route flow gate blocks feature/bugfix/refactor/maintain until a plan with per-step expected results is saved under docs/plans/.","blocking":true}`
+   - `{"action":"plan","kind":"author","command":null,"why":"Specifications exist but no saved plan does; the route flow gate blocks feature/bugfix/refactor/maintain until a plan with per-step expected results is saved under docs/daw/plans/.","blocking":true}`
    - `{"action":"plan-verify","kind":"run","command":"python3 \"$SKILL_DIR/scripts/validate.py\" status --project-root \"$PROJECT_DIR\"","why":"Re-run status; summary.plans becomes `ok` once the plan is saved.","blocking":true}`
 6. otherwise (`none`)
    - `{"action":"none","kind":"decide","command":null,"why":"No preflight blocker detected; continue the authorized route (or dispatch the classified route) and keep the plan/progress record current.","blocking":false}`
@@ -708,7 +708,7 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
   "findings": [],
   "limitations": [
     "Read-only aggregate: never runs tests, evidence commands, or builds, and never writes files.",
-    "Task discovery is limited to the convention path docs/evidence/<task-id>/contract.json; contracts stored elsewhere are not checked.",
+    "Task discovery is limited to the project's evidence directory (<task-id>/contract.json); contracts stored elsewhere are not checked.",
     "Inherits every composed check's limitations (config, ledger, docs, contract); semantic truth of evidence is never evaluated.",
     "next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights."
   ]
@@ -720,7 +720,7 @@ Sub-findings propagate with the owning check prefixed to `path`: `config:`, `led
 ### Limitations
 
 - Read-only; does not run tests or evidence commands (command resolvability only, per §9).
-- Task discovery is limited to the convention path `docs/evidence/<task-id>/contract.json`, globbed one level; contracts stored elsewhere are not seen.
+- Task discovery is limited to the project's evidence directory — `docs/daw/evidence/<task-id>/contract.json` by default, or the legacy `docs/evidence/<task-id>/contract.json` for a project that keeps evidence there — globbed one level; contracts stored elsewhere are not seen.
 - Inherits each composed check's limitations (§2, §8–§9).
 - next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights.
 
@@ -775,7 +775,7 @@ Arguments: `--project-root ROOT` (required; this is the **suite root**, not a ta
 
 > **Not part of the read-only validator.** The validator and route engine never write. This separate tool is the suite's only writer: it emits `<spec_dir>/ledger.json` and nothing else, and only when `--write` is passed. It never invokes `validate.py`, and `validate.py` never invokes it.
 
-Specifications stay the single hand-authored source. The ledger is a **verified projection** of the doc-transition records that already exist under `docs/decisions/`, `docs/specs/records/`, or `docs/evidence/` — path, state, and pinned hash all come from a record, never from a fresh hash of edited bytes.
+Specifications stay the single hand-authored source. The ledger is a **verified projection** of the doc-transition records that already exist under `docs/daw/decisions/`, `docs/specs/records/`, or `docs/daw/evidence/` — path, state, and pinned hash all come from a record, never from a fresh hash of edited bytes.
 
 ### CLI Invocation
 
@@ -910,7 +910,7 @@ The structural half of the [Deterministic Execution Runner](execution-runner.md)
 ### CLI Invocation
 
 ```bash
-python3 "$SKILL_DIR/scripts/validate.py" tasks docs/plans/<workflow-id>.md \
+python3 "$SKILL_DIR/scripts/validate.py" tasks docs/daw/plans/<workflow-id>.md \
   --project-root "$PROJECT_DIR" --format json
 ```
 

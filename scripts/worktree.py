@@ -40,9 +40,9 @@ import sys
 from typing import Any
 
 try:
-    from scripts.daw_common import compute_sha256, resolve_bounded_path
+    from scripts.daw_common import artifact_dir, compute_sha256, resolve_bounded_path
 except ImportError:
-    from daw_common import compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
+    from daw_common import artifact_dir, compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
 
 STATE_SCHEMA_VERSION = 1
 
@@ -54,7 +54,9 @@ DEFAULT_WORKTREE_ROOT = ".worktrees"
 INTEGRATION_BRANCH = "daw/integration"
 
 #: Default location of the isolation state file, relative to the project root.
-DEFAULT_STATE_PATH = "docs/evidence/runner/isolation.json"
+#: Resolved per project, so a project that keeps evidence at the legacy
+#: ``docs/evidence/`` keeps its state file there too.
+DEFAULT_STATE_PATH = "docs/daw/evidence/runner/isolation.json"
 
 #: Branches this tool must never write to.
 PROTECTED_BRANCHES = ("main", "master", "develop", "trunk")
@@ -586,7 +588,7 @@ def remove_task_worktree(repo: pathlib.Path, worktree_rel: str) -> dict[str, Any
 
 def latest_verification(root: pathlib.Path, task_id: str) -> dict[str, Any] | None:
     """Return the newest verification evidence recorded for a task under ``root``."""
-    directory = root / "docs" / "evidence" / task_id
+    directory = artifact_dir(root, "evidence") / task_id
     if not directory.is_dir():
         return None
     attempts: list[tuple[int, pathlib.Path]] = []
@@ -668,7 +670,16 @@ def verification_supports_merge(
 # --------------------------------------------------------------------------
 
 
-def resolve_state_path(project_root: pathlib.Path, raw: str) -> pathlib.Path:
+def resolve_state_path(project_root: pathlib.Path, raw: str | None) -> pathlib.Path:
+    """Resolve the isolation state file.
+
+    With no explicit path the file lives under the project's evidence
+    directory: ``docs/daw/evidence/runner/isolation.json`` by default, or the
+    legacy ``docs/evidence/runner/isolation.json`` when the project already
+    keeps its evidence there.
+    """
+    if not raw:
+        return artifact_dir(project_root, "evidence") / "runner" / "isolation.json"
     candidate = pathlib.Path(raw)
     if candidate.is_absolute():
         return candidate
@@ -985,8 +996,11 @@ def build_parser() -> argparse.ArgumentParser:
         )
         sub.add_argument(
             "--state",
-            default=DEFAULT_STATE_PATH,
-            help=f"Isolation state file (default {DEFAULT_STATE_PATH}).",
+            default=None,
+            help=(
+                "Isolation state file (default: the project's evidence directory — "
+                f"{DEFAULT_STATE_PATH} unless the project keeps evidence at docs/evidence/)."
+            ),
         )
 
     prepare_parser = subparsers.add_parser("prepare", help="Create the isolation worktrees.")

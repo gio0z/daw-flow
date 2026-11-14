@@ -67,7 +67,7 @@ The delivery flow itself is adopted, not invented: [Best Practice Flow](referenc
 1. **Explicit Bare Invocation:**
    - When invoked bare without a task (e.g. `"Use deterministic-agentic-workflow"`):
      - The agent immediately inspects the target directory (`cwd`). It does not scan parent directories unless explicitly directed.
-     - If the target directory has a `## DAW Configuration` block or any DAW artifact (spec dir, `ledger.json`, or a task contract under `docs/evidence/<task-id>/contract.json`) -> the agent first runs `python3 "$SUITE_ROOT/scripts/validate.py" status --project-root <root>` (read-only preflight), reports the `summary`, advisory `recommended_route`, and `next_actions` (primary first) from its envelope, and proposes that route before entering **Adopt**. The `recommended_route` is advisory only: it never enlarges the user's scope, grants mutation authority, or dispatches an unauthorized route. Except for the explicit status-only reporting stop below, the agent continues the user's original request on its originally authorized route; a status error finding never authorizes performing the recommended route, and a read-only question never becomes a mutation because the envelope recommends one.
+     - If the target directory has a `## DAW Configuration` block or any DAW artifact (spec dir, `ledger.json`, or a task contract under `docs/daw/evidence/<task-id>/contract.json`) -> the agent first runs `python3 "$SUITE_ROOT/scripts/validate.py" status --project-root <root>` (read-only preflight), reports the `summary`, advisory `recommended_route`, and `next_actions` (primary first) from its envelope, and proposes that route before entering **Adopt**. The `recommended_route` is advisory only: it never enlarges the user's scope, grants mutation authority, or dispatches an unauthorized route. Except for the explicit status-only reporting stop below, the agent continues the user's original request on its originally authorized route; a status error finding never authorizes performing the recommended route, and a read-only question never becomes a mutation because the envelope recommends one.
      - Otherwise, if existing code or partial documentation is found -> enters **Adopt** mode (suggest **Setup** first if no `## DAW Configuration` block exists).
      - If the target directory is empty and a brief is provided -> enters **Bootstrap** mode (starts with `daw-wizard` interview).
      - If the target directory is empty and **no brief** is provided -> starts `daw-wizard` interview phase 1; the wizard's phase 1 round acts as the material question round to establish project concept, scope, and target users. It halts blocked on unanswered material questions and **never invents phantom product documents**.
@@ -139,15 +139,15 @@ The suite ships an execution layer so that *which task runs next*, *what context
 
 ```bash
 # Validate a saved plan's task manifest (read-only).
-python3 "$SUITE_ROOT/scripts/validate.py" tasks docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
+python3 "$SUITE_ROOT/scripts/validate.py" tasks docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
 
 # Compute the ready set, assemble one task's bounded context pack, run its verification command.
-python3 "$SUITE_ROOT/scripts/run.py" next    --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
-python3 "$SUITE_ROOT/scripts/run.py" context --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
-python3 "$SUITE_ROOT/scripts/run.py" verify  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
+python3 "$SUITE_ROOT/scripts/run.py" next    --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
+python3 "$SUITE_ROOT/scripts/run.py" context --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
+python3 "$SUITE_ROOT/scripts/run.py" verify  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
 
 # Run one task inside its own git worktree and integrate it only when it verifies green.
-python3 "$SUITE_ROOT/scripts/run.py" isolate --plan docs/plans/<workflow-id>.md \
+python3 "$SUITE_ROOT/scripts/run.py" isolate --plan docs/daw/plans/<workflow-id>.md \
   --project-root "$PROJECT_DIR" --task TASK-01 --agent-command '["claude","-p","{prompt_file}"]'
 ```
 
@@ -157,7 +157,7 @@ Rules that bind the runner and its users:
 - It never pushes, tags, publishes, or deploys, never writes to a protected branch, and never grants point-of-risk authorization. A passing verification is evidence, not approval.
 - A task is `afk` (delegable) or `hitl` (needs a live human decision). Only `afk` tasks ever enter the ready set; `hitl` tasks wait for a person, always.
 - The task list lives in the saved plan as a `<!-- daw-task-manifest -->` JSON block, so plan prose and executable task list cannot drift apart.
-- Verification commands are executed as argv without a shell, and their output is captured as durable evidence under `docs/evidence/<task-id>/`.
+- Verification commands are executed as argv without a shell, and their output is captured as durable evidence under `docs/daw/evidence/<task-id>/`.
 - Under per-task isolation the worker's writes stay in its own worktree; a task whose agent wrote outside it is detected and never integrated.
 
 ---
@@ -224,7 +224,7 @@ When specifications are required by `bootstrap`, `adopt`, or complex `feature` w
 - **Default Baseline Subset (6 Core Docs):** For new greenfield projects (`bootstrap`) and existing codebase documentation (`adopt`), author the default 6 baseline specification contracts: `blueprint.md`, `prd.md`, `frd.md`, `techstack.md`, `security.md`, `roadmap.md`. Add the conditional `erd.md` when persisted entities/relationships are introduced, materially changed, or adopted without an adequate existing model (default `erd.md` under spec convention; reuse an adequate separate existing model). Otherwise ERD is `skipped`/`N/A` with a scoped reason. The remaining specifications are omitted unless explicitly requested; in the planning table, state omitted documents as `skipped` without generating empty files.
 - **Explicit Full 14-Doc Suite:** When an operator explicitly requests the full 14-document suite, all 14 document contracts must be satisfied. Existing architecture documents, filenames, or established project aliases count toward satisfying contracts; do not force duplicate new files when existing project specifications already satisfy the contract. Any contract not applicable to the architecture (e.g., UI wireframes for a headless backend CLI) must contain an explicit, meaningful `N/A` section with rationale, rather than being omitted.
 - **Specification Directory Determination:** Always check the target project's established conventions first (e.g. existing `docs/` or root aliases). If no established directory exists, **the deterministic default is `docs/specs/`**.
-- **Artifact persistence (canonical [Workflow Artifacts](references/workflow-artifacts.md)):** Where specs are required and multi-step work is authorized, authoring follows the proportional-spec → saved-plan → intake-opened progress-record sequence there (default `docs/specs/<workflow-id>.md`, `docs/plans/<workflow-id>.md`, `docs/workflows/<workflow-id>.md` when no convention exists; lean single-document spec/plan/progress sections preferred). UI-affecting entries require an actual rendered visual mockup before UI build (§5); wireframe-only or prose does not satisfy it. The matrix above remains the catalog of canonical kinds — no mandatory full 14-doc generation for settled/tiny/read-only work.
+- **Artifact persistence (canonical [Workflow Artifacts](references/workflow-artifacts.md)):** Where specs are required and multi-step work is authorized, authoring follows the proportional-spec → saved-plan → intake-opened progress-record sequence there (default `docs/specs/<workflow-id>.md`, `docs/daw/plans/<workflow-id>.md`, `docs/daw/workflows/<workflow-id>.md` when no convention exists; lean single-document spec/plan/progress sections preferred). UI-affecting entries require an actual rendered visual mockup before UI build (§5); wireframe-only or prose does not satisfy it. The matrix above remains the catalog of canonical kinds — no mandatory full 14-doc generation for settled/tiny/read-only work.
 - **Standardized Document Metadata Block:** Every specification document must include the standard template metadata block:
   ```markdown
   > **Status:** Draft / Ready for Review / Approved / Superseded

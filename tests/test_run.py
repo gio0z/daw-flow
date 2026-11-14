@@ -260,8 +260,21 @@ class VerificationTests(RunnerTestBase):
         plan = self.write_plan(_manifest([_task("T-1")]))
         for _ in range(2):
             self.run_cli("verify", "--plan", str(plan), "--project-root", str(self.root), "--task", "T-1")
-        logs = sorted((self.root / "docs" / "evidence" / "T-1").glob("verify-*.log"))
+        logs = sorted((self.root / "docs" / "daw" / "evidence" / "T-1").glob("verify-*.log"))
         self.assertEqual([p.name for p in logs], ["verify-1.log", "verify-2.log"])
+
+    def test_evidence_uses_the_projects_existing_evidence_directory(self) -> None:
+        # A project that already keeps evidence at docs/evidence/ keeps it:
+        # the runner writes where the project already writes.
+        (self.root / "docs" / "evidence").mkdir(parents=True)
+        plan = self.write_plan(_manifest([_task("T-1")]))
+        code, payload = self.run_cli(
+            "verify", "--plan", str(plan), "--project-root", str(self.root), "--task", "T-1"
+        )
+        self.assertEqual(code, 0, payload)
+        logs = sorted((self.root / "docs" / "evidence" / "T-1").glob("verify-*.log"))
+        self.assertEqual([p.name for p in logs], ["verify-1.log"])
+        self.assertFalse((self.root / "docs" / "daw" / "evidence").exists())
 
     def test_shell_metacharacters_are_not_executed(self) -> None:
         marker = self.root / "pwned.txt"

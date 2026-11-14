@@ -68,7 +68,7 @@ try:
         topological_depth,
         validate_manifest,
     )
-    from scripts.daw_common import compute_sha256, resolve_bounded_path
+    from scripts.daw_common import artifact_dir, compute_sha256, resolve_bounded_path
     from scripts.worktree import (
         IsolationError,
         commit_task_work,
@@ -89,7 +89,7 @@ except ImportError:
         topological_depth,
         validate_manifest,
     )
-    from daw_common import compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
+    from daw_common import artifact_dir, compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
     from worktree import (  # type: ignore[import-not-found]
         IsolationError,
         commit_task_work,
@@ -455,7 +455,22 @@ def assemble_context(
 
 
 def evidence_dir(project_root: pathlib.Path, task_id: str) -> pathlib.Path:
-    return project_root / "docs" / "evidence" / task_id
+    return artifact_dir(project_root, "evidence") / task_id
+
+
+def resolve_work_dir(project_root: pathlib.Path, raw: str | None) -> pathlib.Path:
+    """Resolve the runner's scratch directory: context packs and agent logs.
+
+    With no explicit path it sits under the project's evidence directory, so
+    the runner's own writes land beside the evidence they produce and are
+    recognised as runner-owned by the escape check.
+    """
+    if not raw:
+        return artifact_dir(project_root, "evidence") / "runner"
+    candidate = pathlib.Path(raw)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    return candidate
 
 
 def next_attempt_index(directory: pathlib.Path) -> int:
@@ -721,7 +736,7 @@ def verb_isolate(args: argparse.Namespace) -> int:
         _print(result, args.format)
         return 0 if result["valid"] else 1
 
-    work_dir = project_root / args.work_dir
+    work_dir = resolve_work_dir(project_root, args.work_dir)
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -856,7 +871,7 @@ def verb_run(args: argparse.Namespace) -> int:
         raise RunnerError(f"Project root is not a directory: {project_root}")
     manifest, bodies, findings = load_manifest(pathlib.Path(args.plan), project_root)
     accepted = parse_accepted(args.accepted, args.accepted_file)
-    work_dir = project_root / args.work_dir
+    work_dir = resolve_work_dir(project_root, args.work_dir)
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -1023,7 +1038,7 @@ def build_parser() -> argparse.ArgumentParser:
     isolate_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
     isolate_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
     isolate_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
-    isolate_parser.add_argument("--work-dir", default="docs/evidence/runner", help="Directory for context packs and agent logs.")
+    isolate_parser.add_argument("--work-dir", default=None, help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).")
     isolate_parser.add_argument("--dry-run", action="store_true", help="Prepare only; do not run the agent or merge.")
     isolate_parser.set_defaults(func=verb_isolate)
 
@@ -1036,7 +1051,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
     run_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
     run_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
-    run_parser.add_argument("--work-dir", default="docs/evidence/runner", help="Directory for context packs and agent logs.")
+    run_parser.add_argument("--work-dir", default=None, help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).")
     run_parser.add_argument("--dry-run", action="store_true", help="Print the agent argv without executing it.")
     run_parser.set_defaults(func=verb_run)
 

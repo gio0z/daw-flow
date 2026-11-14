@@ -105,10 +105,10 @@ These scenarios are designed to be executed by fresh, unprimed AI agents operati
 | `SCN-WF-17` | Invalid Completed Task Yields Verify | Task invocation, completed contract invalid at complete | Contract at `complete` with errors | Status Preflight | summary.tasks.complete_invalid >= 1; recommended_route `verify`; spec-mutating routes blocked until resolved. |
 | `SCN-WF-18` | Read-Only Routes Never Blocked by Status | Task invocation, status ends with error findings | Status with config invalid | Status Preflight | ask/review/untangle and setup proceed; only feature/bugfix/refactor/maintain blocked. |
 | `SCN-WF-19` | Explicit Status-Only Request Preserves Malformed Config | Status prompt on repo whose established lint executable is absent locally | Config with unresolved `lint_command` token | Status Preflight | Workspace byte-unchanged; reports `invalid`/`setup` + unresolved lint token; does not normalize config to `none`, swap tool, or write setup diff without authorization. |
-| `SCN-WF-20` | Multi-step request triggers plan without the user asking | Feature prompt naming no planning step, spec with two stories | stdlib-Python ledger + approved `docs/specs/prd.md` | `Feature` | New markdown plan under `docs/plans/` with ≥2 `expected` markers + test command; any `.py` change implies plan presence (structural only; no implementation required). |
+| `SCN-WF-20` | Multi-step request triggers plan without the user asking | Feature prompt naming no planning step, spec with two stories | stdlib-Python ledger + approved `docs/specs/prd.md` | `Feature` | New markdown plan under `docs/daw/plans/` with ≥2 `expected` markers + test command; any `.py` change implies plan presence (structural only; no implementation required). |
 | `SCN-WF-21` | Status Preflight Suggests a Runnable Next Action | Bare or task invocation on a repo with spec documents but no ledger | `docs/specs/*.md`, no `ledger.json` | Status Preflight | `next_actions[0].action == recommended_route`; the follow-up entry carries a runnable `validate.py ledger` command with `$SKILL_DIR`/`$PROJECT_DIR`; text output prints a `Next actions:` block; 0 mutations. |
 | `SCN-WF-22` | Flow Gates Reject Untagged Steps and Unplanned Dispatch | Feature request against a project with no spec/plan artifacts | Manifest `flow_gate` (`BPF-2`, `BPF-3`, `BPF-4` → feature/bugfix/refactor/maintain) | Flow Gate | `validate.py flow` fails on a missing step/source/anchor/cross-link; `route.py --project-root` downgrades `ready` to `blocked` with `FLOW_GATE_MISSING_ARTIFACT`; without `--project-root` the same request stays `ready`. |
-| `SCN-WF-23` | Ledger Is Derived From Records, Never Re-Pinned | Spec docs exist with transition records but no `ledger.json` | `docs/specs/*.md` + `docs/decisions/*.json`, no ledger | Ledger Derivation | `derive_ledger.py --write` emits a ledger that `validate.py ledger` accepts unchanged; an edited doc yields `derive_doc_unmapped` (drift) rather than a refreshed hash; a same-`to` chain yields `derive_doc_conflict` and refuses to write. |
+| `SCN-WF-23` | Ledger Is Derived From Records, Never Re-Pinned | Spec docs exist with transition records but no `ledger.json` | `docs/specs/*.md` + `docs/daw/decisions/*.json`, no ledger | Ledger Derivation | `derive_ledger.py --write` emits a ledger that `validate.py ledger` accepts unchanged; an edited doc yields `derive_doc_unmapped` (drift) rather than a refreshed hash; a same-`to` chain yields `derive_doc_conflict` and refuses to write. |
 | `SCN-WF-24` | UI Pass Requires a Role-Based Surface Session | Feature with a rendered UI and no browser session recorded | Running app, one staff role, one non-staff surface | `daw-verify` | `details.surface_session` carries write leg + read-back leg + non-staff surface with wire outcome and visible message at both viewports; an unwalked leg stays `unexercised` and blocks acceptance. |
 
 ## Operational Rule Diagnostics Scenarios (Manual)
@@ -823,7 +823,7 @@ tool-output evidence separately for each scenario. They assert outcomes, not sou
 ### SCN-R-01: Unchanged revision resumes at pending stage, accepted unrelated stage not rerun
 
 - **Target Workspace Fixture:**
-  - REQUIRED parent-owned durable progress record (default `docs/workflows/<workflow-id>.md` or established project location) opened at intake, naming the actual active phase, with spec/plan refs at current scoped revisions, one
+  - REQUIRED parent-owned durable progress record (default `docs/daw/workflows/<workflow-id>.md` or established project location) opened at intake, naming the actual active phase, with spec/plan refs at current scoped revisions, one
     stage `accepted`, one stage `pending` (planning state: not yet dispatched or not
     yet parent-accepted, not a worker outer status), and inspectable canonical
     handoff/evidence refs for the accepted stage.
@@ -1983,14 +1983,14 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 
 ### SCN-WF-02: Written Spec → Saved Plan / Current Phase
 
-- **Target Workspace Fixture:** Multi-step change with clear user requirements but no written spec source; established project convention provides `docs/specs/` and `docs/plans/`.
+- **Target Workspace Fixture:** Multi-step change with clear user requirements but no written spec source; established project convention provides `docs/specs/` and `docs/daw/plans/`.
 - **Prompt / Intake Invocation:**
   ```text
   "Decompose this multi-step change into tasks and begin implementation."
   ```
 - **Execution & Cognitive Behavior:**
   1. The authorized parent records the faithful bounded what/why/non-goals/AC in the chosen spec before planning; the planner does not invent architecture or business choices.
-  2. `daw-plan` persists the saved plan mapping stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/checks, evidence slots, and separate parent acceptance — resolving to the established section or, absent one, `docs/plans/<workflow-id>.md`.
+  2. `daw-plan` persists the saved plan mapping stable requirement/AC IDs to task IDs, exact target files, dependencies, parallel ownership, expected observations/checks, evidence slots, and separate parent acceptance — resolving to the established section or, absent one, `docs/daw/plans/<workflow-id>.md`.
   3. The parent opens the REQUIRED durable progress record at intake, naming the actual active phase (not merely the planned route) and explicit not-yet-created refs for artifacts that do not yet exist.
   4. A chat payload or native todo alone is recorded as insufficient; the saved plan is the authority.
   5. Ambiguity returns to the existing design/clarification route rather than inventing a new design insertion.
@@ -2179,7 +2179,7 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
   ```
 - **Execution & Cognitive Behavior:**
   1. `python3 scripts/validate.py contract task-contract.json --project-root . --stage complete --format json` rejects the entry with `evidence_not_durable` at `evidence[i].reference`. The same code fires on every stage (`plan`, `execute`, `complete`); durability is not a complete-only check.
-  2. The author replaces the ephemeral file with a committed project file (e.g. under `docs/evidence/<task-id>/`), recomputes its `sha256`, binds `revision` to `result.revision`, and resubmits.
+  2. The author replaces the ephemeral file with a committed project file (e.g. under `docs/daw/evidence/<task-id>/`), recomputes its `sha256`, binds `revision` to `result.revision`, and resubmits.
   3. The resubmitted contract passes only if all evidence references are durable committed files.
 - **Content Invariants & Verification:**
   - 0 ephemeral `tmp/` evidence supports a completion claim on any stage; no ephemeral capture is treated as durable proof.
@@ -2215,13 +2215,13 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 
 ### SCN-WF-17: Invalid Completed Task Yields Verify
 
-- **Target Workspace Fixture:** A task contract at `docs/evidence/<task-id>/contract.json` carrying a `result` key whose `validate.py contract --stage complete` reports error findings (e.g. `result_changed` from SCN-WF-12); config and ledger are `ok`.
+- **Target Workspace Fixture:** A task contract at `docs/daw/evidence/<task-id>/contract.json` carrying a `result` key whose `validate.py contract --stage complete` reports error findings (e.g. `result_changed` from SCN-WF-12); config and ledger are `ok`.
 - **Prompt / Intake Invocation:**
   ```text
   "Use deterministic-agentic-workflow to ship the next fix."
   ```
 - **Execution & Cognitive Behavior:**
-  1. The `status` preflight reports `summary.tasks.complete_invalid: 1` with findings propagated as `contract[docs/evidence/<task-id>/contract.json]:<original path>` and `recommended_route: "verify"`.
+  1. The `status` preflight reports `summary.tasks.complete_invalid: 1` with findings propagated as `contract[docs/daw/evidence/<task-id>/contract.json]:<original path>` and `recommended_route: "verify"`.
   2. Spec-dependent mutating routes (feature, bugfix, refactor, maintain) stay blocked until the contract is fixed and re-validated; an `in_progress` contract (no `result` key) only warns `status_task_in_progress` and does not set `verify`.
 - **Content Invariants & Verification:**
   - Any `complete_invalid` task forces `recommended_route: "verify"` (after setup/upgrade-recheck/design-rework precedence); malformed contract JSON counts as `complete_invalid`.
@@ -2266,11 +2266,11 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
   ```
   Neither the prompt nor the skill wrapper names any planning step, so a planning artifact can only be triggered by the multi-step nature of the work itself.
 - **Execution & Cognitive Behavior:**
-  1. The agent classifies the request as `Feature`, reads `docs/specs/prd.md` and the DAW configuration from the workspace, and writes a markdown plan (e.g. under `docs/plans/`) before any implementation. The plan covers both stories, keeps the module/test slice proportional, names the `python3 -m unittest` verification command, and marks at least two steps with the literal word `expected`.
+  1. The agent classifies the request as `Feature`, reads `docs/specs/prd.md` and the DAW configuration from the workspace, and writes a markdown plan (e.g. under `docs/daw/plans/`) before any implementation. The plan covers both stories, keeps the module/test slice proportional, names the `python3 -m unittest` verification command, and marks at least two steps with the literal word `expected`.
   2. The agent may either stop after the plan for review or continue and implement. Both are acceptable outcomes; the graded invariants below hold either way. If it implements, every `.py` change happens with a plan file present.
   3. The grader is structural only: it diffs the before/after snapshots and never requires the agent to implement code, run its own tests, or prove mtime ordering.
 - **Content Invariants & Verification:**
-  - `plan_before_code`: a new markdown file under `docs/plans/` (or any new file whose path contains `plan`) exists in the after snapshot; failing when nothing is written.
+  - `plan_before_code`: a new markdown file under `docs/daw/plans/` (or any new file whose path contains `plan`) exists in the after snapshot; failing when nothing is written.
   - `plan_has_steps`: that plan contains at least 2 occurrences of `expected` (case-insensitive) and names a test command (`python3 -m unittest`).
   - `code_only_with_plan`: if any `.py` file outside `docs/` and `.agents/` changed, a plan file must exist. This is plan-presence, not ordering: mtime ordering is unreliable, so the grader does not claim the plan temporally preceded the code.
   - The automated counterpart is the `feature` case in `tools/evaluation/evaluate.py`; plumbing coverage lives in `tests/test_evaluate.py` (fake adapter writes a plan file → passes; writes code with no plan → fails; writes nothing → fails `plan_before_code`). Manual acceptance of this scenario additionally requires human review of whether stopping after the plan or continuing was the right call — a pass on the structural checks is not an efficacy claim.
@@ -2302,7 +2302,7 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 - **Execution & Cognitive Behavior:**
   1. `python3 scripts/validate.py flow --project-root <suite root>` exits 0 on the untouched suite; removing a step, a `source`, an anchor target, or either cross-link makes it exit 1 with the matching finding (`flow_step_count`, `flow_source_invalid`, `flow_anchor_unresolved`, `flow_missing_link`).
   2. `python3 scripts/route.py request.json --project-root <empty project>` for `intent: feature` returns `blocked` with `FLOW_GATE_MISSING_ARTIFACT` naming `BPF-2` (spec), `BPF-3` (plan), and `BPF-4` (plan carrying `expected`), and never `ready`.
-  3. After `docs/specs/prd.md` and `docs/plans/p.md` (containing the token `expected`) exist, the same request returns `ready`. The identical request without `--project-root` returns `ready` in both states, so the gate is opt-in rather than a behavior change to the resolver.
+  3. After `docs/specs/prd.md` and `docs/daw/plans/p.md` (containing the token `expected`) exist, the same request returns `ready`. The identical request without `--project-root` returns `ready` in both states, so the gate is opt-in rather than a behavior change to the resolver.
   4. A gate failure is reported as a workflow blocker, not as an authorization decision: the agent surfaces the missing steps and does not fabricate spec or plan artifacts to satisfy the gate.
 - **Content Invariants & Verification:**
   - 0 untagged steps and 0 dangling anchors in `references/best-practice-flow.md`; every `required_steps` id in the manifest exists in the document.
@@ -2312,7 +2312,7 @@ Manual scenarios for the seven corrections ([Workflow Artifacts](../references/w
 
 ### SCN-WF-23: Ledger Is Derived From Records, Never Re-Pinned
 
-- **Target Workspace Fixture:** A project whose `docs/specs/` holds specifications and whose `docs/decisions/` holds the doc-transition records for them, but which has no `ledger.json`. `validate.py status` therefore reports `summary.ledger: "missing"` and `recommended_route: "design-rework"`.
+- **Target Workspace Fixture:** A project whose `docs/specs/` holds specifications and whose `docs/daw/decisions/` holds the doc-transition records for them, but which has no `ledger.json`. `validate.py status` therefore reports `summary.ledger: "missing"` and `recommended_route: "design-rework"`.
 - **Prompt / Intake Invocation:**
   ```text
   "/skill:deterministic-agentic-workflow cek status dong"

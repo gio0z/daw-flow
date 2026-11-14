@@ -176,7 +176,7 @@ When invoked to re-plan or reconcile gaps identified during execution, review, o
 
 ### Step 8: Synthesize Implementation Contract & Prebuild Review Handoff (Contract §F)
 
-1. Format the plan into the standard output schema. For multi-step authorized work, save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (existing roadmap/issue-export/project doc section if sufficient, otherwise `docs/plans/<workflow-id>.md`). The saved plan carries the task list described in Step 3 item 9 — task files plus the derived manifest — so the deterministic runner can consume it. Include saved plan/progress refs in existing `details` and keep examples consistent with the saved form. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
+1. Format the plan into the standard output schema. For multi-step authorized work, save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (existing roadmap/issue-export/project doc section if sufficient, otherwise `docs/daw/plans/<workflow-id>.md`). The saved plan carries the task list described in Step 3 item 9 — task files plus the derived manifest — so the deterministic runner can consume it. Include saved plan/progress refs in existing `details` and keep examples consistent with the saved form. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
 2. **Parent-Owned Independent Prebuild Readiness Review:** For spec-dependent implementation workflows (`feature`, `bugfix`), `daw-plan` self-checks the plan and recommends `handoff_to: "daw-review"` (or parent readiness checkpoint) for a proportional independent read-only conformity review before `daw-build` execution begins.
 
 ---
@@ -203,10 +203,10 @@ Illustrative `details` only (not a complete handoff; wrap in the canonical envel
 {
   "route": "feature",
   "execution_mode": "Sequential",
-  "saved_plan_ref": "docs/plans/<workflow-id>.md @ <revision>",
-  "saved_progress_ref": "docs/workflows/<workflow-id>.md @ <revision>",
+  "saved_plan_ref": "docs/daw/plans/<workflow-id>.md @ <revision>",
+  "saved_progress_ref": "docs/daw/workflows/<workflow-id>.md @ <revision>",
   "spec_source_ref": "docs/specs/<workflow-id>.md @ <revision>",
-  "ranked_queue_ref": "docs/plans/<workflow-id>.md#ranked-result-triage",
+  "ranked_queue_ref": "docs/daw/plans/<workflow-id>.md#ranked-result-triage",
   "plan_header": {
     "goal": "Rotate session tokens on refresh without invalidating unrelated sessions",
     "architecture": "SessionSerializer carries a token_version through refresh; the refresh route mints and validates the rotated pair.",

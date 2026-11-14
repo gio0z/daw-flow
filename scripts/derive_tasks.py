@@ -16,8 +16,8 @@ follows the same discipline:
 
 Usage:
 
-    python3 scripts/derive_tasks.py --plan docs/plans/<workflow-id>.md --project-root .
-    python3 scripts/derive_tasks.py --plan docs/plans/<workflow-id>.md --project-root . --write
+    python3 scripts/derive_tasks.py --plan docs/daw/plans/<workflow-id>.md --project-root .
+    python3 scripts/derive_tasks.py --plan docs/daw/plans/<workflow-id>.md --project-root . --write
 """
 
 from __future__ import annotations

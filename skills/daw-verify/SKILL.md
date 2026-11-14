@@ -199,7 +199,7 @@ Inspect the actual codebase and latest runtime evidence against authoritative co
 ### Rule 7: Pre-Ship Evidence Handoff
 
 - On `status: "pass"` for any code-changing route, package `details.pre_ship_evidence` — verdict, exercised checks (claim/check/actual), regression suite counts, convergence, coverage, and limitations — so `daw-ship` can consume current-revision evidence for commit hygiene, PR, and release readiness without re-running the suite. The verifier itself never commits, pushes, or opens PRs.
-- Multi-session or multi-commit work persists the task contract and `daw-verify` evidence in the repo under `docs/evidence/<task-id>/` (or the contract's evidence paths) before commit; inline-only acceptance is limited to single-session trivial/patch work (see [Operations §2](../../references/operations.md#inline-vs-json-representation)).
+- Multi-session or multi-commit work persists the task contract and `daw-verify` evidence in the repo under `docs/daw/evidence/<task-id>/` (or the contract's evidence paths) before commit; inline-only acceptance is limited to single-session trivial/patch work (see [Operations §2](../../references/operations.md#inline-vs-json-representation)).
 
 ### Rule 8: Role-Based Surface Session (UI-Affecting Work)
 

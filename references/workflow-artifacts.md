@@ -31,10 +31,42 @@ Reuse established project conventions first. Only when no convention exists, use
 | Artifact        | Established location                              | Default when none                 |
 | :-------------- | :------------------------------------------------ | :-------------------------------- |
 | Specification   | Existing adequate spec path                       | `docs/specs/<workflow-id>.md`     |
-| Plan            | Existing roadmap/issue-export/project doc section | `docs/plans/<workflow-id>.md`     |
-| Progress record | Established project doc location                  | `docs/workflows/<workflow-id>.md` |
+| Plan            | Existing roadmap/issue-export/project doc section | `docs/daw/plans/<workflow-id>.md`     |
+| Progress record | Established project doc location                  | `docs/daw/workflows/<workflow-id>.md` |
 
 Single-document alternative: one file with separate spec/plan/progress sections is allowed and preferred when lean.
+
+### 2A. The `docs/daw/` Home — Where the Suite's Routes Put Their Output
+
+**The rule.** The **14 canonical document kinds** — `blueprint.md`, `brd.md`, `prd.md`, `frd.md`, `erd.md`, `techstack.md`, `design.md`, `wireframe.md`, `ui-ux.md`, `security.md`, `roadmap.md`, `deployment.md`, `qa.md`, `runbook.md` — keep their specification home. **Everything else a route generates goes under `docs/daw/`.**
+
+| Output | Location |
+| :--- | :--- |
+| The 14 canonical document kinds | `docs/specs/<kind>.md` (the specification home) |
+| Plan | `docs/daw/plans/<workflow-id>.md` |
+| Progress record | `docs/daw/workflows/<workflow-id>.md` |
+| Decision record | `docs/daw/decisions/<name>.md` |
+| Evidence | `docs/daw/evidence/<task-id>/…` |
+| Narrative document (design rationale, ADR, retrospective, review or verification record, coupling analysis) | `docs/daw/YYYY-MM-DD-<topic>.md` |
+
+A narrative document is named for its authoring day, opens with the marker `<!-- daw-doc -->`, states its status, and names the route that produced it in a `Produced by:` line. `docs/daw/README.md` is the index of the folder.
+
+**This is a default, not an override.** The "Established location" column in §2 still wins when the project already has a convention. The rule fills the gap where none exists, so a route's output lands in one recognizable place instead of being scattered — or invented per project.
+
+#### 2A.1 Legacy Locations Still Recognized
+
+The four classes above have moved, and their readers moved with them. Because §2 makes the documented default an override only of *absence*, a project that adopted the older location keeps it: **every reader accepts both**, and a writer uses the project's existing directory when it has one.
+
+| Class | Documented location | Also accepted |
+| :--- | :--- | :--- |
+| Plan | `docs/daw/plans/` | `docs/plans/` |
+| Progress record | `docs/daw/workflows/` | `docs/workflows/` |
+| Decision record | `docs/daw/decisions/` | `docs/decisions/` |
+| Evidence | `docs/daw/evidence/` | `docs/evidence/` |
+
+Concretely: the BPF-3/4/9 route flow gate and the status preflight scan both plan directories; `status` discovers task contracts in both evidence directories; `derive_ledger.py` reads decision and evidence records from either; and the runner writes task evidence and its isolation state to the project's existing evidence directory, falling back to `docs/daw/evidence/` only where the project has none. A project that has both sees which one it is using in the paths its own artifacts name.
+
+A project that keeps a legacy location is not wrong, and it is not locked in: removing the legacy directory makes the documented location the project's convention on the next run.
 
 Ownership:
 
@@ -79,8 +111,8 @@ The following is the canonical inline example. It shows actual active phase vs. 
 - Completed accepted stages: daw-plan (accepted, rev b1)
 - Pending acceptance: daw-build round 2 worker outcome `pass` claim, parent acceptance not yet recorded
 - Spec ref: docs/specs/wf-signed-sum-402.md @ snapshot:docs/specs/wf-signed-sum-402.md#rev-s1
-- Plan ref: docs/plans/wf-signed-sum-402.md @ snapshot:docs/plans/wf-signed-sum-402.md#rev-p2
-- Progress record: docs/workflows/wf-signed-sum-402.md (parent-owned)
+- Plan ref: docs/daw/plans/wf-signed-sum-402.md @ snapshot:docs/daw/plans/wf-signed-sum-402.md#rev-p2
+- Progress record: docs/daw/workflows/wf-signed-sum-402.md (parent-owned)
 - Active tasks: task-402-signed-sum (builder daw-build-worker-1, round 2)
 - Blockers: none
 - Next permitted action: parent_acceptance_review (inspect obs-run-signed-sum-r2 vs AC-1 before acceptance)
@@ -238,4 +270,4 @@ When a project has no established spec directory convention, organize multi-step
 
 Inside: `spec.md`, plus `plan.md`, `progress.md`, and `checklists/requirements.md` as needed. The spec directory name and any git branch name are independent; they may differ by design. The resolved feature directory path is persisted to `.specify/feature.json` (or the project's equivalent) so downstream commands locate it without relying on branch-name conventions.
 
-The DAW defaults (`docs/specs/<workflow-id>.md`, `docs/plans/<workflow-id>.md`, `docs/workflows/<workflow-id>.md`) remain the lean single-document alternative and are preferred for small, localized work. Use the feature directory form when the work spans multiple files, stories, or sessions.
+The DAW defaults (`docs/specs/<workflow-id>.md`, `docs/daw/plans/<workflow-id>.md`, `docs/daw/workflows/<workflow-id>.md`) remain the lean single-document alternative and are preferred for small, localized work. Use the feature directory form when the work spans multiple files, stories, or sessions.

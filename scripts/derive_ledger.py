@@ -29,6 +29,7 @@ try:
     from scripts.daw_common import (
         SCHEMA_VERSION,
         DuplicateKeyError,
+        artifact_dirs,
         compute_sha256,
         has_errors,
         is_durable_evidence_path,
@@ -43,6 +44,7 @@ except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
         SCHEMA_VERSION,
         DuplicateKeyError,
+        artifact_dirs,
         compute_sha256,
         has_errors,
         is_durable_evidence_path,
@@ -53,7 +55,9 @@ except ImportError:
     )
 
 LEDGER_STATES = ("intake", "authoring", "review", "rework", "ready")
-DEFAULT_RECORD_SOURCES = ("docs/decisions", "docs/specs/records", "docs/evidence")
+DEFAULT_RECORD_SOURCES = ("docs/daw/decisions", "docs/specs/records", "docs/daw/evidence")
+#: Pre-consolidation locations still honoured for projects that adopted them.
+LEGACY_RECORD_SOURCES = ("docs/decisions", "docs/evidence")
 DEFAULT_SPEC_DIR = "docs/specs"
 LEDGER_FILENAME = "ledger.json"
 MAX_INPUT_BYTES = 1024 * 1024
@@ -90,7 +94,18 @@ def _project_spec_dir(root: pathlib.Path, override: str | None) -> str:
 
 
 def _record_roots(root: pathlib.Path, overrides: list[str]) -> list[pathlib.Path]:
-    names = overrides if overrides else [d for d in DEFAULT_RECORD_SOURCES if (root / d).is_dir()]
+    if overrides:
+        names = list(overrides)
+    else:
+        names = []
+        for kind in ("decisions", "evidence"):
+            for directory in artifact_dirs(root, kind):
+                relative = directory.relative_to(root).as_posix()
+                if relative not in names:
+                    names.append(relative)
+        if "docs/specs/records" not in names:
+            names.append("docs/specs/records")
+    names = [d for d in names if (root / d).is_dir()]
     roots: list[pathlib.Path] = []
     for name in names:
         resolved, err = resolve_bounded_path(root, name)
@@ -443,7 +458,7 @@ def main() -> None:
         "--records-dir",
         action="append",
         default=[],
-        help="Record directory (repeatable). Default: docs/decisions, docs/specs/records, docs/evidence.",
+        help="Record directory (repeatable). Default: docs/daw/decisions, docs/specs/records, docs/daw/evidence (a project's legacy docs/decisions or docs/evidence is honoured too).",
     )
     parser.add_argument("--write", action="store_true", help="Write <spec_dir>/ledger.json.")
     parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format.")

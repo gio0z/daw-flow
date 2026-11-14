@@ -24,7 +24,7 @@ def _ledger_with_review(root: pathlib.Path, doc_path: str) -> dict:
     """Write a record for doc_path and return a ledger the validator accepts."""
     doc = root / doc_path
     sha = hashlib.sha256(doc.read_bytes()).hexdigest()
-    record_rel = "docs/decisions/r1.json"
+    record_rel = "docs/daw/decisions/r1.json"
     record = root / record_rel
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(
@@ -78,13 +78,20 @@ class StatusTestBase(unittest.TestCase):
         lines += ["", "<!-- daw-config:end -->", ""]
         (self.root / "AGENTS.md").write_text("\n".join(lines), encoding="utf-8")
 
-    def write_task(self, task_id: str, *, complete: bool, break_result: bool = False) -> None:
+    def write_task(
+        self,
+        task_id: str,
+        *,
+        complete: bool,
+        break_result: bool = False,
+        evidence_rel: str = "docs/daw/evidence",
+    ) -> None:
         src = self.root / "src" / f"{task_id}.py"
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_text("v1\n", encoding="utf-8")
         base_sha = _sha(src)
         src.write_text("v2\n", encoding="utf-8")
-        task_dir = self.root / "docs" / "evidence" / task_id
+        task_dir = self.root / evidence_rel / task_id
         task_dir.mkdir(parents=True, exist_ok=True)
         log = task_dir / "test.log"
         log.write_text("OK\n", encoding="utf-8")
@@ -102,7 +109,7 @@ class StatusTestBase(unittest.TestCase):
                 {
                     "criterion_id": "AC-1",
                     "status": "passed",
-                    "reference": f"docs/evidence/{task_id}/test.log",
+                    "reference": f"{evidence_rel}/{task_id}/test.log",
                     "summary": "Tests passed.",
                     "sha256": _sha(log),
                     "revision": "r2",
@@ -206,12 +213,12 @@ class TestStatus(StatusTestBase):
         self.assertEqual(data["recommended_route"], "verify")
         result_changed = [f for f in data["findings"] if f["code"] == "result_changed"]
         self.assertTrue(result_changed)
-        self.assertTrue(result_changed[0]["path"].startswith("contract[docs/evidence/T1/contract.json]:"))
+        self.assertTrue(result_changed[0]["path"].startswith("contract[docs/daw/evidence/T1/contract.json]:"))
         actions = data.get("next_actions")
         self.assertIsInstance(actions, list)
         self.assertTrue(actions)
         self.assertEqual(actions[0]["action"], data["recommended_route"])
-        self.assertIn("docs/evidence/T1/contract.json", actions[1]["command"])
+        self.assertIn("docs/daw/evidence/T1/contract.json", actions[1]["command"])
         self.assertIn("--stage complete", actions[1]["command"])
 
 
@@ -266,7 +273,7 @@ class TestStatus(StatusTestBase):
         self.assertEqual(data["recommended_route"], "plan")
         self.assertEqual(data["next_actions"][0]["action"], "plan")
         self.assertTrue(data["next_actions"][0]["blocking"])
-        self.assertIn("docs/plans/", data["next_actions"][0]["why"])
+        self.assertIn("docs/daw/plans/", data["next_actions"][0]["why"])
 
     def test_specs_with_plan_recommend_none(self) -> None:
         self.write_config()
@@ -296,6 +303,36 @@ class TestStatus(StatusTestBase):
 
         self.assertEqual(data["summary"]["plans"], "ok", data)
         self.assertEqual(data["recommended_route"], "none")
+
+    def test_relocated_plan_is_accepted(self) -> None:
+        # The documented plan location is docs/daw/plans/; a project that keeps
+        # plans at the legacy docs/plans/ is accepted too.
+        self.write_config()
+        (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
+        (self.root / "docs" / "daw" / "plans").mkdir(parents=True)
+        (self.root / "docs" / "daw" / "plans" / "wf.md").write_text(
+            "# Plan\n\n- [ ] step: edit file, expected: tests pass\n<!-- daw-task-manifest -->\n",
+            encoding="utf-8",
+        )
+        (self.root / "docs" / "specs" / "ledger.json").write_text(
+            json.dumps(_ledger_with_review(self.root, "docs/specs/prd.md")), encoding="utf-8"
+        )
+        code, data = self.run_status()
+        self.assertEqual(data["summary"]["plans"], "ok", data)
+        self.assertEqual(data["recommended_route"], "none")
+
+    def test_legacy_evidence_directory_is_still_discovered(self) -> None:
+        self.write_config()
+        self.write_task("T1", complete=True, evidence_rel="docs/evidence")
+        code, data = self.run_status()
+        self.assertEqual(data["summary"]["tasks"]["complete_valid"], 1, data)
+        self.assertTrue(
+            any(
+                f["path"].startswith("contract[docs/evidence/T1/contract.json]:")
+                for f in data["findings"]
+            ),
+            data["findings"],
+        )
 
     def test_plan_without_expected_token_reports_missing(self) -> None:
         self.write_config()

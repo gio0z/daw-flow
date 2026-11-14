@@ -21,7 +21,7 @@ The task list has one hand-authored source per workflow, and the machine manifes
 Each task is one Markdown file in a directory the plan names. The frontmatter carries the machine fields; the body is free prose — the "what and why" a human writes and a machine never has to guess.
 
 ```
-docs/plans/wf-session-rotation.tasks/TASK-01.md
+docs/daw/plans/wf-session-rotation.tasks/TASK-01.md
 ```
 
 ```markdown
@@ -53,17 +53,17 @@ Frontmatter values accept three forms: a plain scalar, an inline JSON value (`["
 The plan declares where its task files live:
 
 ```markdown
-<!-- daw-task-sources: docs/plans/wf-session-rotation.tasks -->
+<!-- daw-task-sources: docs/daw/plans/wf-session-rotation.tasks -->
 ```
 
 `scripts/derive_tasks.py` projects those files into the plan's manifest block:
 
 ```bash
 # Print what would be written; nothing is modified.
-python3 scripts/derive_tasks.py --plan docs/plans/wf-session-rotation.md --project-root .
+python3 scripts/derive_tasks.py --plan docs/daw/plans/wf-session-rotation.md --project-root .
 
 # Write it.
-python3 scripts/derive_tasks.py --plan docs/plans/wf-session-rotation.md --project-root . --write
+python3 scripts/derive_tasks.py --plan docs/daw/plans/wf-session-rotation.md --project-root . --write
 ```
 
 This is the same discipline as `derive_ledger.py`: the Markdown files stay the only hand-authored source, the manifest is a verified projection, and the writer never invents a field.
@@ -148,7 +148,7 @@ The pack is written to `--out` or printed to stdout. It is an input artifact for
 `run.py verify` executes a task's prescribed command and captures what actually happened:
 
 - The command is split with `shlex` and executed as an argv **without a shell**, so plan text cannot inject shell syntax.
-- Output and the exit code are written to `docs/evidence/<task-id>/verify-<n>.log`, with the attempt number incrementing per run.
+- Output and the exit code are written to `docs/daw/evidence/<task-id>/verify-<n>.log`, with the attempt number incrementing per run.
 - The result reports `exit_code`, `passed`, the evidence path, and the evidence file's SHA-256.
 - A missing binary is exit `127`; a timeout is exit `124`. Neither is a pass.
 
@@ -227,34 +227,34 @@ The runner never pushes, tags, publishes, or deploys, and never writes to a prot
 
 ```bash
 # Validate a plan's task list (read-only); detects drift against the task files.
-python3 "$SKILL_DIR/scripts/validate.py" tasks docs/plans/<workflow-id>.md \
+python3 "$SKILL_DIR/scripts/validate.py" tasks docs/daw/plans/<workflow-id>.md \
   --project-root "$PROJECT_DIR"
 
 # Re-derive the plan's manifest from its task files.
-python3 "$SKILL_DIR/scripts/derive_tasks.py" --plan docs/plans/<workflow-id>.md \
+python3 "$SKILL_DIR/scripts/derive_tasks.py" --plan docs/daw/plans/<workflow-id>.md \
   --project-root "$PROJECT_DIR" --write
 
 # What may run right now?
 python3 "$SKILL_DIR/scripts/run.py" next \
-  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
+  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
 
 # Assemble one task's bounded context pack.
 python3 "$SKILL_DIR/scripts/run.py" context \
-  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
-  --task TASK-01 --budget-chars 100000 --out docs/evidence/runner/context-TASK-01.md
+  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
+  --task TASK-01 --budget-chars 100000 --out docs/daw/evidence/runner/context-TASK-01.md
 
 # Run one task's verification command and capture evidence.
 python3 "$SKILL_DIR/scripts/run.py" verify \
-  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
+  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
 
 # Run one task inside its own git worktree and integrate it when it verifies green.
 python3 "$SKILL_DIR/scripts/run.py" isolate \
-  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01 \
+  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01 \
   --agent-command '["claude","-p","{prompt_file}"]'
 
 # Unattended loop over ready tasks with an operator-supplied agent.
 python3 "$SKILL_DIR/scripts/run.py" run \
-  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
+  --plan docs/daw/plans/<workflow-id>.md --project-root "$PROJECT_DIR" \
   --agent-command '["claude","-p","{prompt_file}"]' --max-tasks 5
 ```
 

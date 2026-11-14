@@ -16,7 +16,7 @@ VALIDATE = PROJECT_ROOT / "scripts" / "validate.py"
 DERIVE = PROJECT_ROOT / "scripts" / "derive_tasks.py"
 RUNNER = PROJECT_ROOT / "scripts" / "run.py"
 
-SOURCES_MARKER = "<!-- daw-task-sources: docs/plans/wf.tasks -->"
+SOURCES_MARKER = "<!-- daw-task-sources: docs/daw/plans/wf.tasks -->"
 
 
 def _task_file(
@@ -52,9 +52,9 @@ class DerivePatternTestBase(unittest.TestCase):
         self.root = pathlib.Path(self.temp_dir.name).resolve()
         (self.root / "src").mkdir()
         (self.root / "src" / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
-        self.tasks_dir = self.root / "docs" / "plans" / "wf.tasks"
+        self.tasks_dir = self.root / "docs" / "daw" / "plans" / "wf.tasks"
         self.tasks_dir.mkdir(parents=True)
-        self.plan = self.root / "docs" / "plans" / "wf.md"
+        self.plan = self.root / "docs" / "daw" / "plans" / "wf.md"
 
     def write_plan(self, body: str) -> None:
         self.plan.write_text(body, encoding="utf-8")
@@ -173,7 +173,7 @@ class DeriveTests(DerivePatternTestBase):
         self.assertIn("task_sources_undeclared", output)
 
     def test_missing_source_directory_is_refused(self) -> None:
-        self.write_plan("# Plan\n\n<!-- daw-task-sources: docs/plans/nope -->\n")
+        self.write_plan("# Plan\n\n<!-- daw-task-sources: docs/daw/plans/nope -->\n")
         code, output = self.derive("--write")
         self.assertEqual(code, 1)
         self.assertIn("task_source_missing", output)

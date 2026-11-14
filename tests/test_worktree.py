@@ -310,6 +310,19 @@ class StateTests(IsolationRepoBase):
         state_path.write_text("{not json", encoding="utf-8")
         self.assertEqual(worktree.load_state(state_path), worktree.empty_state())
 
+    def test_the_state_file_follows_the_projects_evidence_directory(self) -> None:
+        # The documented default is docs/daw/evidence/; a project that already
+        # keeps evidence at docs/evidence/ keeps its state file there too.
+        self.assertEqual(
+            worktree.resolve_state_path(self.repo, None),
+            self.repo / "docs" / "daw" / "evidence" / "runner" / "isolation.json",
+        )
+        (self.repo / "docs" / "evidence").mkdir(parents=True)
+        self.assertEqual(
+            worktree.resolve_state_path(self.repo, None),
+            self.repo / "docs" / "evidence" / "runner" / "isolation.json",
+        )
+
 
 class CliTests(IsolationRepoBase):
     def run_cli(self, *args: str) -> tuple[int, dict]:

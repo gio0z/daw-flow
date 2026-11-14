@@ -44,7 +44,7 @@ elif action == "status-envelop":
     validate = root / ".agents" / "skills" / "deterministic-agentic-workflow" / "scripts" / "validate.py"
     validate.write_text('print("[valid JSON but not an object]")\\n')
 elif action == "feature-plan":
-    plan = root / "docs" / "plans" / "ledger-plan.md"
+    plan = root / "docs" / "daw" / "plans" / "ledger-plan.md"
     plan.parent.mkdir(parents=True, exist_ok=True)
     plan.write_text("# Plan\\n\\nExpected: duplicate raises. Expected: session isolation. Verify with python3 -m unittest.\\n")
 elif action == "feature-fake-plan":
@@ -275,7 +275,7 @@ class EvaluateRunnerTests(unittest.TestCase):
         self.assertEqual([c["name"] for c in run["checks"]],
                          ["plan_before_code", "plan_has_steps", "code_only_with_plan"])
         self.assertTrue(all(c["status"] == "pass" for c in run["checks"]))
-        self.assertEqual(run["checks"][0]["plan_files"], ["docs/plans/ledger-plan.md"])
+        self.assertEqual(run["checks"][0]["plan_files"], ["docs/daw/plans/ledger-plan.md"])
         prompt = (output / "feature-skill-001/prompt.md").read_text(encoding="utf-8")
         self.assertEqual(prompt, "/skill:deterministic-agentic-workflow tambahkan fitur sesuai docs/specs/prd.md\n")
         for word in ("plan", "rencana", "roadmap", "design"):

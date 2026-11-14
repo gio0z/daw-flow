@@ -157,15 +157,19 @@ The fenced block below is parsed by `validate.py flow` and by the route gate. Fi
   ],
   "artifact_steps": [
     { "step": "BPF-2", "patterns": ["{spec_dir}/*.md"], "require_text": null },
-    { "step": "BPF-3", "patterns": ["docs/plans/*.md"], "require_text": null },
+    {
+      "step": "BPF-3",
+      "patterns": ["docs/daw/plans/*.md", "docs/plans/*.md"],
+      "require_text": null
+    },
     {
       "step": "BPF-4",
-      "patterns": ["docs/plans/*.md"],
+      "patterns": ["docs/daw/plans/*.md", "docs/plans/*.md"],
       "require_text": "expected"
     },
     {
       "step": "BPF-9",
-      "patterns": ["docs/plans/*.md"],
+      "patterns": ["docs/daw/plans/*.md", "docs/plans/*.md"],
       "require_text": "<!-- daw-task-manifest -->"
     }
   ]

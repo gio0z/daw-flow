@@ -124,7 +124,7 @@ After writing, `daw-setup` MUST run `python3 scripts/validate.py config AGENTS.m
 
 ### Step 4: Record Retrospective Lessons
 
-After a shipped or completed workflow, record durable lessons (recurring verifier findings, convention gaps, recurring CI failures) into this same DAW config block or a `docs/retro/` note and reference it from the block, per [Retrospective & Convention Feedback](../../references/developer-lifecycle.md#11-retrospective--convention-feedback). Update in place; never duplicate the block.
+After a shipped or completed workflow, record durable lessons (recurring verifier findings, convention gaps, recurring CI failures) into this same DAW config block or a retrospective note and reference it from the block, per [Retrospective & Convention Feedback](../../references/developer-lifecycle.md#11-retrospective--convention-feedback). Update in place; never duplicate the block. A retrospective note is a narrative artifact: when the project has no established retrospective location, write it to `docs/daw/YYYY-MM-DD-retrospective.md` with the `<!-- daw-doc -->` marker, a status line, and a `Produced by:` line naming the route, per [Workflow Artifacts §2A](../../references/workflow-artifacts.md#2a-narrative-artifacts-the-docsdaw-home).
 
 ### Step 5: Upgrade Re-check (Read-Only Diagnosis)
 

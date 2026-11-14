@@ -1079,16 +1079,18 @@ def _session_start_resolve(project_root: pathlib.Path, suite_root: pathlib.Path)
             except (OSError, UnicodeDecodeError):
                 pass
 
-    # Detect DAW artifact directories.
+    # Detect DAW artifact directories. Both the documented location and the
+    # pre-consolidation one are considered, so a project that has not
+    # relocated still reports the same maturity.
     spec_dir = project_root / "docs" / "specs"
-    plan_dir = project_root / "docs" / "plans"
-    workflow_dir = project_root / "docs" / "workflows"
-    evidence_dir = project_root / "docs" / "evidence"
+
+    def _has_any(kind: str) -> bool:
+        return any(d.is_dir() and any(d.iterdir()) for d in daw_common.artifact_dirs(project_root, kind))
 
     has_specs = spec_dir.is_dir() and any(spec_dir.iterdir())
-    has_plans = plan_dir.is_dir() and any(plan_dir.iterdir())
-    has_workflows = workflow_dir.is_dir() and any(workflow_dir.iterdir())
-    has_evidence = evidence_dir.is_dir() and any(evidence_dir.iterdir())
+    has_plans = _has_any("plans")
+    has_workflows = _has_any("workflows")
+    has_evidence = _has_any("evidence")
 
     # Suggest intent based on artifact maturity. Every suggestion must be a
     # valid intent per VALID_ENUMS['intent'] so resolve_route can resolve it.

@@ -25,7 +25,7 @@ class DeriveLedgerTestBase(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.temp.name).resolve()
         (self.root / "docs" / "specs").mkdir(parents=True)
-        (self.root / "docs" / "decisions").mkdir(parents=True)
+        (self.root / "docs" / "daw" / "decisions").mkdir(parents=True)
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -43,6 +43,7 @@ class DeriveLedgerTestBase(unittest.TestCase):
         to: str,
         from_state: str = "rework",
         docs: list[tuple[str, str]] | None = None,
+        directory: str = "docs/daw/decisions",
     ) -> pathlib.Path:
         payload = {
             "schema_version": 1,
@@ -54,7 +55,8 @@ class DeriveLedgerTestBase(unittest.TestCase):
                 {"path": path, "kind": "spec", "sha256": sha} for path, sha in (docs or [])
             ],
         }
-        path = self.root / "docs" / "decisions" / name
+        path = self.root / directory / name
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
 
@@ -71,6 +73,22 @@ class DeriveLedgerTestBase(unittest.TestCase):
 
 
 class TestDeriveLedger(DeriveLedgerTestBase):
+    def test_legacy_decisions_directory_is_still_read(self) -> None:
+        # A project that adopted the pre-consolidation location keeps it: the
+        # deriver reads decision records from either directory.
+        doc = self.write_doc("docs/specs/prd.md")
+        self.write_record(
+            "r1.json",
+            to="review",
+            from_state="rework",
+            docs=[("docs/specs/prd.md", _sha(doc))],
+            directory="docs/decisions",
+        )
+        code, _ = self.run_derive("--write")
+        self.assertEqual(code, 0)
+        ledger = self.ledger()
+        self.assertEqual(ledger["documents"][0]["record"], "docs/decisions/r1.json")
+
     def test_round_trip_ledger_passes_existing_validator(self) -> None:
         doc = self.write_doc("docs/specs/prd.md")
         self.write_record(
@@ -85,7 +103,7 @@ class TestDeriveLedger(DeriveLedgerTestBase):
         ledger = self.ledger()
         self.assertEqual(ledger["schema_version"], 1)
         self.assertEqual(ledger["documents"][0]["state"], "review")
-        self.assertEqual(ledger["documents"][0]["record"], "docs/decisions/r1.json")
+        self.assertEqual(ledger["documents"][0]["record"], "docs/daw/decisions/r1.json")
 
         check = subprocess.run(
             [
@@ -121,9 +139,9 @@ class TestDeriveLedger(DeriveLedgerTestBase):
         self.assertEqual(code, 0, result)
         entry = self.ledger()["documents"][0]
         self.assertEqual(entry["state"], "review")
-        self.assertEqual(entry["record"], "docs/decisions/b-review.json")
+        self.assertEqual(entry["record"], "docs/daw/decisions/b-review.json")
         self.assertEqual(entry["sha256"], current)
-        self.assertEqual(entry["history"], ["docs/decisions/a-intake.json"])
+        self.assertEqual(entry["history"], ["docs/daw/decisions/a-intake.json"])
 
     def test_same_target_conflict_refuses_write(self) -> None:
         doc = self.write_doc("docs/specs/prd.md")
@@ -170,7 +188,7 @@ class TestDeriveLedger(DeriveLedgerTestBase):
     def test_symlink_ledger_path_is_never_followed(self) -> None:
         doc = self.write_doc("docs/specs/prd.md")
         self.write_record("r1.json", to="review", docs=[("docs/specs/prd.md", _sha(doc))])
-        target = self.root / "docs" / "decisions" / "victim.json"
+        target = self.root / "docs" / "daw" / "decisions" / "victim.json"
         target.write_text('{"keep": true}\n', encoding="utf-8")
         ledger_path = self.root / "docs" / "specs" / "ledger.json"
         ledger_path.symlink_to(target)
@@ -230,7 +248,7 @@ class TestDeriveLedger(DeriveLedgerTestBase):
                 {"path": "docs/specs/other.md", "sha256": "not-a-sha"},
             ],
         }
-        (self.root / "docs" / "decisions" / "r1.json").write_text(json.dumps(payload), encoding="utf-8")
+        (self.root / "docs" / "daw" / "decisions" / "r1.json").write_text(json.dumps(payload), encoding="utf-8")
 
         code, result = self.run_derive("--write")
 
@@ -269,7 +287,7 @@ class TestDeriveLedger(DeriveLedgerTestBase):
     def test_malformed_record_does_not_block_other_documents(self) -> None:
         doc = self.write_doc("docs/specs/prd.md")
         self.write_record("good.json", to="review", docs=[("docs/specs/prd.md", _sha(doc))])
-        (self.root / "docs" / "decisions" / "broken.json").write_text("{not json", encoding="utf-8")
+        (self.root / "docs" / "daw" / "decisions" / "broken.json").write_text("{not json", encoding="utf-8")
 
         code, result = self.run_derive("--write")
 
@@ -302,7 +320,7 @@ class TestDeriveLedger(DeriveLedgerTestBase):
             "reviewer": "Regio (Product Owner)",
             "documents": [{"path": "docs/specs/prd.md", "kind": "prd", "sha256": _sha(doc)}],
         }
-        (self.root / "docs" / "decisions" / "old.json").write_text(json.dumps(payload), encoding="utf-8")
+        (self.root / "docs" / "daw" / "decisions" / "old.json").write_text(json.dumps(payload), encoding="utf-8")
 
         code, result = self.run_derive("--write")
 

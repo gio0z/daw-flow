@@ -824,7 +824,9 @@ class TestRouteSuite(unittest.TestCase):
         script_path = str(REPO_ROOT / "scripts" / "route.py")
         cases = [
             ("evidence", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/evidence/e.md": "evidence\n"}, ["daw-ship"]),
+            ("evidence-relocated", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/daw/evidence/e.md": "evidence\n"}, ["daw-ship"]),
             ("workflows", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/workflows/w.md": "# Workflow\n"}, ["daw-review"]),
+            ("workflows-relocated", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/daw/workflows/w.md": "# Workflow\n"}, ["daw-review"]),
             ("specs", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n", "docs/specs/prd.md": "# PRD\n"}, ["daw-plan", "daw-build", "daw-review", "daw-verify"]),
             ("bootstrap", {"AGENTS.md": "<!-- daw-config:start -->\n<!-- daw-config:end -->\n"}, ["daw-wizard", "daw-design", "daw-plan"]),
             ("setup", {}, ["daw-setup"]),

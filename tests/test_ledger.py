@@ -90,7 +90,7 @@ class LedgerTestBase(unittest.TestCase):
         }
         if overrides:
             rec.update(overrides)
-        rec_path = self.proj_root / "docs/decisions/2026-11-06-frd-ready.json"
+        rec_path = self.proj_root / "docs/daw/decisions/2026-11-06-frd-ready.json"
         rec_path.parent.mkdir(parents=True, exist_ok=True)
         rec_path.write_text(json.dumps(rec), encoding="utf-8")
         return rec_path, rec
@@ -106,7 +106,7 @@ class LedgerTestBase(unittest.TestCase):
             "path": self.doc_rel,
             "state": "ready",
             "sha256": self.doc_sha,
-            "record": "docs/decisions/2026-11-06-frd-ready.json",
+            "record": "docs/daw/decisions/2026-11-06-frd-ready.json",
         }
 
     def run_ledger(self, path: pathlib.Path) -> subprocess.CompletedProcess[str]:
@@ -140,7 +140,7 @@ class TestLedgerFindings(LedgerTestBase):
     def test_record_mismatch(self) -> None:
         self.write_ready_record()
         entry = self.valid_entry()
-        entry["record"] = "docs/decisions/missing.json"
+        entry["record"] = "docs/daw/decisions/missing.json"
         ledger_path = self.write_ledger([entry])
         res = self.run_ledger(ledger_path)
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
@@ -202,7 +202,7 @@ class TestLedgerFindings(LedgerTestBase):
                 "checks": self.make_checks("prd"),
             }
         )
-        rec_path = self.proj_root / "docs/decisions/2026-11-06-frd-ready.json"
+        rec_path = self.proj_root / "docs/daw/decisions/2026-11-06-frd-ready.json"
         rec_path.write_text(json.dumps(rec), encoding="utf-8")
         prd_path.write_text("# PRD\nEdited after review.\n", encoding="utf-8")
         return prd_rel
@@ -218,7 +218,7 @@ class TestLedgerFindings(LedgerTestBase):
             "path": prd_rel,
             "state": "ready",
             "sha256": _sha256((self.proj_root / prd_rel).read_bytes()),
-            "record": "docs/decisions/2026-11-06-frd-ready.json",
+            "record": "docs/daw/decisions/2026-11-06-frd-ready.json",
         }
         res = self.run_ledger(self.write_ledger([self.valid_entry(), prd_entry]))
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)

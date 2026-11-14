@@ -14,6 +14,8 @@ try:
     from scripts.daw_common import (
         SCHEMA_VERSION,
         DuplicateKeyError,
+        artifact_dir,
+        artifact_dirs,
         has_errors,
         make_error,
         make_warning,
@@ -24,6 +26,8 @@ except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
         SCHEMA_VERSION,
         DuplicateKeyError,
+        artifact_dir,
+        artifact_dirs,
         has_errors,
         make_error,
         make_warning,
@@ -44,7 +48,7 @@ except ImportError:
 
 STATUS_LIMITATIONS = [
     "Read-only aggregate: never runs tests, evidence commands, or builds, and never writes files.",
-    "Task discovery is limited to the convention path docs/evidence/<task-id>/contract.json; contracts stored elsewhere are not checked.",
+    "Task discovery is limited to the project's evidence directory (<task-id>/contract.json); contracts stored elsewhere are not checked.",
     "summary.plans is satisfied only by a plan carrying both the BPF-4 `expected` token and the BPF-9 task-manifest marker, matching the route flow gate.",
     "Inherits every composed check's limitations (config, ledger, docs, contract); semantic truth of evidence is never evaluated.",
     "next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights.",
@@ -124,10 +128,12 @@ def _status_ledger(root: pathlib.Path, spec_dir: str | None, findings: list[dict
 def _status_plans(root: pathlib.Path, spec_dir: str | None) -> str:
     """Report whether a saved plan satisfies the route gate's plan requirements.
 
-    The route flow gate blocks feature/bugfix/refactor/maintain unless a
-    `docs/plans/*.md` file contains the literal token `expected` (BPF-4) and the
+    The route flow gate blocks feature/bugfix/refactor/maintain unless a plan
+    file contains the literal token `expected` (BPF-4) and the
     `<!-- daw-task-manifest -->` marker (BPF-9); a status that answered `ok`
-    for any plan file would send two different answers to the operator.
+    for any plan file would send two different answers to the operator. Both
+    the documented plan location and the legacy one are scanned, so a project
+    that has not relocated keeps the same answer.
     """
     if not spec_dir:
         return "not_applicable"
@@ -136,28 +142,29 @@ def _status_plans(root: pathlib.Path, spec_dir: str | None) -> str:
         return "not_applicable"
     if not any(spec_path.glob("*.md")):
         return "not_applicable"
-    plan_dir, plan_err = resolve_bounded_path(root, "docs/plans")
-    if plan_err or plan_dir is None or not plan_dir.is_dir():
-        return "missing"
-    for matched in sorted(plan_dir.glob("*.md")):
-        if not matched.is_file():
+    for plan_dir in artifact_dirs(root, "plans"):
+        if not plan_dir.is_dir():
             continue
-        try:
-            text = matched.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if "expected" in text and TASK_MANIFEST_MARKER in text:
-            return "ok"
+        for matched in sorted(plan_dir.glob("*.md")):
+            if not matched.is_file():
+                continue
+            try:
+                text = matched.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "expected" in text and TASK_MANIFEST_MARKER in text:
+                return "ok"
     return "missing"
 
 
 def _status_tasks(root: pathlib.Path, findings: list[dict[str, str]]) -> tuple[dict[str, int], str | None]:
     counts = {"complete_valid": 0, "complete_invalid": 0, "in_progress": 0}
     first_failing: str | None = None
-    evidence_dir = root / "docs" / "evidence"
-    if not evidence_dir.is_dir():
-        return counts, first_failing
-    for contract_path in sorted(evidence_dir.glob("*/contract.json")):
+    contract_paths: list[pathlib.Path] = []
+    for evidence_dir in artifact_dirs(root, "evidence"):
+        if evidence_dir.is_dir():
+            contract_paths.extend(evidence_dir.glob("*/contract.json"))
+    for contract_path in sorted(contract_paths):
         rel = contract_path.relative_to(root).as_posix()
         prefix = f"contract[{rel}]:"
         try:
@@ -281,8 +288,12 @@ def _next_actions(
             "blocking": blocking,
         }
         records_source = any(
-            (root / candidate).is_dir()
-            for candidate in ("docs/decisions", "docs/specs/records", "docs/evidence")
+            candidate.is_dir()
+            for candidate in (
+                artifact_dir(root, "decisions"),
+                root / (spec_dir or "docs/specs") / "records",
+                artifact_dir(root, "evidence"),
+            )
         )
         if records_source:
             primary = {
@@ -322,8 +333,9 @@ def _next_actions(
                 "why": (
                     "Specifications exist but no saved plan does; the route flow gate blocks "
                     "feature/bugfix/refactor/maintain until a plan with per-step expected "
-                    "results and a `<!-- daw-task-manifest -->` task list is saved under "
-                    "docs/plans/."
+                    "results and a `<!-- daw-task-manifest -->` task list is saved in the "
+                    "project's plan directory (docs/daw/plans/ by default, docs/plans/ for a "
+                    "project that already keeps plans there)."
                 ),
                 "blocking": True,
             },

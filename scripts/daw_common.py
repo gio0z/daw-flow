@@ -33,6 +33,65 @@ CANONICAL_TEMPLATES = (
 
 CANONICAL_DOC_STEMS = set(t.removesuffix(".md") for t in CANONICAL_TEMPLATES)
 
+#: Documented default location for each artifact class, relative to the project
+#: root. The 14 canonical document kinds keep their specification home
+#: (``docs/specs``); everything else a route generates lives under ``docs/daw``.
+ARTIFACT_DEFAULTS: dict[str, str] = {
+    "specs": "docs/specs",
+    "plans": "docs/daw/plans",
+    "workflows": "docs/daw/workflows",
+    "decisions": "docs/daw/decisions",
+    "evidence": "docs/daw/evidence",
+}
+
+#: Locations a project may have adopted before the ``docs/daw`` consolidation.
+#: A project that already keeps a class here keeps it: the documented default
+#: applies only where the project has no convention of its own.
+ARTIFACT_LEGACY: dict[str, str] = {
+    "plans": "docs/plans",
+    "workflows": "docs/workflows",
+    "decisions": "docs/decisions",
+    "evidence": "docs/evidence",
+}
+
+
+def artifact_dir(root_dir: pathlib.Path, kind: str) -> pathlib.Path:
+    """Return the directory a project keeps an artifact class in.
+
+    The project's own convention wins: when the legacy location exists it is
+    used, and the documented default applies only where the project has none.
+    """
+    legacy = ARTIFACT_LEGACY.get(kind)
+    if legacy:
+        candidate = root_dir / legacy
+        if candidate.is_dir():
+            return candidate
+    default = ARTIFACT_DEFAULTS.get(kind)
+    if default is None:
+        raise KeyError(f"Unknown artifact class: {kind!r}")
+    return root_dir / default
+
+
+def artifact_dirs(root_dir: pathlib.Path, kind: str) -> list[pathlib.Path]:
+    """Return every directory that may hold an artifact class.
+
+    The first entry is the project's own location (see :func:`artifact_dir`);
+    the documented default and the legacy path follow, so a reader that looks
+    for *any* file satisfying a condition can consider all of them.
+    """
+    out: list[pathlib.Path] = []
+    for relative in (
+        artifact_dir(root_dir, kind),
+        ARTIFACT_DEFAULTS.get(kind),
+        ARTIFACT_LEGACY.get(kind),
+    ):
+        if relative is None:
+            continue
+        candidate = root_dir / relative
+        if candidate not in out:
+            out.append(candidate)
+    return out
+
 
 class DuplicateKeyError(ValueError):
     """Raised when duplicate keys are encountered in JSON payload."""
