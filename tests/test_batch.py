@@ -296,6 +296,19 @@ class CompositeRepoBase(unittest.TestCase):
             self._make_member("T-2", "b.py", "B = 1\n"),
         ]
         self.batch_id = batch.batch_id(self.base_commit, ["T-1", "T-2"])
+        # The gate derives the composite's base from the integration branch, so
+        # it must exist before a record can be validated.
+        self.integration_rel = worktree.integration_worktree_rel(self.worktree_root)
+        _git(
+            self.repo,
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            worktree.INTEGRATION_BRANCH,
+            self.integration_rel,
+            self.base_commit,
+        )
 
     def _make_member(self, task_id: str, filename: str, content: str) -> dict:
         """Create a task branch off the base with one committed file."""
@@ -565,12 +578,9 @@ class CompositeGateTests(CompositeRepoBase):
         record = self.make_record(composite)
         record_path = self.write_record(record)
 
-        integration_rel = worktree.integration_worktree_rel(self.worktree_root)
-        _git(self.repo, "worktree", "add", "-q", "-b", worktree.INTEGRATION_BRANCH, integration_rel, self.base_commit)
-
         outcome = batch.merge_composite_branch(
             self.repo,
-            integration_rel,
+            self.integration_rel,
             composite["branch"],
             self.batch_id,
             self.repo,
@@ -590,13 +600,10 @@ class CompositeGateTests(CompositeRepoBase):
         record["composite_commit"] = "0" * 40
         record_path = self.write_record(record)
 
-        integration_rel = worktree.integration_worktree_rel(self.worktree_root)
-        _git(self.repo, "worktree", "add", "-q", "-b", worktree.INTEGRATION_BRANCH, integration_rel, self.base_commit)
-
         with self.assertRaises(worktree.IsolationError) as caught:
             batch.merge_composite_branch(
                 self.repo,
-                integration_rel,
+                self.integration_rel,
                 composite["branch"],
                 self.batch_id,
                 self.repo,
@@ -608,14 +615,12 @@ class CompositeGateTests(CompositeRepoBase):
 
     def test_merging_a_composite_with_a_missing_record_is_refused(self) -> None:
         composite = self.build()
-        integration_rel = worktree.integration_worktree_rel(self.worktree_root)
-        _git(self.repo, "worktree", "add", "-q", "-b", worktree.INTEGRATION_BRANCH, integration_rel, self.base_commit)
 
         missing = self.repo / "docs" / "daw" / "evidence" / self.batch_id / "composite-1.json"
         with self.assertRaises(worktree.IsolationError) as caught:
             batch.merge_composite_branch(
                 self.repo,
-                integration_rel,
+                self.integration_rel,
                 composite["branch"],
                 self.batch_id,
                 self.repo,
@@ -653,6 +658,316 @@ class CompositeGateTests(CompositeRepoBase):
             self.base_commit,
         ).strip()
         self.assertEqual(merges, "")
+
+
+class CompositeGateHardeningTests(CompositeRepoBase):
+    """Regressions for the review findings on the composite merge gate."""
+
+    # -- Critical: the merge-history bound may not come from the record -------
+
+    def test_a_tampered_base_commit_cannot_hide_a_merged_member(self) -> None:
+        """A one-field edit of the record must not turn a red composite green.
+
+        The composite holds two merged members. The record lists only the green
+        one and points ``base_commit`` at the merge commit of the red member,
+        which hides that member from ``git rev-list --merges --parents
+        <composite> --not <bound>``.
+        """
+        composite = self.build()
+        record = self.make_record(composite)
+
+        # The merge commit of T-1 (the older merge): using it as the bound
+        # hides T-1's merge and T-1's commit from the reconstruction.
+        merges = _git(
+            self.repo,
+            "rev-list",
+            "--merges",
+            "--parents",
+            composite["commit"],
+            "--not",
+            self.base_commit,
+        ).strip().splitlines()
+        red_merge = merges[1].split()[0]
+        self.assertNotEqual(red_merge, self.base_commit)
+
+        red_member = self.members[0]
+        green_member = self.members[1]
+
+        # The record keeps only the green member and claims the tampered bound.
+        record["base_commit"] = red_merge
+        record["members"] = [
+            member
+            for member in record["members"]
+            if member["task_id"] == green_member["task_id"]
+        ]
+        self.assertNotIn(
+            red_member["task_id"], [m["task_id"] for m in record["members"]]
+        )
+
+        ok, reason = batch.validate_composite_record(
+            self.repo, record, composite["commit"], composite["branch"]
+        )
+        self.assertFalse(ok, "the tampered bound must not validate")
+        self.assertIn("base commit", reason)
+
+    def test_a_record_whose_base_commit_disagrees_with_the_derived_base_is_refused(
+        self,
+    ) -> None:
+        composite = self.build()
+        record = self.make_record(composite)
+        record["base_commit"] = "0" * 40
+        ok, reason = batch.validate_composite_record(
+            self.repo, record, composite["commit"], composite["branch"]
+        )
+        self.assertFalse(ok)
+        self.assertIn("base", reason.lower())
+
+    def test_the_base_is_derived_and_stays_stable_when_the_integration_moves(
+        self,
+    ) -> None:
+        """The derived base does not follow the integration branch forward."""
+        composite = self.build()
+        derived = batch.derive_base_commit(self.repo, composite["commit"])
+        self.assertEqual(derived, self.base_commit)
+
+        integration = self.repo / self.integration_rel
+        (integration / "c.py").write_text("C = 1\n", encoding="utf-8")
+        _git(integration, "add", "-A")
+        _git(integration, "commit", "-qm", "another task")
+
+        self.assertEqual(
+            batch.derive_base_commit(self.repo, composite["commit"]), self.base_commit
+        )
+        # The reconstruction still sees both members.
+        merged = batch._merged_member_commits(self.repo, composite["commit"], derived)
+        self.assertEqual(merged, {member["commit"] for member in self.members})
+
+    def test_a_missing_integration_branch_fails_closed(self) -> None:
+        """Without the integration branch the base cannot be derived."""
+        composite = self.build()
+        record = self.make_record(composite)
+        _git(self.repo, "worktree", "remove", "--force", self.integration_rel)
+        _git(self.repo, "branch", "-D", worktree.INTEGRATION_BRANCH)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.validate_composite_record(
+                self.repo, record, composite["commit"], composite["branch"]
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+
+    # -- Important: the record is checked against the merge's own arguments ---
+
+    def test_a_record_naming_another_branch_is_refused(self) -> None:
+        """The record is checked against the branch the merge is actually for.
+
+        The log header is edited too, so the record and its logs agree with
+        each other about the wrong branch. Only a comparison against the
+        merge's own argument catches that.
+        """
+        composite = self.build()
+        record = self.make_record(composite)
+        record["composite_branch"] = "TOTALLY-DIFFERENT-BRANCH"
+        for member in record["members"]:
+            log_path = self.repo / member["log_path"]
+            log_path.write_text(
+                self.log_header(
+                    exit_code=0,
+                    branch="TOTALLY-DIFFERENT-BRANCH",
+                    commit=composite["commit"],
+                )
+                + "ok\n",
+                encoding="utf-8",
+            )
+            member["log_sha256"] = hashlib.sha256(log_path.read_bytes()).hexdigest()
+        record_path = self.write_record(record)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.merge_composite_branch(
+                self.repo,
+                self.integration_rel,
+                composite["branch"],
+                self.batch_id,
+                self.repo,
+                record_path,
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+        # The refusal must name the branch mismatch, not something else.
+        self.assertIn("TOTALLY-DIFFERENT-BRANCH", str(caught.exception))
+        self.assertIn("branch", str(caught.exception))
+
+    def test_a_record_naming_another_batch_is_refused(self) -> None:
+        composite = self.build()
+        record = self.make_record(composite)
+        record["batch_id"] = "batch-0000000000"
+        record_path = self.write_record(record)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.merge_composite_branch(
+                self.repo,
+                self.integration_rel,
+                composite["branch"],
+                self.batch_id,
+                self.repo,
+                record_path,
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+        self.assertIn("batch-0000000000", str(caught.exception))
+
+    def test_a_log_naming_another_branch_is_refused(self) -> None:
+        """The log header is checked against the branch being merged."""
+        composite = self.build()
+        record = self.make_record(composite)
+        log_path = self.repo / record["members"][0]["log_path"]
+        log_path.write_text(
+            self.log_header(
+                exit_code=0, branch="SOME-OTHER-BRANCH", commit=composite["commit"]
+            )
+            + "ok\n",
+            encoding="utf-8",
+        )
+        record["members"][0]["log_sha256"] = hashlib.sha256(
+            log_path.read_bytes()
+        ).hexdigest()
+        ok, reason = batch.validate_composite_record(
+            self.repo, record, composite["commit"], composite["branch"]
+        )
+        self.assertFalse(ok)
+        self.assertIn("SOME-OTHER-BRANCH", reason)
+
+    # -- Important: a protected branch is never merged ------------------------
+
+    def test_merging_a_protected_composite_branch_is_refused(self) -> None:
+        composite = self.build()
+        record = self.make_record(composite)
+        record["composite_branch"] = "main"
+        record_path = self.write_record(record)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.merge_composite_branch(
+                self.repo,
+                self.integration_rel,
+                "main",
+                self.batch_id,
+                self.repo,
+                record_path,
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+        # The refusal must be the protected-branch one.
+        self.assertIn("protected", str(caught.exception).lower())
+
+    # -- Minor: findings, removal failures, and the log's directory ------------
+
+    def test_a_merge_history_read_failure_carries_a_finding(self) -> None:
+        """A failure to read the merge history is a refusal with a finding."""
+        composite = self.build()
+        record = self.make_record(composite)
+
+        original = batch.run_git
+
+        def failing(args, repo, timeout=120):
+            if args[:2] == ["rev-list", "--merges"]:
+                return 1, "", "boom"
+            return original(args, repo, timeout)
+
+        batch.run_git = failing
+        self.addCleanup(setattr, batch, "run_git", original)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.validate_composite_record(
+                self.repo, record, composite["commit"], composite["branch"]
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+
+    def test_an_unreadable_merge_history_refuses_the_merge(self) -> None:
+        """The gate refuses the merge when the merge history cannot be read."""
+        composite = self.build()
+        record = self.make_record(composite)
+        record_path = self.write_record(record)
+
+        original = batch.run_git
+
+        def failing(args, repo, timeout=120):
+            if args[:2] == ["rev-list", "--merges"]:
+                return 1, "", "boom"
+            return original(args, repo, timeout)
+
+        batch.run_git = failing
+        self.addCleanup(setattr, batch, "run_git", original)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.merge_composite_branch(
+                self.repo,
+                self.integration_rel,
+                composite["branch"],
+                self.batch_id,
+                self.repo,
+                record_path,
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
+        # Nothing was merged.
+        tree = _git(self.repo, "ls-tree", "--name-only", worktree.INTEGRATION_BRANCH).split()
+        self.assertNotIn("a.py", tree)
+
+    def test_a_log_outside_the_evidence_directory_is_refused(self) -> None:
+        """A record may not point the gate at an arbitrary file in the repo."""
+        composite = self.build()
+        record = self.make_record(composite)
+
+        stray = self.repo / "docs" / "daw" / "evidence" / "stray.log"
+        stray.write_text(
+            self.log_header(
+                exit_code=0, branch=composite["branch"], commit=composite["commit"]
+            )
+            + "ok\n",
+            encoding="utf-8",
+        )
+        record["members"][0]["log_path"] = stray.relative_to(self.repo).as_posix()
+        record["members"][0]["log_sha256"] = hashlib.sha256(
+            stray.read_bytes()
+        ).hexdigest()
+
+        ok, reason = batch.validate_composite_record(
+            self.repo, record, composite["commit"], composite["branch"]
+        )
+        self.assertFalse(ok)
+        self.assertIn("evidence directory", reason)
+
+    def test_a_failing_composite_removal_surfaces_the_error(self) -> None:
+        """A worktree that cannot be removed is reported, not swallowed."""
+        composite = self.build()
+        original = batch.run_git
+
+        def failing(args, repo, timeout=120):
+            if args[:2] == ["worktree", "remove"]:
+                return 1, "", "cannot remove"
+            return original(args, repo, timeout)
+
+        batch.run_git = failing
+        self.addCleanup(setattr, batch, "run_git", original)
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            batch.build_composite(
+                self.repo,
+                self.worktree_root,
+                self.base_commit,
+                self.batch_id,
+                self.members,
+            )
+        self.assertIn(
+            "merge_not_verified", [f["code"] for f in caught.exception.findings]
+        )
 
 
 if __name__ == "__main__":

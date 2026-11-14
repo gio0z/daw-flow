@@ -24,12 +24,14 @@ import pathlib
 from typing import Any, Sequence
 
 try:
-    from scripts.daw_common import compute_sha256, finding, resolve_bounded_path
+    from scripts.daw_common import artifact_dir, compute_sha256, finding, resolve_bounded_path
     from scripts.worktree import (
+        INTEGRATION_BRANCH,
         IsolationError,
         branch_commit,
         branch_exists,
         container_dir,
+        is_protected_branch,
         merge_branch_into_worktree,
         prune_worktrees,
         run_git,
@@ -37,15 +39,18 @@ try:
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
+        artifact_dir,
         compute_sha256,
         finding,
         resolve_bounded_path,
     )
     from worktree import (  # type: ignore[import-not-found]
+        INTEGRATION_BRANCH,
         IsolationError,
         branch_commit,
         branch_exists,
         container_dir,
+        is_protected_branch,
         merge_branch_into_worktree,
         prune_worktrees,
         run_git,
@@ -57,6 +62,9 @@ OVERLAP_CODE = "batch_write_set_overlap"
 
 #: Finding code for a member that cannot be merged into the composite.
 CONFLICT_CODE = "batch_merge_conflict"
+
+#: Finding code for a composite the merge gate refuses to integrate.
+NOT_VERIFIED_CODE = "merge_not_verified"
 
 #: Schema version of the composite record — the gate's input.
 composite_record_schema_version = 1
@@ -233,6 +241,15 @@ def composite_worktree_rel(worktree_root: str) -> str:
     return f"{container_dir(worktree_root)}/_composite"
 
 
+def composite_evidence_dir(repo: pathlib.Path, batch_id: str) -> pathlib.Path:
+    """The directory holding one batch's composite evidence.
+
+    ``docs/daw/evidence/<batch-id>/`` by default, honouring a project's own
+    evidence convention.
+    """
+    return artifact_dir(repo, "evidence") / batch_id
+
+
 def write_composite_record(path: pathlib.Path, record: dict[str, Any]) -> None:
     """Write the composite record — the gate's input — as JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -268,6 +285,56 @@ def _log_header_fields(path: pathlib.Path) -> dict[str, str]:
     return fields
 
 
+def derive_base_commit(repo: pathlib.Path, composite_commit: str) -> str:
+    """Derive the composite's base commit from git, not from the record.
+
+    The record is the untrusted artifact the gate exists to cross-check, so
+    the ``--not`` bound of the merge-history reconstruction cannot come from
+    it. The base is instead the merge base of the composite's tip and the
+    integration branch's tip: the composite is created *at* the base and
+    merges members into it, so it descends from the base and from nothing
+    else. That stays true when the integration branch later moves forward
+    with another task's merge — the composite's own ancestry does not.
+
+    Raises ``IsolationError`` when the integration branch does not exist or
+    the merge base cannot be computed: the gate fails closed rather than
+    falling back to a bound the record controls.
+    """
+    if not branch_exists(repo, INTEGRATION_BRANCH):
+        raise IsolationError(
+            f"The composite's base cannot be derived: the integration branch "
+            f"{INTEGRATION_BRANCH} does not exist.",
+            [
+                finding(
+                    "error",
+                    NOT_VERIFIED_CODE,
+                    INTEGRATION_BRANCH,
+                    f"The integration branch {INTEGRATION_BRANCH} does not exist, so the "
+                    f"composite's base commit cannot be derived.",
+                )
+            ],
+        )
+    code, out, err = run_git(
+        ["merge-base", composite_commit, INTEGRATION_BRANCH], repo
+    )
+    base = out.strip()
+    if code != 0 or not base:
+        raise IsolationError(
+            f"The composite's base cannot be derived at {composite_commit}: "
+            f"{err.strip() or out.strip()}",
+            [
+                finding(
+                    "error",
+                    NOT_VERIFIED_CODE,
+                    str(composite_commit),
+                    f"The merge base of {composite_commit} and {INTEGRATION_BRANCH} "
+                    f"cannot be computed: {err.strip() or out.strip()}",
+                )
+            ],
+        )
+    return base
+
+
 def _merged_member_commits(repo: pathlib.Path, composite_commit: str, base_commit: str) -> set[str]:
     """Reconstruct the merged member commits from the composite's own history.
 
@@ -282,7 +349,16 @@ def _merged_member_commits(repo: pathlib.Path, composite_commit: str, base_commi
     if code != 0:
         raise IsolationError(
             f"The composite's merge history cannot be read at {composite_commit}: "
-            f"{err.strip() or out.strip()}"
+            f"{err.strip() or out.strip()}",
+            [
+                finding(
+                    "error",
+                    NOT_VERIFIED_CODE,
+                    str(composite_commit),
+                    f"The composite's merge history cannot be read at "
+                    f"{composite_commit}: {err.strip() or out.strip()}",
+                )
+            ],
         )
     merged: set[str] = set()
     for line in out.splitlines():
@@ -298,6 +374,7 @@ def validate_composite_record(
     repo: pathlib.Path,
     record: dict[str, Any],
     composite_commit: str | None,
+    composite_branch: str | None = None,
 ) -> tuple[bool, str]:
     """Decide whether the composite record proves the composite green.
 
@@ -305,6 +382,16 @@ def validate_composite_record(
     the member set is reconstructed from the composite's own merge history, the
     record's commit must equal the composite's tip, every member must be
     green, and every exit code is re-derived from the log the record names.
+
+    The base commit of that reconstruction is derived from git, never read
+    from the record — otherwise editing one field of the record would shrink
+    the reconstructed set and hide a member. The record keeps its
+    ``base_commit`` field, but only as a cross-checked value: it must equal
+    the derived base.
+
+    ``composite_branch`` is the branch the merge is actually for. When it is
+    given, the log headers are checked against it rather than against the
+    record's own ``composite_branch`` field, which the record also controls.
 
     Returns ``(ok, reason)``; ``reason`` explains a refusal.
     """
@@ -324,9 +411,16 @@ def validate_composite_record(
     if not isinstance(members, list) or not members:
         return False, "the composite record lists no members"
 
-    base_commit = record.get("base_commit")
-    if not isinstance(base_commit, str) or not base_commit:
+    base_commit = derive_base_commit(repo, composite_commit)
+    recorded_base = record.get("base_commit")
+    if not isinstance(recorded_base, str) or not recorded_base:
         return False, "the composite record names no base commit"
+    if recorded_base != base_commit:
+        return (
+            False,
+            f"the composite record names base commit {recorded_base}, but the "
+            f"composite's base is {base_commit}",
+        )
 
     merged = _merged_member_commits(repo, composite_commit, base_commit)
 
@@ -380,6 +474,17 @@ def validate_composite_record(
                 False,
                 f"the composite log for member {task_id} does not exist: {log_path}",
             )
+        # The log must live in this batch's own evidence directory: a record
+        # may not point the gate at an arbitrary file inside the repository.
+        evidence_dir = composite_evidence_dir(repo, str(record.get("batch_id") or ""))
+        try:
+            log.resolve().relative_to(evidence_dir.resolve())
+        except (ValueError, OSError):
+            return (
+                False,
+                f"the composite log for member {task_id} is outside the batch's "
+                f"evidence directory {evidence_dir}: {log_path}",
+            )
         digest = compute_sha256(log)
         if digest != member.get("log_sha256"):
             return (
@@ -400,11 +505,16 @@ def validate_composite_record(
                 f"the composite log for member {task_id} records exit code "
                 f"{logged_exit_int}, but the composite record says {exit_code}",
             )
-        if fields.get("branch") != record.get("composite_branch"):
+        expected_branch = (
+            composite_branch
+            if composite_branch is not None
+            else record.get("composite_branch")
+        )
+        if fields.get("branch") != expected_branch:
             return (
                 False,
                 f"the composite log for member {task_id} was produced on branch "
-                f"{fields.get('branch')}, not {record.get('composite_branch')}",
+                f"{fields.get('branch')}, not {expected_branch}",
             )
         if fields.get("commit") != composite_commit:
             return (
@@ -417,14 +527,44 @@ def validate_composite_record(
 
 
 def _remove_composite(repo: pathlib.Path, branch: str, worktree_rel: str) -> None:
-    """Remove the composite's worktree and branch, so a retry starts clean."""
+    """Remove the composite's worktree and branch, so a retry starts clean.
+
+    A failure is surfaced rather than swallowed: a silently surviving
+    worktree or branch makes the next ``git worktree add -b`` fail with a
+    message that does not name the real cause.
+    """
     if worktree_for_branch(repo, branch) is not None or (repo / worktree_rel).is_dir():
-        run_git(["worktree", "remove", "--force", worktree_rel], repo)
+        code, _, err = run_git(["worktree", "remove", "--force", worktree_rel], repo)
+        if code != 0:
+            raise IsolationError(
+                f"The composite worktree {worktree_rel} cannot be removed: {err.strip()}",
+                [
+                    finding(
+                        "error",
+                        NOT_VERIFIED_CODE,
+                        str(worktree_rel),
+                        f"The composite worktree {worktree_rel} cannot be removed: "
+                        f"{err.strip()}",
+                    )
+                ],
+            )
     # A stale registration would keep the branch checked out, and git would
     # then refuse to delete it.
     prune_worktrees(repo)
     if branch_exists(repo, branch):
-        run_git(["branch", "-D", branch], repo)
+        code, _, err = run_git(["branch", "-D", branch], repo)
+        if code != 0:
+            raise IsolationError(
+                f"The composite branch {branch} cannot be deleted: {err.strip()}",
+                [
+                    finding(
+                        "error",
+                        NOT_VERIFIED_CODE,
+                        str(branch),
+                        f"The composite branch {branch} cannot be deleted: {err.strip()}",
+                    )
+                ],
+            )
 
 
 def build_composite(
@@ -512,7 +652,24 @@ def merge_composite_branch(
     branch only when its record proves every member green at the exact
     composite commit. A caller cannot merge a composite without the record
     passing.
+
+    The record is checked against the branch and the batch this merge is
+    actually for, never against its own fields: a record that names another
+    branch or another batch describes a different composite.
     """
+    if is_protected_branch(composite_branch):
+        raise IsolationError(
+            f"Refusing to merge protected branch {composite_branch}.",
+            [
+                finding(
+                    "error",
+                    NOT_VERIFIED_CODE,
+                    str(composite_branch),
+                    f"The composite branch {composite_branch} is protected and must "
+                    f"never be merged.",
+                )
+            ],
+        )
     if not record_path.is_absolute():
         record_path = project_root / record_path
     record = read_composite_record(record_path)
@@ -520,7 +677,29 @@ def merge_composite_branch(
         reason = f"the composite record cannot be read: {record_path}"
         raise IsolationError(
             f"Batch {batch_id} is not mergeable: {reason}.",
-            [finding("error", "merge_not_verified", str(record_path), reason)],
+            [finding("error", NOT_VERIFIED_CODE, str(record_path), reason)],
+        )
+
+    recorded_branch = record.get("composite_branch")
+    if recorded_branch != composite_branch:
+        reason = (
+            f"the composite record names branch {recorded_branch}, but the merge is "
+            f"for branch {composite_branch}"
+        )
+        raise IsolationError(
+            f"Batch {batch_id} is not mergeable: {reason}.",
+            [finding("error", NOT_VERIFIED_CODE, str(record_path), reason)],
+        )
+
+    recorded_batch = record.get("batch_id")
+    if recorded_batch != batch_id:
+        reason = (
+            f"the composite record names batch {recorded_batch}, but the merge is "
+            f"for batch {batch_id}"
+        )
+        raise IsolationError(
+            f"Batch {batch_id} is not mergeable: {reason}.",
+            [finding("error", NOT_VERIFIED_CODE, str(record_path), reason)],
         )
 
     integration_path = repo / integration_worktree
@@ -531,7 +710,7 @@ def merge_composite_branch(
             [
                 finding(
                     "error",
-                    "merge_not_verified",
+                    NOT_VERIFIED_CODE,
                     str(integration_worktree),
                     f"The integration worktree is missing: {integration_path}",
                 )
@@ -539,11 +718,13 @@ def merge_composite_branch(
         )
 
     composite_commit = branch_commit(repo, composite_branch)
-    ok, reason = validate_composite_record(repo, record, composite_commit)
+    ok, reason = validate_composite_record(
+        repo, record, composite_commit, composite_branch
+    )
     if not ok:
         raise IsolationError(
             f"Batch {batch_id} is not mergeable: {reason}.",
-            [finding("error", "merge_not_verified", str(record_path), reason)],
+            [finding("error", NOT_VERIFIED_CODE, str(record_path), reason)],
         )
 
     message = f"merge(batch): {batch_id}"
