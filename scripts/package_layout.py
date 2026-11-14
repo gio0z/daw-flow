@@ -18,8 +18,12 @@ OPERATIONAL_SCRIPTS = (
     "scripts/check_status.py",
     "scripts/check_flow.py",
     "scripts/check_surface.py",
+    "scripts/check_tasks.py",
     "scripts/derive_ledger.py",
+    "scripts/derive_tasks.py",
     "scripts/package_layout.py",
+    "scripts/run.py",
+    "scripts/worktree.py",
 )
 
 REQUIRED_FILES = (

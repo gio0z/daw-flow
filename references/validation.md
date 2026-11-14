@@ -900,3 +900,72 @@ Arguments: `FILE` (session JSON), `--project-root ROOT` (required), `--stage exe
 ### Relationship to `daw-verify`
 
 Rule 8 records the session as `details.surface_session` and states the coverage floor; this check enforces the parts a machine can decide (presence, required legs, viewport pair, wire outcome, message, `passed` status). Passing it never authorizes acceptance: the parent still inspects the recorded observations against the running product.
+
+---
+
+## 14. Task List Validation (`scripts/validate.py tasks`)
+
+The structural half of the [Deterministic Execution Runner](execution-runner.md): a saved plan carries a machine-readable task list, and this check refuses one that a runner could not execute safely — and, when the plan names hand-authored task files, refuses one that has drifted from them. Read-only; it never runs a task, never accepts a task, and never evaluates semantic truth.
+
+### CLI Invocation
+
+```bash
+python3 "$SKILL_DIR/scripts/validate.py" tasks docs/plans/<workflow-id>.md \
+  --project-root "$PROJECT_DIR" --format json
+```
+
+Arguments: `FILE` (the plan document), `--project-root ROOT` (required; the plan path must resolve inside it, else exit `2`), `--format text|json`. Exit codes match §1 (`0` valid, `1` error findings, `2` usage/IO error).
+
+### What Is Rejected
+
+| Finding code | Meaning |
+| :----------- | :------ |
+| `manifest_missing` | No `<!-- daw-task-manifest -->` marker, or no fenced JSON block follows it. |
+| `manifest_ambiguous` | More than one marker in the plan. |
+| `manifest_malformed` | The block is not strict JSON, or is not an object with a `tasks` array. |
+| `manifest_unknown_field` | An unknown top-level manifest field. |
+| `manifest_schema_version_invalid` | `schema_version` is not the integer `1`. |
+| `manifest_tasks_invalid` | `tasks` is missing, not an array, or empty. |
+| `task_unknown_field` / `task_missing_field` | A task carries an unknown or an omitted required field. |
+| `task_id_invalid` / `task_id_duplicate` | The task id is blank or repeats. |
+| `task_autonomy_invalid` | `autonomy` is neither `afk` nor `hitl`. |
+| `task_depends_on_invalid` | `depends_on` is not an array of task ids. |
+| `task_dependency_unknown` | A dependency names a task the manifest does not declare. |
+| `task_dependency_cycle` | The dependency graph contains a cycle. |
+| `task_target_files_invalid` / `task_acceptance_criteria_invalid` | The array is empty or holds a non-string. |
+| `task_verification_command_invalid` / `task_expected_outcome_invalid` / `task_title_invalid` | A required string is blank. |
+| `task_parallel_safe_invalid` | `parallel_safe` is not a boolean. |
+| `task_target_file_unsafe` | A target path is absolute or escapes the project root. |
+| `task_file_frontmatter_missing` | A task file has no closed `---` frontmatter block. |
+| `task_file_field_invalid` | An unparsable frontmatter line, or an indented line that is not a `- item` list entry. |
+| `task_file_field_duplicate` | A frontmatter key repeats within one task file. |
+| `task_file_unreadable` | A task file cannot be read as UTF-8 text. |
+| `task_source_missing` / `task_source_empty` | The declared task-source directory is absent or holds no Markdown task file. |
+| `manifest_drift` | The plan's manifest does not match the projection of its task files; names the task and the differing field. |
+
+### Drift Detection
+
+When the plan declares `<!-- daw-task-sources: <dir> -->`, the task files are the hand-authored source and the plan's manifest is their projection. This check recomputes the projection and compares it: an edited field, an added task, or a removed task is reported as `manifest_drift` naming the exact task and field. Re-derive with `python3 scripts/derive_tasks.py --plan <plan> --project-root <root> --write`; until then the runner refuses to execute.
+
+### Output Envelope
+
+```json
+{
+  "valid": true,
+  "check": "tasks",
+  "schema_version": 1,
+  "task_count": 2,
+  "workflow_id": "wf-session-rotation",
+  "findings": [],
+  "limitations": [
+    "Structural validation only; never executes a task, never accepts a task, and never evaluates semantic truth.",
+    "The manifest is validated as a self-contained DAG: dependency, uniqueness, autonomy, and path safety only.",
+    "Evidence referenced by a task is not verified here; verification evidence is produced by the runner's verify step.",
+    "Drift detection compares the embedded manifest against the derived projection of the task files; it never re-derives a task field."
+  ]
+}
+```
+
+### Relationship to the Runner
+
+`scripts/run.py` consumes the same list: `next` computes the ready set, `context` assembles a bounded context pack, `verify` runs a task's prescribed command and captures evidence, `isolate` runs one task inside its own git worktree and integrates it only when that verification exited `0`, and `run` drives the unattended loop with an operator-supplied agent command. `scripts/derive_tasks.py` is the suite's second writer: it projects task files into the plan's manifest and never invents a field. Full contract: [Deterministic Execution Runner](execution-runner.md).

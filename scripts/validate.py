@@ -21,6 +21,7 @@ try:
     from scripts.check_package import validate_package
     from scripts.check_status import validate_status
     from scripts.check_surface import SURFACE_LIMITATIONS, validate_surface_session
+    from scripts.check_tasks import validate_plan_manifest
     from scripts.daw_common import DuplicateKeyError, output_result, parse_strict_json, resolve_bounded_path
 except ImportError:
     from check_config import validate_config_file  # type: ignore[import-not-found]
@@ -34,6 +35,7 @@ except ImportError:
         SURFACE_LIMITATIONS,
         validate_surface_session,
     )
+    from check_tasks import validate_plan_manifest  # type: ignore[import-not-found]
     from daw_common import (  # type: ignore[import-not-found]
         DuplicateKeyError,
         output_result,
@@ -143,6 +145,17 @@ def main() -> None:
     flow_parser = subparsers.add_parser("flow", help="Validate the best-practice-flow mapping and suite-manifest flow_gate wiring.")
     flow_parser.add_argument("--project-root", required=True, help="Project root directory to inspect.")
     flow_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json.")
+
+    tasks_parser = subparsers.add_parser(
+        "tasks", help="Validate the task manifest carried by a saved plan document."
+    )
+    tasks_parser.add_argument("file", help="Path to the plan document carrying the task manifest.")
+    tasks_parser.add_argument(
+        "--project-root",
+        required=True,
+        help="Project root directory bounding the plan and its target files.",
+    )
+    tasks_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json.")
 
     try:
         args = parser.parse_args()
@@ -404,6 +417,42 @@ def main() -> None:
             "findings": findings,
             "limitations": SURFACE_LIMITATIONS,
         }
+        output_result(res, args.format)
+        sys.exit(0 if res["valid"] else 1)
+
+    elif args.subcommand == "tasks":
+        proj_root_raw = pathlib.Path(args.project_root)
+        try:
+            proj_root = proj_root_raw.resolve()
+        except (OSError, RuntimeError, ValueError):
+            sys.stderr.write("Error: Cannot resolve project root.\n")
+            sys.exit(2)
+        if not proj_root.is_dir():
+            sys.stderr.write("Error: Project root is not a directory.\n")
+            sys.exit(2)
+
+        raw_file_str = str(args.file)
+        file_raw = pathlib.Path(raw_file_str)
+        if file_raw.is_absolute():
+            plan_path = file_raw
+        else:
+            bound_path, bound_err = resolve_bounded_path(proj_root, raw_file_str)
+            if bound_err or bound_path is None:
+                sys.stderr.write(f"Error: Plan path is not bounded by the project root: {raw_file_str}\n")
+                sys.exit(2)
+            plan_path = bound_path
+        try:
+            if not plan_path.is_file():
+                sys.stderr.write("Error: Plan file does not exist or is not a file.\n")
+                sys.exit(2)
+        except OSError:
+            sys.stderr.write("Error accessing plan file.\n")
+            sys.exit(2)
+        try:
+            res = validate_plan_manifest(plan_path, proj_root)
+        except OSError:
+            sys.stderr.write("OS error validating task manifest.\n")
+            sys.exit(2)
         output_result(res, args.format)
         sys.exit(0 if res["valid"] else 1)
 

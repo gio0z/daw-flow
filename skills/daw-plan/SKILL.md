@@ -114,6 +114,22 @@ The planning module converts design specifications, architectural requirements, 
 6. **Ordered Execution Steps:** Inside each task, list single-action steps (write failing test -> run, expect fail with named reason -> minimal change -> run, expect pass -> suite). Each step names its file and an exact `run` + `expected` observable. Baseline step first (current revision, suite green before edits). Steps are plan text; evidence stays null until executed.
 7. **Bounded Contract Preview:** For contract-bearing surfaces only (schema DDL, migration, API payload/envelope, public function signature) the task carries the exact intended text in `change_preview`; full function bodies stay in `daw-build`. Constraints from the data model (nullability, enums, limits, money units) are quoted verbatim into `constraints_quoted`.
 8. **Autonomy:** Each task/slice carries `autonomy: hitl|afk` — `hitl` needs a live human decision; only `afk` tasks are delegable unsteered. An `afk` task may not depend on an open human decision.
+9. **Task List:** The saved plan carries the task list in the form the deterministic runner consumes, so a task that is not in the list does not exist to the executor. Two forms are available; pick one per workflow and never mix them:
+   - **Task files (preferred):** one Markdown file per task in a directory the plan names via `<!-- daw-task-sources: <dir> -->`. Frontmatter carries the machine fields (`task_id`, `title`, `autonomy`, `depends_on`, `parallel_safe`, `target_files`, `acceptance_criteria`, `verification_command`, `expected_outcome`); the body is free prose — What to build, Out of scope, and the reasoning a machine must not guess. The plan's JSON manifest is then *derived* from these files: `python3 "$SUITE_ROOT/scripts/derive_tasks.py" --plan <plan-path> --project-root "$PROJECT_DIR" --write`. The task files stay the single hand-authored source; the manifest is their projection.
+   - **Embedded manifest:** one fenced ` ```json ` block immediately after the `<!-- daw-task-manifest -->` marker, using the same field names, when a workflow has no task files.
+
+   Field names match this module's task contract in both forms, so plan prose and executable task list cannot drift into different vocabularies. Validate before handing off: `python3 "$SUITE_ROOT/scripts/validate.py" tasks <plan-path> --project-root "$PROJECT_DIR"` — it reports `manifest_drift` when the plan's manifest and its task files disagree. Full contract: [Deterministic Execution Runner](../../references/execution-runner.md).
+
+   **Writing the task files is part of decomposition, not a follow-up.** Each task becomes one Markdown file whose frontmatter is the machine contract and whose body is the slice statement ("What to build", "Out of scope", the reasoning behind the boundaries). The body is what a fresh worker actually reads, so it carries the intent the frontmatter cannot express. After writing the files, derive the manifest and validate, in that order — a plan that has never been derived is not a plan the runner can execute:
+
+   ```bash
+   python3 "$SUITE_ROOT/scripts/derive_tasks.py" --plan <plan-path> \
+     --project-root "$PROJECT_DIR" --write
+   python3 "$SUITE_ROOT/scripts/validate.py" tasks <plan-path> \
+     --project-root "$PROJECT_DIR"
+   ```
+
+   A `manifest_drift` finding means a task file was edited after the last derivation: re-derive it rather than hand-editing the manifest block.
 
 ### Step 4: Sequence Dependencies, Concurrency & Parallel Criteria [P] (Contract §D)
 
@@ -160,7 +176,7 @@ When invoked to re-plan or reconcile gaps identified during execution, review, o
 
 ### Step 8: Synthesize Implementation Contract & Prebuild Review Handoff (Contract §F)
 
-1. Format the plan into the standard output schema. For multi-step authorized work, save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (existing roadmap/issue-export/project doc section if sufficient, otherwise `docs/plans/<workflow-id>.md`). Include saved plan/progress refs in existing `details` and keep examples consistent with the saved form. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
+1. Format the plan into the standard output schema. For multi-step authorized work, save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (existing roadmap/issue-export/project doc section if sufficient, otherwise `docs/plans/<workflow-id>.md`). The saved plan carries the task list described in Step 3 item 9 — task files plus the derived manifest — so the deterministic runner can consume it. Include saved plan/progress refs in existing `details` and keep examples consistent with the saved form. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
 2. **Parent-Owned Independent Prebuild Readiness Review:** For spec-dependent implementation workflows (`feature`, `bugfix`), `daw-plan` self-checks the plan and recommends `handoff_to: "daw-review"` (or parent readiness checkpoint) for a proportional independent read-only conformity review before `daw-build` execution begins.
 
 ---
@@ -343,6 +359,7 @@ Illustrative `details` only (not a complete handoff; wrap in the canonical envel
 Before completing `daw-plan`, verify:
 
 - [ ] Every task specifies exact file paths and concrete operational changes.
+- [ ] The saved plan's task list is in its final, runner-consumable form: task files written (each with frontmatter and a prose body stating What to build and Out of scope), the manifest derived from them with `derive_tasks.py --write`, and `validate.py tasks` reporting no findings.
 - [ ] Current persisted proportional spec was consumed with exact source refs and revisions; clear no-file requirements were parent-recorded, with no invented design or new stage.
 - [ ] Saved plan + progress refs are present in `details` for multi-step work; native todos complement durable artifacts with no separate task tracker; tiny patches stay inline.
 - [ ] Full bidirectional traceability: Every requirement and acceptance criterion maps to task(s)/files/deps/verification/evidence/status or carries explicit, reasoned `N/A` justification; parent decision is separate from worker status. Where a conditional ERD was selected, its erd-01..03 criteria and traceability links map to tasks without inventing schema or migrations; a scoped ERD skip/N/A is a reasoned non-mapping, never an implicit pass.

@@ -16,6 +16,8 @@ Workspace safety is the first line of defense against data loss. Generative reas
 > - Worktrees isolate files and git references; they do **NOT** isolate shared system resources (ports, local databases, background daemons, or shared secrets).
 
 > - In-repo worktree directories must be ignored before creation; sibling paths outside the repository need no ignore entry. [Procedure B](#procedure-b-authorized-isolated-worktree-setup) owns the setup commands and linked-worktree exclude resolution. Never edit global git configuration or global ignores as part of workspace setup.
+>
+> - For worktrees that belong to a saved plan's task list, prefer the deterministic runner over hand-issued git commands: `python3 "$SUITE_ROOT/scripts/run.py" isolate --plan <plan-path> --project-root "$PROJECT_DIR" --task <task-id> --agent-command '["<agent-cli>","-p","{prompt_file}"]'` derives the branch name and worktree path from the task id, bases the task on the integration branch, and integrates only a task whose verification exited `0`. [Procedure B](#procedure-b-authorized-isolated-worktree-setup) governs ad-hoc isolation that has no task in a plan.
 
 > - Deliverables remain uncommitted and unmerged until explicitly directed.
 

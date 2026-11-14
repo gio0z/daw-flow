@@ -223,7 +223,7 @@ Before final delivery of any code-changing workflow, the parent orchestrator exe
 
 ## 4. Verification & Structural Validation
 
-The suite includes two read-only Python 3.10+ standard library diagnostic utilities plus one companion generator. The diagnostics perform structural inspection and schema validation; they do not automatically dispatch agents, enforce runtime policies, or provide semantic proof of code correctness. The generator writes exactly one artifact and only on explicit request:
+The suite includes two read-only Python 3.10+ standard library diagnostic utilities, one companion generator, and one explicitly invoked execution runner. The diagnostics perform structural inspection and schema validation; they do not automatically dispatch agents, enforce runtime policies, or provide semantic proof of code correctness. The generator writes exactly one artifact and only on explicit request. The runner writes only the evidence logs and context packs it is asked for, inside the project root, and is never invoked by the diagnostics:
 
 1. **Suite Integrity Check (`route.py --check-suite`):**
    - Validates that `references/suite-manifest.json` conforms to schema 1.
@@ -239,6 +239,12 @@ The suite includes two read-only Python 3.10+ standard library diagnostic utilit
 3. **Ledger Derivation (`derive_ledger.py`, the suite's only writer):**
    - `python3 scripts/derive_ledger.py --project-root <dir> [--write]`: projects `<spec_dir>/ledger.json` from the doc-transition records already under `docs/decisions/`, `docs/specs/records/`, or `docs/evidence/`, so specifications stay the only hand-authored artifact.
    - Every field is copied from a record: `state` from `transition.to`, `sha256` from the record that still matches the document's current bytes, `record` from the file itself, `history` from the rest of the transition chain. An edited document is reported as `derive_doc_unmapped` (drift) rather than silently re-pinned, and a conflicted chain is reported as `derive_doc_conflict` — `--write` refuses instead of guessing. Without `--write` it prints the ledger it would write and touches nothing.
+
+4. **Deterministic Execution Runner (`run.py`):**
+   - `python3 scripts/run.py next|context|verify|run --plan <plan> --project-root <dir>`: consumes the task list carried by a saved plan and makes three decisions mechanically — which task may run next, what bounded context a worker receives, and whether the task's verification command actually passed.
+   - The task list has one hand-authored source per workflow: either one Markdown file per task (frontmatter carries the machine fields, the body carries the prose) named by a `<!-- daw-task-sources: <dir> -->` marker, or the manifest embedded directly after a `<!-- daw-task-manifest -->` marker. `derive_tasks.py` projects the task files into the plan's manifest; `validate.py tasks` reports any drift between them and refuses a plan whose two halves disagree.
+   - `context` assembles a byte-bounded context pack ("smart zone") with per-file SHA-256, explicit truncation, and the task's prose brief; `verify` runs a task's prescribed command as argv without a shell and captures the exit code and output to `docs/evidence/<task-id>/verify-<n>.log`; `isolate` runs one task inside its own git worktree (branch `daw/<task-id>-<slug>`, based on the local integration branch) and merges it only when that verification exited `0` at the merged commit; `run` drives the unattended loop using an operator-supplied agent command.
+   - It is explicitly invoked per unit of work — never a daemon, scheduler, or background service — never pushes/merges/tags/deploys, never installs or discovers an agent command, and never grants point-of-risk authorization. A passing verification is evidence, not approval. Full contract: [Deterministic Execution Runner](references/execution-runner.md).
 
 ---
 

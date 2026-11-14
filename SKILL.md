@@ -133,6 +133,33 @@ The request requires classified input facts (`schema_version`, `intent`, `requir
 - If requirements are unknown for `bootstrap`, `feature`, `refactor`, or `maintain`, requirements are unknown or unclear for `patch`, or if workspace is unknown for mutating intents (`feature`, `bugfix`, `patch`, `refactor`, `maintain`), or if risk is unknown for mutating intents (`feature`, `bugfix`, `patch`, `refactor`, `maintain`, `ship`), the engine returns `status: "needs-input"` with explicit blockers. `spike` allows unknown requirements; `ship` uses unknown risk as a `needs-input` blocker and high risk as `interactive_approval_required`.
 - In shell-less or Python-less environments, agents may evaluate `references/suite-manifest.json` manually, but must explicitly disclose that the deterministic resolver script was unexercised.
 
+### Deterministic Execution Runner
+
+The suite ships an execution layer so that *which task runs next*, *what context a worker sees*, and *whether a task actually passed* are decided by a program rather than by model judgment at runtime. The contract is [Deterministic Execution Runner](references/execution-runner.md); the implementation is `scripts/run.py`.
+
+```bash
+# Validate a saved plan's task manifest (read-only).
+python3 "$SUITE_ROOT/scripts/validate.py" tasks docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
+
+# Compute the ready set, assemble one task's bounded context pack, run its verification command.
+python3 "$SUITE_ROOT/scripts/run.py" next    --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR"
+python3 "$SUITE_ROOT/scripts/run.py" context --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
+python3 "$SUITE_ROOT/scripts/run.py" verify  --plan docs/plans/<workflow-id>.md --project-root "$PROJECT_DIR" --task TASK-01
+
+# Run one task inside its own git worktree and integrate it only when it verifies green.
+python3 "$SUITE_ROOT/scripts/run.py" isolate --plan docs/plans/<workflow-id>.md \
+  --project-root "$PROJECT_DIR" --task TASK-01 --agent-command '["claude","-p","{prompt_file}"]'
+```
+
+Rules that bind the runner and its users:
+
+- The runner is explicitly invoked per unit of work. It is never a daemon, scheduler, or background service, and it never installs or discovers an agent command.
+- It never pushes, tags, publishes, or deploys, never writes to a protected branch, and never grants point-of-risk authorization. A passing verification is evidence, not approval.
+- A task is `afk` (delegable) or `hitl` (needs a live human decision). Only `afk` tasks ever enter the ready set; `hitl` tasks wait for a person, always.
+- The task list lives in the saved plan as a `<!-- daw-task-manifest -->` JSON block, so plan prose and executable task list cannot drift apart.
+- Verification commands are executed as argv without a shell, and their output is captured as durable evidence under `docs/evidence/<task-id>/`.
+- Under per-task isolation the worker's writes stay in its own worktree; a task whose agent wrote outside it is detected and never integrated.
+
 ---
 
 ## 4. Preflight Checks, Coexistence & High-Risk Gating
