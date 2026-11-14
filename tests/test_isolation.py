@@ -177,6 +177,16 @@ class IsolateTests(IsolatedRunBase):
         codes = [f["code"] for f in payload["findings"]]
         self.assertIn("worktree_escape_detected", codes)
 
+    def test_an_agent_modifying_an_already_dirty_path_is_detected(self) -> None:
+        # A path that was already dirty before the run appears in the before
+        # and after path sets alike, so comparing path sets cannot see the
+        # agent's write. Comparing content hashes can.
+        (self.repo / "app.py").write_text("def ok():\n    return True\n# dirty\n", encoding="utf-8")
+        code, payload = self.isolate(agent=self.escape_agent)
+        self.assertEqual(code, 2, payload)
+        codes = [f["code"] for f in payload["findings"]]
+        self.assertIn("worktree_escape_detected", codes)
+
     def test_the_users_working_tree_is_never_modified(self) -> None:
         before = (self.repo / "app.py").read_text(encoding="utf-8")
         self.isolate()

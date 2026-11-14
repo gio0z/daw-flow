@@ -73,9 +73,12 @@ try:
         IntegrationLock,
         IsolationError,
         commit_task_work,
+        escape_paths,
+        lock_path,
         merge_task_branch,
         prepare_isolation,
-        snapshot_main_tree,
+        resolve_state_path,
+        snapshot_tree_state,
     )
 except ImportError:
     from check_config import parse_config_block  # type: ignore[import-not-found]
@@ -95,9 +98,12 @@ except ImportError:
         IntegrationLock,
         IsolationError,
         commit_task_work,
+        escape_paths,
+        lock_path,
         merge_task_branch,
         prepare_isolation,
-        snapshot_main_tree,
+        resolve_state_path,
+        snapshot_tree_state,
     )
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 100_000
@@ -475,6 +481,20 @@ def resolve_work_dir(project_root: pathlib.Path, raw: str | None) -> pathlib.Pat
     return candidate
 
 
+def repo_relative(project_root: pathlib.Path, target: pathlib.Path) -> str:
+    """Return ``target`` as a repository-relative, forward-slash path.
+
+    The escape check compares paths in the same form ``git status --porcelain``
+    reports, so a runner-owned path must be spelled the same way on both sides
+    of the comparison.
+    """
+    try:
+        relative = target.resolve().relative_to(project_root.resolve())
+    except (ValueError, OSError):
+        return target.as_posix()
+    return relative.as_posix()
+
+
 def next_attempt_index(directory: pathlib.Path) -> int:
     if not directory.is_dir():
         return 1
@@ -771,7 +791,7 @@ def verb_isolate(args: argparse.Namespace) -> int:
         # comparison afterwards isolates what the *agent* changed. The runner's own
         # writes (the context pack and the evidence directory) are already in place
         # at this point and are therefore not mistaken for an escape.
-        before_dirty = snapshot_main_tree(project_root)
+        before_state = snapshot_tree_state(project_root)
 
         agent_exit = 0
         agent_output = ""
@@ -796,9 +816,22 @@ def verb_isolate(args: argparse.Namespace) -> int:
 
         # The isolation boundary is only real if the agent's writes stayed inside
         # the worktree. Compare the main working tree before and after the agent
-        # ran: any new dirty path there means the agent escaped its sandbox, and a
-        # task that escaped is never merged.
-        escaped = sorted(set(snapshot_main_tree(project_root)) - set(before_dirty))
+        # ran: any path whose content hash changed there means the agent escaped
+        # its sandbox, and a task that escaped is never merged. Comparing hashes
+        # rather than path sets is what catches a path that was already dirty
+        # before the run and was modified further by the agent.
+        escaped = escape_paths(
+            before_state,
+            snapshot_tree_state(project_root),
+            owned_prefixes=[
+                repo_relative(project_root, artifact_dir(project_root, "evidence")),
+                repo_relative(project_root, work_dir),
+            ],
+            owned_paths=[
+                repo_relative(project_root, lock_path(project_root)),
+                repo_relative(project_root, resolve_state_path(project_root, None)),
+            ],
+        )
         if escaped:
             raise RunnerError(
                 "The agent modified files outside its worktree; the task is not mergeable.",

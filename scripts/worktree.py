@@ -39,7 +39,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Sequence
 
 try:
     from scripts.daw_common import artifact_dir, compute_sha256, finding, resolve_bounded_path
@@ -297,9 +297,70 @@ def dirty_paths(path: pathlib.Path) -> list[str]:
     return entries
 
 
-def snapshot_main_tree(repo: pathlib.Path) -> list[str]:
-    """Snapshot the main working tree's dirty paths, to detect an escaped agent."""
-    return dirty_paths(repo)
+def snapshot_tree_state(repo: pathlib.Path) -> dict[str, str]:
+    """Map every dirty path in the working tree to the SHA-256 of its bytes.
+
+    The value is the empty string for a path that does not exist (a deleted
+    file). Untracked directories are expanded into their individual files
+    (``-uall``) so a runner artifact is never mistaken for a new directory.
+    """
+    code, out, _ = run_git(["status", "--porcelain", "-uall"], repo)
+    if code != 0:
+        return {}
+    state: dict[str, str] = {}
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        # Porcelain format: two status columns then the path.
+        entry = line[3:].strip() if len(line) > 3 else ""
+        if " -> " in entry:
+            entry = entry.split(" -> ", 1)[1]
+        relative = entry.strip('"')
+        if not relative:
+            continue
+        target = repo / relative
+        try:
+            state[relative] = compute_sha256(target)
+        except (FileNotFoundError, IsADirectoryError):
+            # The path holds no bytes to hash: deleted, or not a plain file.
+            state[relative] = ""
+    return {relative: state[relative] for relative in sorted(state)}
+
+
+def escape_paths(
+    before: dict[str, str],
+    after: dict[str, str],
+    owned_prefixes: Sequence[str] = (),
+    owned_paths: Sequence[str] = (),
+) -> list[str]:
+    """Return the paths that changed or appeared, excluding runner-owned paths.
+
+    A path is an escape when it is absent from ``before`` or when its content
+    hash differs. Comparing hashes (not path sets) is what catches a path that
+    was already dirty before the run and was modified further by an agent.
+
+    ``owned_prefixes`` are repository-relative directory prefixes; a path under
+    one of them is runner-owned. ``owned_paths`` are exact repository-relative
+    paths.
+    """
+    prefixes = tuple(prefix.strip("/") for prefix in owned_prefixes if prefix)
+    exact = tuple(path.strip("/") for path in owned_paths if path)
+
+    def owned(relative: str) -> bool:
+        if relative in exact:
+            return True
+        return any(
+            relative == prefix or relative.startswith(prefix + "/")
+            for prefix in prefixes
+        )
+
+    escaped: list[str] = []
+    for relative, digest in after.items():
+        if owned(relative):
+            continue
+        if relative not in before or before[relative] != digest:
+            escaped.append(relative)
+    return sorted(escaped)
 
 
 def is_protected_branch(branch: str) -> bool:

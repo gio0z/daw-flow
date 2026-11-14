@@ -8,6 +8,7 @@ merge gate) only means something when git actually does it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import shutil
@@ -205,6 +206,47 @@ class NamingTests(unittest.TestCase):
         for branch in ("main", "master", "release/1.2", "develop"):
             self.assertTrue(worktree.is_protected_branch(branch), branch)
         self.assertFalse(worktree.is_protected_branch("daw/TASK-01-thing"))
+
+
+class TreeStateTests(IsolationRepoBase):
+    def test_a_dirty_path_maps_to_its_content_hash(self) -> None:
+        (self.repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("app.py", state)
+        self.assertEqual(
+            state["app.py"],
+            hashlib.sha256(b"VALUE = 2\n").hexdigest(),
+        )
+
+    def test_an_untracked_directory_is_expanded_into_its_files(self) -> None:
+        (self.repo / "pkg").mkdir()
+        (self.repo / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+        state = worktree.snapshot_tree_state(self.repo)
+        self.assertIn("pkg/mod.py", state)
+        self.assertNotIn("pkg", state)
+
+    def test_a_path_changed_between_snapshots_is_an_escape(self) -> None:
+        before = worktree.snapshot_tree_state(self.repo)
+        (self.repo / "app.py").write_text("VALUE = 3\n", encoding="utf-8")
+        after = worktree.snapshot_tree_state(self.repo)
+        self.assertEqual(worktree.escape_paths(before, after), ["app.py"])
+
+    def test_runner_owned_paths_are_not_escapes(self) -> None:
+        before = worktree.snapshot_tree_state(self.repo)
+        after = dict(before)
+        after["docs/daw/evidence/runner/context-TASK-01.md"] = "hash"
+        after["docs/daw/evidence/runner/integration.lock"] = "hash"
+        after["docs/daw/evidence/runner/isolation.json"] = "hash"
+        escaped = worktree.escape_paths(
+            before,
+            after,
+            owned_prefixes=["docs/daw/evidence"],
+            owned_paths=[
+                "docs/daw/evidence/runner/integration.lock",
+                "docs/daw/evidence/runner/isolation.json",
+            ],
+        )
+        self.assertEqual(escaped, [])
 
 
 class PrepareTests(IsolationRepoBase):
