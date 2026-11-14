@@ -1038,8 +1038,10 @@ def _batch_escape_paths(
     project_root: pathlib.Path,
     before_state: dict[str, str],
     work_dir: pathlib.Path,
+    state_path: pathlib.Path | None = None,
 ) -> list[str]:
     """Return main-tree changes outside the runner's artifact paths."""
+    resolved_state = state_path or resolve_state_path(project_root, None)
     return escape_paths(
         before_state,
         snapshot_tree_state(project_root),
@@ -1049,7 +1051,7 @@ def _batch_escape_paths(
         ],
         owned_paths=[
             repo_relative(project_root, lock_path(project_root)),
-            repo_relative(project_root, resolve_state_path(project_root, None)),
+            repo_relative(project_root, resolved_state),
         ],
     )
 
@@ -1059,6 +1061,7 @@ def _accepted_set_findings(
     repo: pathlib.Path,
     accepted: set[str],
     base_commit: str | None,
+    state_path: pathlib.Path | None = None,
 ) -> list[dict[str, str]]:
     """Check the accepted set against the integration branch's actual content.
 
@@ -1072,7 +1075,7 @@ def _accepted_set_findings(
     checked this way; it is a warning, not an error.
     """
     findings: list[dict[str, str]] = []
-    state = load_state(resolve_state_path(project_root, None))
+    state = load_state(state_path or resolve_state_path(project_root, None))
     for task_id in sorted(accepted):
         entry = state.get("tasks", {}).get(task_id)
         if not isinstance(entry, dict):
@@ -1214,7 +1217,10 @@ def execute_batch(
 
     # Clear any prior batch failure marker once the member is prepared for
     # this batch: a stale marker from an earlier batch must not block a retry.
-    state_path = resolve_state_path(project_root, None)
+    try:
+        state_path = resolve_state_path(project_root, options.get("state"))
+    except IsolationError as exc:
+        raise RunnerError(str(exc), exc.findings) from exc
     state = load_state(state_path)
     for member in members:
         clear_batch_failure(state_path, state, member["task_id"])
@@ -1248,7 +1254,7 @@ def execute_batch(
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
         outcomes = list(pool.map(run_member, members))
 
-    escaped = _batch_escape_paths(project_root, before_state, work_dir)
+    escaped = _batch_escape_paths(project_root, before_state, work_dir, state_path)
     if escaped:
         findings.append(
             _error(
@@ -1371,6 +1377,7 @@ def execute_batch(
             timeout_seconds,
             before_state,
             work_dir,
+            state_path,
         )
         findings.extend(outcome["findings"])
         integration_findings.extend(outcome["findings"])
@@ -1387,6 +1394,8 @@ def execute_batch(
         composite_verifications = outcome.get("verifications", {})
         composite_red = bool(outcome.get("composite_red"))
         conflict_occurred = bool(outcome.get("conflict_occurred"))
+        if any(f.get("code") == "worktree_escape_detected" for f in outcome["findings"]):
+            escaped = True
 
     # -- record state --------------------------------------------------
     for member in members:
@@ -1450,6 +1459,8 @@ def execute_batch(
                 "commit": member["commit"],
                 "category": member["category"],
                 "agent_exit_code": member["agent_exit_code"],
+                "agent_log": member["result"]["agent_log"],
+                "context": member["result"]["context"],
                 "verification": member["verification"],
                 "changed_paths": member["changed_paths"],
                 "undeclared_paths": member["undeclared_paths"],
@@ -1594,6 +1605,7 @@ def _integrate_composite(
     timeout_seconds: int,
     before_state: dict[str, str],
     work_dir: pathlib.Path,
+    state_path: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Build the composite, verify it with every member's command, and merge it.
 
@@ -1713,7 +1725,7 @@ def _integrate_composite(
             "record_sha256": record_sha256,
         }
 
-    escaped = _batch_escape_paths(project_root, before_state, work_dir)
+    escaped = _batch_escape_paths(project_root, before_state, work_dir, state_path)
     if escaped:
         findings.append(
             _error(
@@ -1891,40 +1903,14 @@ def verb_batch(args: argparse.Namespace) -> int:
         }
 
         batches: list[dict[str, Any]] = []
-        failed: list[str] = []
+        failed: set[str] = set()
         review_dispatch: list[dict[str, str]] = []
         for group in groups:
             outcome = execute_batch(manifest, bodies, project_root, group, options)
             findings.extend(outcome["findings"])
             review_dispatch.extend(outcome.get("review_dispatch", []))
-            composite = outcome.get("composite") or {}
-            green = [m for m in outcome["members"] if m["category"] == "green"]
-            batches.append(
-                {
-                    "id": outcome["batch_id"],
-                    "size": len(outcome["members"]),
-                    "members": [m["task_id"] for m in outcome["members"]],
-                    "base_commit": outcome["base_commit"],
-                    "composite_branch": composite.get("branch"),
-                    "composite_commit": composite.get("commit"),
-                    "integrated": outcome["integrated"],
-                    "members_at_risk": len(green) if not outcome["integrated"] else 0,
-                }
-            )
-            batch_escaped = any(
-                f.get("code") == "worktree_escape_detected"
-                for f in outcome["findings"]
-            )
-            for member in outcome["members"]:
-                if member["category"] == "green":
-                    if member["integrated"]:
-                        accepted.add(member["task_id"])
-                    else:
-                        failed.append(member["task_id"])
-                elif member["category"] == "no-op" and not batch_escaped:
-                    accepted.add(member["task_id"])
-                else:
-                    failed.append(member["task_id"])
+            batches.append(_batch_summary(outcome))
+            _apply_batch_outcome(outcome, accepted, failed)
     finally:
         lock.release()
 
@@ -1935,7 +1921,7 @@ def verb_batch(args: argparse.Namespace) -> int:
             "workflow_id": manifest.get("workflow_id"),
             "batches": batches,
             "accepted": sorted(accepted),
-            "failed": sorted(set(failed)),
+            "failed": sorted(failed),
             "review_dispatch": review_dispatch,
         },
     )
@@ -1945,18 +1931,134 @@ def verb_batch(args: argparse.Namespace) -> int:
     return 0 if not failed else 1
 
 
+def _batch_summary(outcome: dict[str, Any]) -> dict[str, Any]:
+    """Summarize one batch outcome for the CLI envelope."""
+    composite = outcome.get("composite") or {}
+    green = [m for m in outcome["members"] if m["category"] == "green"]
+    return {
+        "id": outcome["batch_id"],
+        "size": len(outcome["members"]),
+        "members": [m["task_id"] for m in outcome["members"]],
+        "base_commit": outcome["base_commit"],
+        "composite_branch": composite.get("branch"),
+        "composite_commit": composite.get("commit"),
+        "integrated": outcome["integrated"],
+        "members_at_risk": len(green) if not outcome["integrated"] else 0,
+    }
+
+
+def _apply_batch_outcome(
+    outcome: dict[str, Any],
+    accepted: set[str],
+    failed: set[str],
+) -> bool:
+    """Update ``accepted`` and ``failed`` from one batch outcome."""
+    batch_escaped = any(
+        f.get("code") == "worktree_escape_detected"
+        for f in outcome["findings"]
+    )
+    progressed = False
+    for member in outcome["members"]:
+        if member["category"] == "green":
+            if member["integrated"]:
+                accepted.add(member["task_id"])
+                progressed = True
+            else:
+                failed.add(member["task_id"])
+        elif member["category"] == "no-op" and not batch_escaped:
+            accepted.add(member["task_id"])
+            progressed = True
+        else:
+            failed.add(member["task_id"])
+    return progressed
+
+
+def _dry_run_afk(
+    manifest: dict[str, Any],
+    bodies: dict[str, str],
+    project_root: pathlib.Path,
+    accepted: set[str],
+    findings: list[dict[str, str]],
+    argv_template: list[str],
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Plan isolated batches for ``run --dry-run`` without touching disk or git."""
+    dry_accepted = set(accepted)
+    completed_tasks: list[dict[str, Any]] = []
+    planned_batches: list[dict[str, Any]] = []
+    processed = 0
+    stopped = "no_ready_task"
+    work_dir = resolve_work_dir(project_root, args.work_dir)
+    while processed < args.max_tasks:
+        ready, _, _ = compute_ready(manifest, dry_accepted)
+        if not ready:
+            stopped = "no_ready_task"
+            break
+        groups, selection_warnings = batch.select_batch_members(
+            manifest, ready, None, args.max_concurrency, args.max_tasks - processed
+        )
+        findings.extend(selection_warnings)
+        if not groups:
+            stopped = "no_ready_task"
+            break
+        group = groups[0]
+        planned_batches.append(
+            {
+                "id": batch.batch_id("base", group),
+                "size": len(group),
+                "members": group,
+                "branches": [
+                    branch_name_for(task_id, find_task(manifest, task_id)["title"])
+                    for task_id in group
+                ],
+                "argv": argv_template,
+            }
+        )
+        for task_id in group:
+            task = find_task(manifest, task_id)
+            _, meta = assemble_context(
+                manifest, task, project_root, args.budget_chars, bodies.get(task_id, "")
+            )
+            substitutions = {
+                "{prompt_file}": str(work_dir / f"context-{task_id}.md"),
+                "{workspace}": str(project_root),
+                "{task_id}": task_id,
+            }
+            completed_tasks.append(
+                {
+                    "task_id": task_id,
+                    "dry_run": True,
+                    "argv": substitute_argv(argv_template, substitutions),
+                    "context": meta,
+                }
+            )
+            dry_accepted.add(task_id)
+        processed += len(group)
+    if processed >= args.max_tasks:
+        stopped = "max_tasks"
+    return _envelope(
+        "run",
+        findings,
+        {
+            "workflow_id": manifest.get("workflow_id"),
+            "completed": completed_tasks,
+            "batches": planned_batches,
+            "accepted": sorted(dry_accepted),
+            "failed": [],
+            "review_dispatch": [],
+            "stopped": stopped,
+            "dry_run": True,
+        },
+    )
+
+
 def verb_run(args: argparse.Namespace) -> int:
-    """AFK loop: take ready tasks, hand each its context pack, then verify."""
+    """AFK loop: execute ready tasks as isolated batches until done or budgeted."""
     project_root = pathlib.Path(args.project_root).resolve()
     if not project_root.is_dir():
         raise RunnerError(f"Project root is not a directory: {project_root}")
     manifest, bodies, findings = load_manifest(pathlib.Path(args.plan), project_root)
-    accepted = parse_accepted(args.accepted, args.accepted_file)
-    work_dir = resolve_work_dir(project_root, args.work_dir)
-    try:
-        work_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        raise RunnerError(f"Work directory cannot be created: {work_dir} ({exc})") from exc
+    accepted = set(parse_accepted(args.accepted, args.accepted_file))
 
     argv_template = json.loads(args.agent_command)
     if not isinstance(argv_template, list) or not argv_template or not all(
@@ -1964,76 +2066,116 @@ def verb_run(args: argparse.Namespace) -> int:
     ):
         raise RunnerError("--agent-command must be a JSON array of strings.")
 
-    completed_tasks: list[dict[str, Any]] = []
-    for _ in range(args.max_tasks):
-        ready, _, _ = compute_ready(manifest, accepted)
-        if not ready:
-            break
-        entry = ready[0]
-        task = find_task(manifest, entry["task_id"])
-        pack, meta = assemble_context(
-        manifest, task, project_root, args.budget_chars, bodies.get(task['task_id'], '')
-    )
-        pack_path = work_dir / f"context-{task['task_id']}.md"
-        pack_path.write_text(pack, encoding="utf-8")
-        substitutions = {
-            "{prompt_file}": str(pack_path),
-            "{workspace}": str(project_root),
-            "{task_id}": task["task_id"],
-        }
-        argv = substitute_argv(argv_template, substitutions)
-        if args.dry_run:
-            completed_tasks.append(
-                {"task_id": task["task_id"], "dry_run": True, "argv": argv, "context": meta}
-            )
-            accepted.add(task["task_id"])
-            continue
-        try:
-            agent = subprocess.run(  # noqa: S603 - operator-supplied argv, no shell
-                argv,
-                cwd=str(project_root),
-                input=pack.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=args.agent_timeout,
-                check=False,
-            )
-            agent_exit = agent.returncode
-            agent_output = agent.stdout.decode("utf-8", errors="replace")
-        except FileNotFoundError:
-            agent_exit, agent_output = 127, f"<!-- agent command not found: {argv[0]} -->"
-        except subprocess.TimeoutExpired:
-            agent_exit, agent_output = 124, f"<!-- agent timed out after {args.agent_timeout}s -->"
-        agent_log = work_dir / f"agent-{task['task_id']}.log"
-        agent_log.write_text(agent_output, encoding="utf-8")
-        outcome = run_verification(task, project_root, args.timeout)
-        completed_tasks.append(
-            {
-                "task_id": task["task_id"],
-                "agent_exit_code": agent_exit,
-                "agent_log": agent_log.relative_to(project_root).as_posix(),
-                "context": meta,
-                "verification": outcome,
-            }
+    try:
+        state_path = resolve_state_path(project_root, args.state)
+    except IsolationError as exc:
+        raise RunnerError(str(exc), exc.findings) from exc
+    accepted |= set(accepted_task_ids(load_state(state_path)))
+
+    if args.dry_run:
+        result = _dry_run_afk(
+            manifest, bodies, project_root, accepted, findings, argv_template, args
         )
-        if outcome["passed"] and agent_exit == 0:
-            accepted.add(task["task_id"])
-        else:
-            break
+        _print(result, args.format)
+        return 0 if result["valid"] else 1
+
+    work_dir = resolve_work_dir(project_root, args.work_dir)
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RunnerError(f"Work directory cannot be created: {work_dir} ({exc})") from exc
+
+    lock = IntegrationLock(project_root)
+    try:
+        lock.acquire()
+    except IsolationError as exc:
+        raise RunnerError(str(exc), exc.findings) from exc
+
+    completed_tasks: list[dict[str, Any]] = []
+    batches_summary: list[dict[str, Any]] = []
+    review_dispatch: list[dict[str, str]] = []
+    failed: set[str] = set()
+    processed = 0
+    progressed = False
+    stopped = "no_ready_task"
+
+    try:
+        try:
+            require_repo(project_root)
+        except IsolationError as exc:
+            raise RunnerError(str(exc), exc.findings) from exc
+
+        base_ref = getattr(args, "base_ref", None)
+        base_commit = _expected_base_commit(project_root, base_ref)
+        accepted_findings = _accepted_set_findings(
+            project_root, project_root, accepted, base_commit, state_path=state_path
+        )
+        findings.extend(accepted_findings)
+        if any(f["severity"] == "error" for f in accepted_findings):
+            raise RunnerError(
+                "The accepted set does not match the integration branch's content.",
+                accepted_findings,
+            )
+
+        options = {
+            "worktree_root": getattr(args, "worktree_root", DEFAULT_WORKTREE_ROOT),
+            "work_dir": work_dir,
+            "argv_template": argv_template,
+            "agent_timeout": args.agent_timeout,
+            "timeout_seconds": args.timeout,
+            "base_ref": base_ref,
+            "add_ignore": getattr(args, "add_ignore", False),
+            "budget_chars": args.budget_chars,
+            "state": args.state,
+        }
+
+        while processed < args.max_tasks:
+            raw_ready, _, _ = compute_ready(manifest, accepted)
+            ready = [entry for entry in raw_ready if entry["task_id"] not in failed]
+            if not ready:
+                stopped = (
+                    "all_failed"
+                    if (raw_ready and failed and not progressed)
+                    else "no_ready_task"
+                )
+                break
+            groups, selection_warnings = batch.select_batch_members(
+                manifest, ready, None, args.max_concurrency, args.max_tasks - processed
+            )
+            findings.extend(selection_warnings)
+            if not groups:
+                stopped = "no_ready_task"
+                break
+            group = groups[0]
+            outcome = execute_batch(manifest, bodies, project_root, group, options)
+            findings.extend(outcome["findings"])
+            review_dispatch.extend(outcome.get("review_dispatch", []))
+            batches_summary.append(_batch_summary(outcome))
+            for member in outcome["members"]:
+                completed_tasks.append({"batch_id": outcome["batch_id"], **member})
+            if _apply_batch_outcome(outcome, accepted, failed):
+                progressed = True
+            processed += len(group)
+        if processed >= args.max_tasks:
+            stopped = "max_tasks"
+    finally:
+        lock.release()
+
     result = _envelope(
         "run",
         findings,
         {
             "workflow_id": manifest.get("workflow_id"),
             "completed": completed_tasks,
+            "batches": batches_summary,
             "accepted": sorted(accepted),
-            "stopped": "no_ready_task" if len(completed_tasks) < args.max_tasks else "max_tasks",
+            "failed": sorted(failed),
+            "review_dispatch": review_dispatch,
+            "stopped": stopped,
         },
     )
     _print(result, args.format)
-    return 0 if result["valid"] and all(
-        entry.get("verification", {}).get("passed", True) for entry in completed_tasks
-    ) else 1
+    return 0 if result["valid"] and not failed else 1
 
 
 # --------------------------------------------------------------------------
@@ -2171,6 +2313,31 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--accepted", action="append", help="Already accepted task ids.")
     run_parser.add_argument("--accepted-file", help="File with one accepted task id per line.")
     run_parser.add_argument("--max-tasks", type=int, default=1, help="Maximum tasks to process in this run.")
+    run_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=None,
+        help="Maximum members per batch (default: unlimited).",
+    )
+    run_parser.add_argument(
+        "--state",
+        default=None,
+        help="Isolation state file path (default: project evidence directory).",
+    )
+    run_parser.add_argument(
+        "--worktree-root",
+        default=DEFAULT_WORKTREE_ROOT,
+        help=f"Container directory for worktrees (default {DEFAULT_WORKTREE_ROOT}).",
+    )
+    run_parser.add_argument(
+        "--base-ref", help="Base ref for the integration branch (default the current HEAD)."
+    )
+    run_parser.add_argument(
+        "--add-ignore",
+        action="store_true",
+        help="Append the worktree container to the repository-local exclude file when it "
+        "is not already ignored. Never touches .gitignore or global git config.",
+    )
     run_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
     run_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
     run_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")

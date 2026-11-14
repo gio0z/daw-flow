@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -292,15 +293,41 @@ class VerificationTests(RunnerTestBase):
 
 
 class RunLoopTests(RunnerTestBase):
+    def setUp(self) -> None:
+        if not shutil.which("git"):
+            self.skipTest("git is not available")
+        super().setUp()
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        (self.repo / ".gitignore").write_text(".worktrees/\n__pycache__/\n", encoding="utf-8")
+        (self.repo / "src").mkdir()
+        (self.repo / "src" / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+        for args in (
+            ["init", "-q", "."],
+            ["config", "user.email", "test@example.invalid"],
+            ["config", "user.name", "Runner Test"],
+            ["add", "-A"],
+            ["commit", "-qm", "init"],
+        ):
+            proc = subprocess.run(["git", *args], cwd=str(self.repo), capture_output=True, text=True, check=False)
+            if proc.returncode != 0:
+                self.fail(f"git {args} failed: {proc.stderr}")
+
+    def write_repo_plan(self, body: str, name: str = "plan.md") -> pathlib.Path:
+        path = self.repo / "docs" / "plans" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        return path
+
     def test_dry_run_does_not_execute_agent(self) -> None:
         marker = self.root / "agent-ran.txt"
-        plan = self.write_plan(_manifest([_task("T-1")]))
+        plan = self.write_repo_plan(_manifest([_task("T-1")]))
         code, payload = self.run_cli(
             "run",
             "--plan",
             str(plan),
             "--project-root",
-            str(self.root),
+            str(self.repo),
             "--agent-command",
             json.dumps(["python3", "-c", f"open({str(marker)!r}, 'w').write('x')"]),
             "--dry-run",
@@ -310,14 +337,14 @@ class RunLoopTests(RunnerTestBase):
         self.assertTrue(payload["completed"][0]["dry_run"])
 
     def test_agent_receives_the_context_pack_on_stdin(self) -> None:
-        plan = self.write_plan(_manifest([_task("T-1")]))
+        plan = self.write_repo_plan(_manifest([_task("T-1")]))
         captured = self.root / "received.md"
         code, payload = self.run_cli(
             "run",
             "--plan",
             str(plan),
             "--project-root",
-            str(self.root),
+            str(self.repo),
             "--agent-command",
             json.dumps(
                 ["python3", "-c", f"import sys;open({str(captured)!r},'w').write(sys.stdin.read())"]
@@ -329,7 +356,7 @@ class RunLoopTests(RunnerTestBase):
         self.assertIn("Verification command:", received)
 
     def test_run_executes_agent_then_verifies(self) -> None:
-        plan = self.write_plan(
+        plan = self.write_repo_plan(
             _manifest([_task("T-1", verification_command="python3 -c \"print('verified')\"")])
         )
         code, payload = self.run_cli(
@@ -337,22 +364,22 @@ class RunLoopTests(RunnerTestBase):
             "--plan",
             str(plan),
             "--project-root",
-            str(self.root),
+            str(self.repo),
             "--agent-command",
             json.dumps(["python3", "-c", "print('agent ran')"]),
         )
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 0, payload)
         entry = payload["completed"][0]
         self.assertEqual(entry["agent_exit_code"], 0)
         self.assertTrue(entry["verification"]["passed"])
         self.assertIn("T-1", payload["accepted"])
 
     def test_run_stops_on_failed_verification(self) -> None:
-        plan = self.write_plan(
+        plan = self.write_repo_plan(
             _manifest(
                 [
                     _task("T-1", verification_command="python3 -c \"raise SystemExit(1)\""),
-                    _task("T-2"),
+                    _task("T-2", depends_on=["T-1"]),
                 ]
             )
         )
@@ -361,31 +388,31 @@ class RunLoopTests(RunnerTestBase):
             "--plan",
             str(plan),
             "--project-root",
-            str(self.root),
+            str(self.repo),
             "--agent-command",
             json.dumps(["python3", "-c", "print('agent ran')"]),
             "--max-tasks",
             "5",
         )
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 1, payload)
         self.assertEqual(len(payload["completed"]), 1)
         self.assertEqual(payload["accepted"], [])
 
     def test_hitl_task_is_not_dispatched(self) -> None:
         marker = self.root / "agent-ran.txt"
-        plan = self.write_plan(_manifest([_task("T-1", autonomy="hitl")]))
+        plan = self.write_repo_plan(_manifest([_task("T-1", autonomy="hitl")]))
         code, payload = self.run_cli(
             "run",
             "--plan",
             str(plan),
             "--project-root",
-            str(self.root),
+            str(self.repo),
             "--agent-command",
             json.dumps(["python3", "-c", f"open({str(marker)!r}, 'w').write('x')"]),
             "--max-tasks",
             "3",
         )
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 0, payload)
         self.assertFalse(marker.exists())
         self.assertEqual(payload["completed"], [])
 

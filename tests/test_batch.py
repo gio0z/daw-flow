@@ -1795,5 +1795,161 @@ class ReviewDispatchTests(BatchRepoBase):
             self.assertFalse(self._dispatch_path(task_id).exists())
 
 
+class RunMigrationTests(BatchRepoBase):
+    """`run.py run` executes as isolated batches without touching the main tree."""
+
+    def run_afk(
+        self,
+        agents: str | pathlib.Path | None = None,
+        extra: list[str] | None = None,
+    ) -> tuple[int, dict]:
+        if isinstance(agents, pathlib.Path):
+            agent_command = json.dumps([str(agents), "{prompt_file}"])
+        elif agents is None:
+            agent_command = json.dumps(["/nonexistent/agent", "{prompt_file}"])
+        else:
+            agent_command = json.dumps(
+                [str(self.root / "agent.sh"), "{prompt_file}", "{task_id}"]
+            )
+        argv = [
+            sys.executable,
+            str(RUNNER),
+            "run",
+            "--plan",
+            str(self.plan),
+            "--project-root",
+            str(self.repo),
+            "--agent-command",
+            agent_command,
+            "--format",
+            "json",
+            *(extra or []),
+        ]
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False)
+        try:
+            payload = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            payload = {"stdout": proc.stdout, "stderr": proc.stderr}
+        return proc.returncode, payload
+
+    def _three_task_plan(self) -> None:
+        manifest_data = json.loads(
+            BATCH_PLAN_TEMPLATE.split("```json\n", 1)[1].split("\n```", 1)[0]
+        )
+        manifest_data["tasks"].append(
+            {
+                "task_id": "TASK-GAMMA",
+                "title": "Gamma change",
+                "autonomy": "afk",
+                "depends_on": [],
+                "parallel_safe": True,
+                "target_files": ["src/gamma.py"],
+                "acceptance_criteria": ["gamma is green"],
+                "verification_command": 'python3 -c "import src.gamma; assert src.gamma.VALUE == 2"',
+                "expected_outcome": "0 exit code",
+            }
+        )
+        self.plan.write_text(
+            f"# Plan: batch test\n\n<!-- daw-task-manifest -->\n```json\n{json.dumps(manifest_data, indent=2)}\n```\n",
+            encoding="utf-8",
+        )
+
+    def test_run_works_in_an_isolated_worktree(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_afk(agents="per-task")
+        self.assertEqual(code, 0, payload)
+        self.assertTrue(
+            (self.repo / self.worktree_root / "TASK-ALPHA" / "ran-TASK-ALPHA.txt").is_file()
+        )
+        self.assertFalse((self.repo / "ran-TASK-ALPHA.txt").exists())
+
+    def test_the_users_working_tree_is_never_modified(self) -> None:
+        tracked = ["src/__init__.py", "src/alpha.py", "src/beta.py", "src/gamma.py", "src/shared.py"]
+        before = {rel: (self.repo / rel).read_bytes() for rel in tracked}
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_afk(agents="per-task", extra=["--max-tasks", "2"])
+        self.assertEqual(code, 0, payload)
+        for rel, expected in before.items():
+            self.assertEqual((self.repo / rel).read_bytes(), expected, rel)
+        self.assertIn("VALUE = 2", self.integration_content("src/alpha.py"))
+        self.assertIn("VALUE = 2", self.integration_content("src/beta.py"))
+
+    def test_run_marks_a_task_accepted_only_when_it_was_integrated(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        failing = self.agent("agent-fail.sh", "exit 1")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {failing}",
+        )
+        code, payload = self.run_afk(agents="per-task", extra=["--max-tasks", "5"])
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload.get("accepted"), ["TASK-ALPHA"])
+        self.assertEqual(payload.get("failed"), ["TASK-BETA"])
+
+    def test_a_red_task_is_not_retried_and_the_others_still_proceed(self) -> None:
+        counter = self.root / "alpha-attempts.txt"
+        alpha_fail = self.agent(
+            "agent-alpha-fail.sh",
+            f"echo attempt >> {counter}\nexit 1",
+        )
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha_fail}; fi\nexec {beta}",
+        )
+        code, payload = self.run_afk(
+            agents="per-task", extra=["--max-tasks", "5", "--max-concurrency", "1"]
+        )
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload.get("failed"), ["TASK-ALPHA"])
+        self.assertEqual(payload.get("accepted"), ["TASK-BETA"])
+        self.assertIn("VALUE = 2", self.integration_content("src/beta.py"))
+        self.assertEqual(len(counter.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_max_tasks_counts_tasks_not_batches(self) -> None:
+        self._three_task_plan()
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        gamma = self.writing_agent("TASK-GAMMA", "src/gamma.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\n"
+            f"if [ \"$2\" = 'TASK-BETA' ]; then exec {beta}; fi\n"
+            f"exec {gamma}",
+        )
+        code, payload = self.run_afk(agents="per-task", extra=["--max-tasks", "2"])
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(len(payload.get("completed", [])), 2)
+        self.assertEqual(len(payload.get("accepted", [])), 2)
+        self.assertEqual(len(payload.get("batches", [])), 1)
+        self.assertEqual(payload["batches"][0]["members"], ["TASK-ALPHA", "TASK-BETA"])
+        self.assertEqual(payload.get("stopped"), "max_tasks")
+
+    def test_the_default_max_tasks_still_processes_one_task(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_afk(agents="per-task")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(len(payload.get("completed", [])), 1)
+        self.assertEqual(payload.get("accepted"), ["TASK-ALPHA"])
+        self.assertEqual(len(payload.get("batches", [])), 1)
+        self.assertEqual(payload["batches"][0]["members"], ["TASK-ALPHA"])
+        self.assertEqual(payload.get("stopped"), "max_tasks")
+
+
 if __name__ == "__main__":
     unittest.main()
