@@ -1527,5 +1527,273 @@ class BatchExecutionTests(BatchRepoBase):
         self.assertFalse((self.repo / self.worktree_root).exists())
 
 
+class ReviewDispatchTests(BatchRepoBase):
+    """Fact-only review dispatch packages produced for failed or conflicting batches."""
+
+    def _dispatch_path(self, task_id: str) -> pathlib.Path:
+        return self.repo / "docs" / "daw" / "evidence" / task_id / "review-dispatch.json"
+
+    def _read_dispatch(self, task_id: str) -> dict:
+        path = self._dispatch_path(task_id)
+        self.assertTrue(path.is_file(), f"missing review-dispatch.json for {task_id}")
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_a_red_member_produces_a_package_with_its_evidence(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        failing = self.agent("agent-fail.sh", "exit 1")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {failing}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+
+        self.assertFalse(
+            self._dispatch_path("TASK-ALPHA").exists(),
+            "healthy sibling in a non-conflicting batch gets no package",
+        )
+        pkg = self._read_dispatch("TASK-BETA")
+        entry = self.batch_entry(payload)
+
+        self.assertEqual(pkg["schema_version"], 1)
+        self.assertEqual(pkg["task_id"], "TASK-BETA")
+        self.assertEqual(pkg["title"], "Beta change")
+        self.assertEqual(pkg["branch"], "daw/TASK-BETA-beta-change")
+        self.assertIsNone(pkg["commit"])
+        self.assertEqual(pkg["base_commit"], entry["base_commit"])
+        self.assertEqual(pkg["diff_range"], "")
+        self.assertIsNotNone(pkg["self_verification"]["exit_code"])
+        self.assertNotEqual(pkg["self_verification"]["exit_code"], 0)
+        self.assertTrue(
+            (self.repo / pkg["self_verification"]["log_path"]).is_file(),
+            pkg["self_verification"],
+        )
+        self.assertEqual(len(pkg["self_verification"]["log_sha256"]), 64)
+        self.assertIsNone(pkg["composite_verification"])
+        self.assertEqual(pkg["combination_dependent_task_ids"], [])
+        self.assertEqual(pkg["declared_target_files"], ["src/beta.py"])
+        self.assertEqual(pkg["actual_changed_paths"], [])
+        self.assertEqual(pkg["undeclared_paths"], [])
+        self.assertEqual(pkg["findings"], ["batch_task_agent_failed"])
+
+        rows = {row["task_id"]: row for row in pkg["members"]}
+        self.assertEqual(set(rows), {"TASK-ALPHA", "TASK-BETA"})
+        self.assertEqual(rows["TASK-BETA"]["agent_exit_code"], 1)
+        self.assertIsNone(rows["TASK-BETA"]["composite_exit_code"])
+        self.assertEqual(rows["TASK-ALPHA"]["agent_exit_code"], 0)
+        self.assertEqual(rows["TASK-ALPHA"]["self_verification_exit_code"], 0)
+        self.assertIsNone(rows["TASK-ALPHA"]["composite_exit_code"])
+
+    def test_a_red_composite_produces_a_package_for_every_member(self) -> None:
+        self.plan.write_text(BREAKING_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 1\n# -\n# -\n# -\n# -\nB = 2"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+        entry = self.batch_entry(payload)
+
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            pkg = self._read_dispatch(task_id)
+            self.assertEqual(pkg["schema_version"], 1)
+            self.assertEqual(pkg["task_id"], task_id)
+            self.assertTrue(pkg["commit"])
+            self.assertEqual(pkg["base_commit"], entry["base_commit"])
+            self.assertEqual(pkg["diff_range"], f"{entry['base_commit']}..{pkg['commit']}")
+            self.assertEqual(pkg["self_verification"]["exit_code"], 0)
+            self.assertIsNotNone(pkg["composite_verification"])
+            self.assertTrue(
+                (self.repo / pkg["composite_verification"]["log_path"]).is_file()
+            )
+            self.assertEqual(len(pkg["composite_verification"]["log_sha256"]), 64)
+            self.assertEqual(
+                pkg["actual_changed_paths"],
+                sorted([f"ran-{task_id}.txt", "src/shared.py"]),
+            )
+            self.assertEqual(
+                pkg["undeclared_paths"],
+                sorted([f"ran-{task_id}.txt", "src/shared.py"]),
+            )
+            self.assertEqual(pkg["findings"], ["batch_composite_verification_failed"])
+
+    def test_the_package_distinguishes_red_alone_from_red_only_on_the_composite(
+        self,
+    ) -> None:
+        manifest_data = json.loads(
+            BREAKING_PLAN_TEMPLATE.split("```json\n", 1)[1].split("\n```", 1)[0]
+        )
+        manifest_data["tasks"][1]["verification_command"] = (
+            'python3 -c "import src.shared; assert src.shared.B == 2"'
+        )
+        manifest_data["tasks"].append(
+            {
+                "task_id": "TASK-GAMMA",
+                "title": "Gamma change",
+                "autonomy": "afk",
+                "depends_on": [],
+                "parallel_safe": True,
+                "target_files": ["src/gamma.py"],
+                "acceptance_criteria": ["gamma is green"],
+                "verification_command": 'python3 -c "import src.gamma; assert src.gamma.VALUE == 2"',
+                "expected_outcome": "0 exit code",
+            }
+        )
+        self.plan.write_text(
+            f"# Plan: batch test\n\n<!-- daw-task-manifest -->\n```json\n{json.dumps(manifest_data, indent=2)}\n```\n",
+            encoding="utf-8",
+        )
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 1\n# -\n# -\n# -\n# -\nB = 2"
+        )
+        gamma_noop = self.agent("agent-gamma-noop.sh", "exit 0")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\n"
+            f"if [ \"$2\" = 'TASK-BETA' ]; then exec {beta}; fi\n"
+            f"exec {gamma_noop}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+
+        pkg = self._read_dispatch("TASK-ALPHA")
+        rows = {row["task_id"]: row for row in pkg["members"]}
+        self.assertEqual(rows["TASK-ALPHA"]["self_verification_exit_code"], 0)
+        self.assertIsNotNone(rows["TASK-ALPHA"]["composite_exit_code"])
+        self.assertNotEqual(rows["TASK-ALPHA"]["composite_exit_code"], 0)
+
+        self.assertEqual(rows["TASK-BETA"]["self_verification_exit_code"], 0)
+        self.assertEqual(rows["TASK-BETA"]["composite_exit_code"], 0)
+
+        self.assertNotEqual(rows["TASK-GAMMA"]["self_verification_exit_code"], 0)
+        self.assertIsNone(rows["TASK-GAMMA"]["composite_exit_code"])
+
+        self.assertEqual(pkg["combination_dependent_task_ids"], ["TASK-ALPHA"])
+
+    def test_the_package_carries_no_verdict(self) -> None:
+        self.plan.write_text(BREAKING_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 1\n# -\n# -\n# -\n# -\nB = 2"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+
+        forbidden_keys = ("verdict", "culprit", "guilty")
+        responsibility_words = (
+            "verdict",
+            "culprit",
+            "guilty",
+            "blame",
+            "fault",
+            "responsible",
+        )
+
+        def check_node(node: object) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    lowered = str(key).lower()
+                    for word in forbidden_keys:
+                        self.assertNotIn(word, lowered, f"forbidden key: {key}")
+                    check_node(value)
+            elif isinstance(node, list):
+                for item in node:
+                    check_node(item)
+            elif isinstance(node, str):
+                lowered = node.lower()
+                for word in responsibility_words:
+                    self.assertNotIn(word, lowered, f"responsibility prose: {node}")
+                self.assertFalse(
+                    node.rstrip().endswith("."),
+                    f"unexpected prose sentence in package: {node!r}",
+                )
+
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            check_node(self._read_dispatch(task_id))
+
+    def test_the_package_names_its_own_path_in_the_envelope(self) -> None:
+        self.plan.write_text(BREAKING_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 1\n# -\n# -\n# -\n# -\nB = 2"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+
+        dispatch = payload.get("review_dispatch")
+        self.assertIsInstance(dispatch, list, payload)
+        by_task = {entry["task_id"]: entry["path"] for entry in dispatch}
+        self.assertEqual(set(by_task), {"TASK-ALPHA", "TASK-BETA"})
+        for task_id, rel_path in by_task.items():
+            self.assertFalse(pathlib.Path(rel_path).is_absolute(), rel_path)
+            self.assertEqual(
+                rel_path, f"docs/daw/evidence/{task_id}/review-dispatch.json"
+            )
+            disk_path = self.repo / rel_path
+            self.assertTrue(disk_path.is_file(), disk_path)
+            pkg = json.loads(disk_path.read_text(encoding="utf-8"))
+            self.assertEqual(pkg["task_id"], task_id)
+
+    def test_a_conflicting_batch_produces_a_package_for_every_green_member(self) -> None:
+        self.plan.write_text(CONFLICT_PLAN_TEMPLATE, encoding="utf-8")
+        alpha = self.writing_agent(
+            "TASK-ALPHA", "src/shared.py", "A = 2\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        beta = self.writing_agent(
+            "TASK-BETA", "src/shared.py", "A = 8\n# -\n# -\n# -\n# -\nB = 1"
+        )
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 1, payload)
+
+        by_task = {entry["task_id"]: entry["path"] for entry in payload.get("review_dispatch", [])}
+        self.assertEqual(set(by_task), {"TASK-ALPHA", "TASK-BETA"})
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            pkg = self._read_dispatch(task_id)
+            self.assertIsNone(pkg["composite_verification"])
+            self.assertEqual(pkg["combination_dependent_task_ids"], [])
+            self.assertEqual(pkg["findings"], ["batch_merge_conflict"])
+            rows = {row["task_id"]: row for row in pkg["members"]}
+            self.assertIsNone(rows["TASK-ALPHA"]["composite_exit_code"])
+            self.assertIsNone(rows["TASK-BETA"]["composite_exit_code"])
+
+    def test_a_fully_green_batch_produces_no_packages(self) -> None:
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        code, payload = self.run_batch(agents="per-task")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload.get("review_dispatch"), [])
+        for task_id in ("TASK-ALPHA", "TASK-BETA"):
+            self.assertFalse(self._dispatch_path(task_id).exists())
+
+
 if __name__ == "__main__":
     unittest.main()

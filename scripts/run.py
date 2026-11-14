@@ -1315,7 +1315,10 @@ def execute_batch(
     composite_record_path: pathlib.Path | None = None
     composite_record_sha256: str | None = None
     composite_exit_codes: dict[str, int] = {}
+    composite_verifications: dict[str, dict[str, Any]] = {}
+    composite_red = False
     conflict_occurred = False
+    integration_findings: list[dict[str, str]] = []
 
     if escaped:
         # An escaping member may have modified the user's working tree. Do not
@@ -1345,7 +1348,12 @@ def execute_batch(
                 },
             )
         except IsolationError as exc:
-            findings.extend(exc.findings or [_error("merge_not_verified", member["task_id"], str(exc))])
+            merge_findings = exc.findings or [
+                _error("merge_not_verified", member["task_id"], str(exc))
+            ]
+            findings.extend(merge_findings)
+            integration_findings.extend(merge_findings)
+            conflict_occurred = True
         else:
             integrated = True
             merge_commit = merged.get("merge_commit")
@@ -1365,6 +1373,7 @@ def execute_batch(
             work_dir,
         )
         findings.extend(outcome["findings"])
+        integration_findings.extend(outcome["findings"])
         composite = outcome["composite"]
         if outcome["integrated"]:
             integrated = True
@@ -1375,6 +1384,8 @@ def execute_batch(
         composite_record_path = outcome.get("record_path")
         composite_record_sha256 = outcome.get("record_sha256")
         composite_exit_codes = outcome.get("exit_codes", {})
+        composite_verifications = outcome.get("verifications", {})
+        composite_red = bool(outcome.get("composite_red"))
         conflict_occurred = bool(outcome.get("conflict_occurred"))
 
     # -- record state --------------------------------------------------
@@ -1414,6 +1425,19 @@ def execute_batch(
             per_member["composite_exit_code"] = composite_exit_codes.get(member["task_id"])
             record_batch_failure(state_path, state, member["task_id"], per_member)
 
+    # -- review dispatch packages --------------------------------------
+    review_dispatch = _dispatch_batch_reviews(
+        project_root=project_root,
+        base_commit=base_commit,
+        members=members,
+        findings=findings,
+        integration_findings=integration_findings,
+        composite_exit_codes=composite_exit_codes,
+        composite_verifications=composite_verifications,
+        composite_red=composite_red,
+        conflict_occurred=conflict_occurred,
+    )
+
     return {
         "batch_id": batch_id,
         "base_commit": base_commit,
@@ -1436,7 +1460,127 @@ def execute_batch(
         "integrated": integrated,
         "composite": composite,
         "findings": findings,
+        "review_dispatch": review_dispatch,
     }
+
+
+def _dispatch_batch_reviews(
+    *,
+    project_root: pathlib.Path,
+    base_commit: str,
+    members: list[dict[str, Any]],
+    findings: list[dict[str, str]],
+    integration_findings: list[dict[str, str]],
+    composite_exit_codes: dict[str, int],
+    composite_verifications: dict[str, dict[str, Any]],
+    composite_red: bool,
+    conflict_occurred: bool,
+) -> list[dict[str, str]]:
+    """Write fact-only review-dispatch packages for excluded or at-risk members."""
+    member_rows = [
+        {
+            "task_id": row_member["task_id"],
+            "agent_exit_code": row_member["agent_exit_code"],
+            "self_verification_exit_code": (
+                row_member["verification"].get("exit_code")
+                if isinstance(row_member.get("verification"), dict)
+                else None
+            ),
+            "composite_exit_code": composite_exit_codes.get(row_member["task_id"]),
+        }
+        for row_member in members
+    ]
+    combination_dependent_task_ids = [
+        row["task_id"]
+        for row in member_rows
+        if row["composite_exit_code"] is not None
+        and row["self_verification_exit_code"] is not None
+        and row["composite_exit_code"] != row["self_verification_exit_code"]
+    ]
+    integration_error_codes = list(
+        dict.fromkeys(
+            f["code"]
+            for f in integration_findings
+            if f.get("severity") == "error" and f.get("code")
+        )
+    )
+    project_target = str(project_root)
+
+    dispatches: list[dict[str, str]] = []
+    for member in members:
+        is_red = member["category"] == "red"
+        is_at_risk_green = (composite_red or conflict_occurred) and member[
+            "category"
+        ] == "green"
+        if not (is_red or is_at_risk_green):
+            continue
+
+        if is_red:
+            member_findings = list(
+                dict.fromkeys(
+                    f["code"]
+                    for f in findings
+                    if f.get("severity") == "error"
+                    and f.get("code")
+                    and f.get("path") in (member["task_id"], project_target)
+                )
+            )
+        else:
+            member_findings = list(integration_error_codes)
+
+        verification = member.get("verification")
+        self_verification = {
+            "exit_code": (
+                verification.get("exit_code")
+                if isinstance(verification, dict)
+                else None
+            ),
+            "log_path": (
+                verification.get("evidence_path")
+                if isinstance(verification, dict)
+                else None
+            ),
+            "log_sha256": (
+                verification.get("evidence_sha256")
+                if isinstance(verification, dict)
+                else None
+            ),
+        }
+        produced_commit = (
+            member["commit"]
+            if member["result"].get("committed")
+            and member["commit"]
+            and member["commit"] != base_commit
+            else None
+        )
+        facts = {
+            "task_id": member["task_id"],
+            "title": member["title"],
+            "branch": member["branch"],
+            "commit": produced_commit,
+            "base_commit": base_commit,
+            "diff_range": (
+                f"{base_commit}..{produced_commit}" if produced_commit else ""
+            ),
+            "self_verification": self_verification,
+            "composite_verification": composite_verifications.get(member["task_id"]),
+            "members": member_rows,
+            "combination_dependent_task_ids": combination_dependent_task_ids,
+            "declared_target_files": list(member["task"].get("target_files") or []),
+            "actual_changed_paths": list(member["changed_paths"]),
+            "undeclared_paths": list(member["undeclared_paths"]),
+            "findings": member_findings,
+        }
+        dispatch_path = batch.write_review_dispatch(
+            project_root, member["task_id"], facts
+        )
+        dispatches.append(
+            {
+                "task_id": member["task_id"],
+                "path": repo_relative(project_root, dispatch_path),
+            }
+        )
+    return dispatches
 
 
 def _integrate_composite(
@@ -1490,6 +1634,8 @@ def _integrate_composite(
             "composite": None,
             "findings": findings,
             "exit_codes": {},
+            "verifications": {},
+            "composite_red": False,
             "conflict_occurred": True,
         }
 
@@ -1499,6 +1645,7 @@ def _integrate_composite(
     composite_worktree = pathlib.Path(composite["worktree_path"])
 
     exit_codes: dict[str, int] = {}
+    verifications: dict[str, dict[str, Any]] = {}
     record_members: list[dict[str, Any]] = []
     composite_red = False
     for member in sorted(green, key=lambda m: m["task_id"]):
@@ -1513,6 +1660,11 @@ def _integrate_composite(
             log_prefix="composite",
         )
         exit_codes[member["task_id"]] = outcome["exit_code"]
+        verifications[member["task_id"]] = {
+            "exit_code": outcome["exit_code"],
+            "log_path": outcome["evidence_path"],
+            "log_sha256": outcome["evidence_sha256"],
+        }
         if outcome["exit_code"] != 0:
             composite_red = True
             findings.append(
@@ -1555,6 +1707,8 @@ def _integrate_composite(
             "composite": composite,
             "findings": findings,
             "exit_codes": exit_codes,
+            "verifications": verifications,
+            "composite_red": True,
             "record_path": record_path,
             "record_sha256": record_sha256,
         }
@@ -1575,6 +1729,8 @@ def _integrate_composite(
             "composite": composite,
             "findings": findings,
             "exit_codes": exit_codes,
+            "verifications": verifications,
+            "composite_red": False,
             "record_path": record_path,
             "record_sha256": record_sha256,
         }
@@ -1595,6 +1751,8 @@ def _integrate_composite(
             "composite": composite,
             "findings": findings,
             "exit_codes": exit_codes,
+            "verifications": verifications,
+            "composite_red": False,
             "record_path": record_path,
             "record_sha256": record_sha256,
             "conflict_occurred": True,
@@ -1605,6 +1763,8 @@ def _integrate_composite(
         "composite": composite,
         "findings": findings,
         "exit_codes": exit_codes,
+        "verifications": verifications,
+        "composite_red": False,
         "merge_commit": merged.get("merge_commit"),
         "record_path": record_path,
         "record_sha256": record_sha256,
@@ -1684,6 +1844,7 @@ def verb_batch(args: argparse.Namespace) -> int:
                 "batches": planned,
                 "accepted": sorted(accepted),
                 "failed": [],
+                "review_dispatch": [],
                 "dry_run": True,
             },
         )
@@ -1731,9 +1892,11 @@ def verb_batch(args: argparse.Namespace) -> int:
 
         batches: list[dict[str, Any]] = []
         failed: list[str] = []
+        review_dispatch: list[dict[str, str]] = []
         for group in groups:
             outcome = execute_batch(manifest, bodies, project_root, group, options)
             findings.extend(outcome["findings"])
+            review_dispatch.extend(outcome.get("review_dispatch", []))
             composite = outcome.get("composite") or {}
             green = [m for m in outcome["members"] if m["category"] == "green"]
             batches.append(
@@ -1773,6 +1936,7 @@ def verb_batch(args: argparse.Namespace) -> int:
             "batches": batches,
             "accepted": sorted(accepted),
             "failed": sorted(set(failed)),
+            "review_dispatch": review_dispatch,
         },
     )
     _print(result, args.format)

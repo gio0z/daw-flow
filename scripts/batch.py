@@ -69,6 +69,9 @@ NOT_VERIFIED_CODE = "merge_not_verified"
 #: Schema version of the composite record — the gate's input.
 composite_record_schema_version = 1
 
+#: Schema version of the fact-only review dispatch package.
+review_dispatch_schema_version = 1
+
 
 def _normalize_path(path: str) -> str:
     """Strip a leading ``./`` and any trailing ``/`` from a relative path."""
@@ -752,3 +755,17 @@ def merge_composite_branch(
         "batch_id": batch_id,
         "composite_commit": composite_commit,
     }
+
+
+def write_review_dispatch(
+    project_root: pathlib.Path, task_id: str, facts: dict[str, Any]
+) -> pathlib.Path:
+    """Write a fact-only review-dispatch package for one batch member."""
+    target_dir = artifact_dir(project_root, "evidence") / task_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    path = target_dir / "review-dispatch.json"
+    payload = {"schema_version": review_dispatch_schema_version, **facts}
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return path
