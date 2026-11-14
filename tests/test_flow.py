@@ -63,14 +63,14 @@ class FlowTests(unittest.TestCase):
         self.assertTrue(env["valid"])
         self.assertEqual(env["check"], "flow")
         self.assertEqual(env["schema_version"], 1)
-        self.assertEqual(env["steps"], 8)
+        self.assertEqual(env["steps"], 9)
         self.assertEqual(env["findings"], [])
 
     def test_happy_path_temp_copy(self) -> None:
         code, env = _run_flow(self.root)
         self.assertEqual(code, 0)
         self.assertTrue(env["valid"])
-        self.assertEqual(env["steps"], 8)
+        self.assertEqual(env["steps"], 9)
 
     def test_step_count(self) -> None:
         self._rewrite_mapping(lambda d: d.update(steps=d["steps"][:-1]))
@@ -105,7 +105,7 @@ class FlowTests(unittest.TestCase):
         self.assertIn("flow_manifest_gate_missing", _codes(env))
 
     def test_manifest_gate_step_unknown(self) -> None:
-        self._rewrite_manifest(lambda d: d["flow_gate"].update(required_steps=["BPF-9"]))
+        self._rewrite_manifest(lambda d: d["flow_gate"].update(required_steps=["BPF-10"]))
         code, env = _run_flow(self.root)
         self.assertEqual(code, 1)
         self.assertIn("flow_gate_step_unknown", _codes(env))
@@ -157,7 +157,7 @@ class FlowTests(unittest.TestCase):
 
     def test_artifact_step_unknown(self) -> None:
         self._rewrite_mapping(
-            lambda d: d["artifact_steps"].append({"step": "BPF-9", "patterns": ["x"], "require_text": None})
+            lambda d: d["artifact_steps"].append({"step": "BPF-10", "patterns": ["x"], "require_text": None})
         )
         code, env = _run_flow(self.root)
         self.assertEqual(code, 1)

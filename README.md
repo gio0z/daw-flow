@@ -339,7 +339,7 @@ The table below summarizes the alignment between upstream GitHub Spec Kit mechan
 
 ## 6. References & Documentation
 
-- [Best Practice Flow (`references/best-practice-flow.md`)](references/best-practice-flow.md): The eight adopted delivery steps (spec-kit, superpowers, Matt Pocock) mapped to the DAW rule that implements each, with the machine mapping read by both enforcement gates.
+- [Best Practice Flow (`references/best-practice-flow.md`)](references/best-practice-flow.md): The nine adopted delivery steps (spec-kit, superpowers, Matt Pocock) mapped to the DAW rule that implements each, with the machine mapping read by both enforcement gates.
 - [Grilling Protocol (`references/grilling.md`)](references/grilling.md): Canonical bounded-round elicitation protocol used by `daw-wizard`, `daw-ask`, and `daw-design`.
 - [Routing & Specification Manifest (`references/routing.md`)](references/routing.md): Detailed intent precedence, 14-doc authoring rules, and stage pipeline handoffs.
 - [Developer Lifecycle (`references/developer-lifecycle.md`)](references/developer-lifecycle.md): Inner loop, time-boxing, spike, refactor, maintenance, bisection, commit hygiene, PR/CI, review feedback, release, and retro protocols.

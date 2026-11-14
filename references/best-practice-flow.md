@@ -7,7 +7,7 @@ Two rules govern edits here:
 1. **No untagged step.** Every step carries a `source` and a resolvable anchor into this repository. A step whose rule cannot be located in the suite is not a real step, and the validator rejects it.
 2. **Anchor before prose.** Changing a rule's location requires updating the matching `anchor` in the machine mapping in the same revision; a dangling anchor fails the gate rather than silently documenting a rule that no longer exists.
 
-## The Eight Steps
+## The Nine Steps
 
 ### BPF-1 — Constitution and principles come first
 
@@ -56,6 +56,12 @@ DAW realization: `skills/daw-verify/SKILL.md` fixes the claim → check → actu
 Borrowed from **Matt Pocock**'s commit-sized workflow and **spec-kit**'s explicit implementation handoff: delivery steps are a route with their own checks, not a tail appended to coding.
 
 DAW realization: `skills/daw-ship/SKILL.md` owns pre-ship inventory, commit shaping, PR drafting, CI triage, review-feedback intake, and merge/release readiness; push, merge, tag, and deploy stay point-of-risk actions.
+
+### BPF-9 — A machine-readable task list drives execution
+
+Borrowed from **Matt Pocock**'s PRD-to-issues workflow and his unattended agent loop: a plan is decomposed into independently grabbable task files, the next task is chosen by a program rather than by a model's runtime judgment, and each task runs against a fixed context and a fixed verification command.
+
+DAW realization: the saved plan carries a task manifest (a fenced JSON block after the `<!-- daw-task-manifest -->` marker) whose field names match the planning module's task contract. [`scripts/run.py`](../scripts/run.py) computes the ready set from the dependency DAG, assembles a byte-bounded context pack per task, and runs each task's prescribed verification command, capturing output and exit code as durable evidence; `scripts/check_tasks.py` validates the manifest's structure read-only. The runner is explicitly invoked, never a daemon, and never pushes, merges, or deploys. Full contract: [Deterministic Execution Runner](execution-runner.md).
 
 ## Enforcement
 
@@ -140,6 +146,13 @@ The fenced block below is parsed by `validate.py flow` and by the route gate. Fi
       "source": "pocock",
       "anchor": "skills/daw-ship/SKILL.md#3-ship-procedures",
       "mandatory": true
+    },
+    {
+      "id": "BPF-9",
+      "name": "A machine-readable task list drives execution",
+      "source": "pocock",
+      "anchor": "references/execution-runner.md#2-the-task-list",
+      "mandatory": true
     }
   ],
   "artifact_steps": [
@@ -149,6 +162,11 @@ The fenced block below is parsed by `validate.py flow` and by the route gate. Fi
       "step": "BPF-4",
       "patterns": ["docs/plans/*.md"],
       "require_text": "expected"
+    },
+    {
+      "step": "BPF-9",
+      "patterns": ["docs/plans/*.md"],
+      "require_text": "<!-- daw-task-manifest -->"
     }
   ]
 }

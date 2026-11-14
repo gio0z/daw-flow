@@ -273,7 +273,8 @@ class TestStatus(StatusTestBase):
         (self.root / "docs" / "specs" / "prd.md").write_text("# PRD\n", encoding="utf-8")
         (self.root / "docs" / "plans").mkdir(parents=True)
         (self.root / "docs" / "plans" / "wf.md").write_text(
-            "# Plan\n\n- [ ] step: edit file, expected: tests pass\n", encoding="utf-8"
+            "# Plan\n\n- [ ] step: edit file, expected: tests pass\n<!-- daw-task-manifest -->\n",
+            encoding="utf-8",
         )
         (self.root / "docs" / "specs" / "ledger.json").write_text(
             json.dumps(_ledger_with_review(self.root, "docs/specs/prd.md")), encoding="utf-8"

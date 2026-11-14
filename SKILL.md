@@ -26,7 +26,7 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 The DAW suite is **self-contained as a complete 12-module bundle**. It requires **no external workflow frameworks (e.g. Superpowers) or third-party registries**. However, all 12 bundled internal execution modules are **mandatory core dependencies** for complete suite execution:
 
-The delivery flow itself is adopted, not invented: [Best Practice Flow](references/best-practice-flow.md) maps each of the eight adopted steps (spec-kit, superpowers, Matt Pocock) to the DAW rule that implements it, and both `validate.py flow` and the route flow gate read that mapping.
+The delivery flow itself is adopted, not invented: [Best Practice Flow](references/best-practice-flow.md) maps each of the nine adopted steps (spec-kit, superpowers, Matt Pocock) to the DAW rule that implements it, and both `validate.py flow` and the route flow gate read that mapping.
 
 | Module            | Canonical Path                                                 | Primary Responsibility                                                                                                                                            |
 | :---------------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |

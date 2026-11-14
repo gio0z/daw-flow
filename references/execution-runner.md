@@ -72,7 +72,7 @@ This is the same discipline as `derive_ledger.py`: the Markdown files stay the o
 
 ### 2B. The embedded manifest as the source
 
-A plan that declares no task-source directory carries the task list directly, as one fenced ` ```json ` block immediately after the `<!-- daw-task-manifest -->` marker. The marker makes the block unambiguous inside a plan that may contain other JSON examples, and it is the literal token the route flow gate looks for (see [Best Practice Flow](best-practice-flow.md)).
+A plan that declares no task-source directory carries the task list directly, as one fenced ` ```json ` block immediately after the `<!-- daw-task-manifest -->` marker. The marker makes the block unambiguous inside a plan that may contain other JSON examples, and it is the literal token the route flow gate looks for (see [Best Practice Flow](best-practice-flow.md) BPF-9).
 
 ```markdown
 <!-- daw-task-manifest -->

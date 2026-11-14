@@ -966,6 +966,6 @@ When the plan declares `<!-- daw-task-sources: <dir> -->`, the task files are th
 }
 ```
 
-### Relationship to the Runner
+### Relationship to the Flow Gate and the Runner
 
-`scripts/run.py` consumes the same list: `next` computes the ready set, `context` assembles a bounded context pack, `verify` runs a task's prescribed command and captures evidence, `isolate` runs one task inside its own git worktree and integrates it only when that verification exited `0`, and `run` drives the unattended loop with an operator-supplied agent command. `scripts/derive_tasks.py` is the suite's second writer: it projects task files into the plan's manifest and never invents a field. Full contract: [Deterministic Execution Runner](execution-runner.md).
+BPF-9 of the [Best Practice Flow](best-practice-flow.md) requires a plan to carry a task list; `route.py --project-root` blocks `feature`/`bugfix`/`refactor`/`maintain` when no plan carries it, and `validate.py status` reports `summary.plans: "missing"` for the same reason. `scripts/run.py` consumes the same list: `next` computes the ready set, `context` assembles a bounded context pack, `verify` runs a task's prescribed command and captures evidence, `isolate` runs one task inside its own git worktree and integrates it only when that verification exited `0`, and `run` drives the unattended loop with an operator-supplied agent command. `scripts/derive_tasks.py` is the suite's second writer: it projects task files into the plan's manifest and never invents a field. Full contract: [Deterministic Execution Runner](execution-runner.md).

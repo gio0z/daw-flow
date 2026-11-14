@@ -9,7 +9,7 @@ _Advice separation note:_ Core article principles (generative planning, determin
 
 ## 1. Intent Precedence & Routing Hierarchy
 
-The eight-step delivery flow that these intents dispatch is defined in [Best Practice Flow](best-practice-flow.md) (sources: spec-kit, superpowers, Matt Pocock; enforcement: `validate.py flow` plus the route flow gate).
+The nine-step delivery flow that these intents dispatch is defined in [Best Practice Flow](best-practice-flow.md) (sources: spec-kit, superpowers, Matt Pocock; enforcement: `validate.py flow` plus the route flow gate).
 
 Routing in DAW is deterministic and requires classified input facts. The workflow does not rely on open-ended keyword heuristics. Incoming engineering tasks are mapped into one of 13 finite intents:
 

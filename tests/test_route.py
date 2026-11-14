@@ -754,7 +754,9 @@ class TestRouteSuite(unittest.TestCase):
             (project_root / "docs" / "specs").mkdir(parents=True)
             (project_root / "docs" / "specs" / "prd.md").write_text("# PRD\nRequirements.\n", encoding="utf-8")
             (project_root / "docs" / "plans").mkdir(parents=True)
-            (project_root / "docs" / "plans" / "p.md").write_text("# Plan\nexpected: run tests\n", encoding="utf-8")
+            (project_root / "docs" / "plans" / "p.md").write_text(
+                "# Plan\nexpected: run tests\n<!-- daw-task-manifest -->\n", encoding="utf-8"
+            )
             req_file = self.suite_root / "request.json"
             req_data = make_request(intent="feature", requirements="clear", risk="low", workspace="in-place")
             req_file.write_text(json.dumps(req_data), encoding="utf-8")

@@ -35,14 +35,17 @@ try:
     from scripts.check_config import parse_config_block, validate_config_text
     from scripts.check_contract import validate_contract
     from scripts.check_ledger import validate_ledger
+    from scripts.check_tasks import MANIFEST_MARKER as TASK_MANIFEST_MARKER
 except ImportError:
     from check_config import parse_config_block, validate_config_text  # type: ignore[import-not-found]
     from check_contract import validate_contract  # type: ignore[import-not-found]
     from check_ledger import validate_ledger  # type: ignore[import-not-found]
+    from check_tasks import MANIFEST_MARKER as TASK_MANIFEST_MARKER  # type: ignore[import-not-found]
 
 STATUS_LIMITATIONS = [
     "Read-only aggregate: never runs tests, evidence commands, or builds, and never writes files.",
     "Task discovery is limited to the convention path docs/evidence/<task-id>/contract.json; contracts stored elsewhere are not checked.",
+    "summary.plans is satisfied only by a plan carrying both the BPF-4 `expected` token and the BPF-9 task-manifest marker, matching the route flow gate.",
     "Inherits every composed check's limitations (config, ledger, docs, contract); semantic truth of evidence is never evaluated.",
     "next_actions are advisory suggestions carrying $SKILL_DIR/$PROJECT_DIR placeholders; they never authorize execution or grant mutation rights.",
 ]
@@ -119,12 +122,12 @@ def _status_ledger(root: pathlib.Path, spec_dir: str | None, findings: list[dict
 
 
 def _status_plans(root: pathlib.Path, spec_dir: str | None) -> str:
-    """Report whether a saved plan satisfies the route gate's BPF-4 requirement.
+    """Report whether a saved plan satisfies the route gate's plan requirements.
 
     The route flow gate blocks feature/bugfix/refactor/maintain unless a
-    `docs/plans/*.md` file contains the literal token `expected`; a status that
-    answered `ok` for any plan file would send two different answers to the
-    operator.
+    `docs/plans/*.md` file contains the literal token `expected` (BPF-4) and the
+    `<!-- daw-task-manifest -->` marker (BPF-9); a status that answered `ok`
+    for any plan file would send two different answers to the operator.
     """
     if not spec_dir:
         return "not_applicable"
@@ -143,7 +146,7 @@ def _status_plans(root: pathlib.Path, spec_dir: str | None) -> str:
             text = matched.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if "expected" in text:
+        if "expected" in text and TASK_MANIFEST_MARKER in text:
             return "ok"
     return "missing"
 
@@ -319,7 +322,8 @@ def _next_actions(
                 "why": (
                     "Specifications exist but no saved plan does; the route flow gate blocks "
                     "feature/bugfix/refactor/maintain until a plan with per-step expected "
-                    "results is saved under docs/plans/."
+                    "results and a `<!-- daw-task-manifest -->` task list is saved under "
+                    "docs/plans/."
                 ),
                 "blocking": True,
             },
@@ -330,7 +334,10 @@ def _next_actions(
                     'python3 "$SKILL_DIR/scripts/validate.py" status '
                     '--project-root "$PROJECT_DIR"'
                 ),
-                "why": "Re-run status; summary.plans becomes `ok` once the plan is saved.",
+                "why": (
+                    "Re-run status; summary.plans becomes `ok` once the plan is saved with both "
+                    "the `expected` token and the task-manifest marker."
+                ),
                 "blocking": True,
             },
         ]

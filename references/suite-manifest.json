@@ -252,7 +252,7 @@
   },
   "flow_gate": {
     "document": "references/best-practice-flow.md",
-    "required_steps": ["BPF-2", "BPF-3", "BPF-4"],
+    "required_steps": ["BPF-2", "BPF-3", "BPF-4", "BPF-9"],
     "affected_intents": ["feature", "bugfix", "refactor", "maintain"]
   }
 }

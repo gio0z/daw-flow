@@ -1,7 +1,7 @@
 """Best Practice Flow mapping check (`validate.py flow`).
 
 Validates that the machine-readable mapping embedded in
-``references/best-practice-flow.md`` is well-formed, that its eight adopted
+``references/best-practice-flow.md`` is well-formed, that its nine adopted
 steps point at anchors that resolve in this repository, that every cross-link
 document still references the flow, and that ``references/suite-manifest.json``
 carries the matching ``flow_gate`` wiring. Read-only; owns no other rules.
@@ -43,7 +43,7 @@ FLOW_LIMITATIONS = [
 _FLOW_DOC_PATH = "references/best-practice-flow.md"
 _MANIFEST_PATH = "references/suite-manifest.json"
 _FLOW_SCHEMA_VERSION = 1
-_EXPECTED_STEP_COUNT = 8
+_EXPECTED_STEP_COUNT = 9
 _ALLOWED_SOURCES = frozenset({"spec-kit", "superpowers", "pocock", "original"})
 _REQUIRED_CROSS_LINKS = ("SKILL.md", "references/routing.md")
 _JSON_PARSE_ERRORS = (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError)

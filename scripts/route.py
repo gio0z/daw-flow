@@ -503,7 +503,7 @@ def _validate_route_entries(routes: Any) -> list[dict[str, str]]:
 
     return findings
 
-FLOW_GATE_STEP_RE = re.compile(r"^BPF-[1-8]$")
+FLOW_GATE_STEP_RE = re.compile(r"^BPF-[1-9]$")
 
 
 def _validate_flow_gate(gate: Any, routes: Any) -> list[dict[str, str]]:
@@ -522,7 +522,7 @@ def _validate_flow_gate(gate: Any, routes: Any) -> list[dict[str, str]]:
     else:
         for entry in required_steps:
             if not isinstance(entry, str) or not FLOW_GATE_STEP_RE.match(entry):
-                findings.append({"code": "MANIFEST_FLOW_GATE_UNKNOWN_STEP", "message": "Manifest flow_gate.required_steps contains a step id not matching ^BPF-[1-8]$."})
+                findings.append({"code": "MANIFEST_FLOW_GATE_UNKNOWN_STEP", "message": "Manifest flow_gate.required_steps contains a step id not matching ^BPF-[1-9]$."})
                 break
     affected_intents = gate.get("affected_intents")
     if not isinstance(affected_intents, list) or not affected_intents:
