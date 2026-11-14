@@ -70,6 +70,7 @@ try:
     )
     from scripts.daw_common import artifact_dir, compute_sha256, resolve_bounded_path
     from scripts.worktree import (
+        IntegrationLock,
         IsolationError,
         commit_task_work,
         merge_task_branch,
@@ -91,6 +92,7 @@ except ImportError:
     )
     from daw_common import artifact_dir, compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
     from worktree import (  # type: ignore[import-not-found]
+        IntegrationLock,
         IsolationError,
         commit_task_work,
         merge_task_branch,
@@ -697,28 +699,157 @@ def verb_isolate(args: argparse.Namespace) -> int:
     ):
         raise RunnerError("--agent-command must be a JSON array of strings.")
 
+    lock = IntegrationLock(project_root)
     try:
-        prepared = prepare_isolation(
-            project_root,
-            args.worktree_root,
-            args.base_ref,
-            task["task_id"],
-            task["title"],
-            args.add_ignore,
-            dry_run=args.dry_run,
-        )
+        lock.acquire()
     except IsolationError as exc:
         raise RunnerError(str(exc), exc.findings) from exc
+    try:
+        try:
+            prepared = prepare_isolation(
+                project_root,
+                args.worktree_root,
+                args.base_ref,
+                task["task_id"],
+                task["title"],
+                args.add_ignore,
+                dry_run=args.dry_run,
+            )
+        except IsolationError as exc:
+            raise RunnerError(str(exc), exc.findings) from exc
 
-    integration = prepared["integration"]
-    worktree = prepared["task"]
-    if worktree is None:
-        raise RunnerError("Isolation did not produce a task worktree.")
-    worktree_path = pathlib.Path(worktree["worktree_path"])
-    branch = worktree["branch"]
+        integration = prepared["integration"]
+        worktree = prepared["task"]
+        if worktree is None:
+            raise RunnerError("Isolation did not produce a task worktree.")
+        worktree_path = pathlib.Path(worktree["worktree_path"])
+        branch = worktree["branch"]
 
-    if args.dry_run:
-        # A dry run creates nothing: report the layout it would use and stop.
+        if args.dry_run:
+            # A dry run creates nothing: report the layout it would use and stop.
+            result = _envelope(
+                "isolate",
+                findings,
+                {
+                    "workflow_id": manifest.get("workflow_id"),
+                    "task_id": task["task_id"],
+                    "title": task["title"],
+                    "branch": branch,
+                    "worktree_path": str(worktree_path),
+                    "integration_branch": integration["branch"],
+                    "dry_run": True,
+                    "merged": {"merged": False, "reason": "dry run"},
+                },
+            )
+            _print(result, args.format)
+            return 0 if result["valid"] else 1
+
+        work_dir = resolve_work_dir(project_root, args.work_dir)
+        try:
+            work_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RunnerError(f"Work directory cannot be created: {work_dir} ({exc})") from exc
+
+        pack, meta = assemble_context(
+            manifest,
+            task,
+            project_root,
+            args.budget_chars,
+            bodies.get(task["task_id"], ""),
+            work_root=worktree_path,
+        )
+        pack_path = work_dir / f"context-{task['task_id']}.md"
+        pack_path.write_text(pack, encoding="utf-8")
+        substitutions = {
+            "{prompt_file}": str(pack_path),
+            "{workspace}": str(worktree_path),
+            "{task_id}": task["task_id"],
+        }
+        argv = substitute_argv(argv_template, substitutions)
+
+        # Snapshot the main working tree immediately before the agent runs, so the
+        # comparison afterwards isolates what the *agent* changed. The runner's own
+        # writes (the context pack and the evidence directory) are already in place
+        # at this point and are therefore not mistaken for an escape.
+        before_dirty = snapshot_main_tree(project_root)
+
+        agent_exit = 0
+        agent_output = ""
+        try:
+            agent = subprocess.run(  # noqa: S603 - operator-supplied argv, no shell
+                argv,
+                cwd=str(worktree_path),
+                input=pack.encode("utf-8"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=args.agent_timeout,
+                check=False,
+            )
+            agent_exit = agent.returncode
+            agent_output = agent.stdout.decode("utf-8", errors="replace")
+        except FileNotFoundError:
+            agent_exit, agent_output = 127, f"<!-- agent command not found: {argv[0]} -->"
+        except subprocess.TimeoutExpired:
+            agent_exit, agent_output = 124, f"<!-- agent timed out after {args.agent_timeout}s -->"
+        agent_log = work_dir / f"agent-{task['task_id']}.log"
+        agent_log.write_text(agent_output, encoding="utf-8")
+
+        # The isolation boundary is only real if the agent's writes stayed inside
+        # the worktree. Compare the main working tree before and after the agent
+        # ran: any new dirty path there means the agent escaped its sandbox, and a
+        # task that escaped is never merged.
+        escaped = sorted(set(snapshot_main_tree(project_root)) - set(before_dirty))
+        if escaped:
+            raise RunnerError(
+                "The agent modified files outside its worktree; the task is not mergeable.",
+                [
+                    _error(
+                        "worktree_escape_detected",
+                        str(project_root),
+                        "The agent left changes in the main working tree: "
+                        + ", ".join(escaped)
+                        + ". Isolation requires the worker to operate inside its worktree.",
+                    )
+                ],
+            )
+
+        committed: dict[str, Any] = {"committed": False, "reason": "agent did not run"}
+        commit = worktree.get("commit")
+        if agent_exit == 0:
+            try:
+                committed = commit_task_work(worktree_path, task["task_id"], task["title"])
+            except IsolationError as exc:
+                raise RunnerError(str(exc), exc.findings) from exc
+            commit = committed.get("commit")
+
+        outcome = run_verification(
+            task,
+            project_root,
+            args.timeout,
+            work_dir=worktree_path,
+            branch=branch,
+            commit=commit,
+        )
+
+        merged: dict[str, Any] = {"merged": False, "reason": "verification did not pass"}
+        if outcome["passed"] and agent_exit == 0:
+            try:
+                merged = merge_task_branch(
+                    project_root,
+                    integration["worktree_rel"],
+                    branch,
+                    task["task_id"],
+                    task["title"],
+                    project_root=project_root,
+                    evidence={
+                        "passed": True,
+                        "branch": branch,
+                        "commit": commit,
+                    },
+                )
+            except IsolationError as exc:
+                raise RunnerError(str(exc), exc.findings) from exc
+
         result = _envelope(
             "isolate",
             findings,
@@ -729,139 +860,18 @@ def verb_isolate(args: argparse.Namespace) -> int:
                 "branch": branch,
                 "worktree_path": str(worktree_path),
                 "integration_branch": integration["branch"],
-                "dry_run": True,
-                "merged": {"merged": False, "reason": "dry run"},
+                "context": meta,
+                "agent_exit_code": agent_exit,
+                "agent_log": agent_log.relative_to(project_root).as_posix(),
+                "commit": commit,
+                "verification": outcome,
+                "merged": merged,
             },
         )
         _print(result, args.format)
-        return 0 if result["valid"] else 1
-
-    work_dir = resolve_work_dir(project_root, args.work_dir)
-    try:
-        work_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        raise RunnerError(f"Work directory cannot be created: {work_dir} ({exc})") from exc
-
-    pack, meta = assemble_context(
-        manifest,
-        task,
-        project_root,
-        args.budget_chars,
-        bodies.get(task["task_id"], ""),
-        work_root=worktree_path,
-    )
-    pack_path = work_dir / f"context-{task['task_id']}.md"
-    pack_path.write_text(pack, encoding="utf-8")
-    substitutions = {
-        "{prompt_file}": str(pack_path),
-        "{workspace}": str(worktree_path),
-        "{task_id}": task["task_id"],
-    }
-    argv = substitute_argv(argv_template, substitutions)
-
-    # Snapshot the main working tree immediately before the agent runs, so the
-    # comparison afterwards isolates what the *agent* changed. The runner's own
-    # writes (the context pack and the evidence directory) are already in place
-    # at this point and are therefore not mistaken for an escape.
-    before_dirty = snapshot_main_tree(project_root)
-
-    agent_exit = 0
-    agent_output = ""
-    try:
-        agent = subprocess.run(  # noqa: S603 - operator-supplied argv, no shell
-            argv,
-            cwd=str(worktree_path),
-            input=pack.encode("utf-8"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=args.agent_timeout,
-            check=False,
-        )
-        agent_exit = agent.returncode
-        agent_output = agent.stdout.decode("utf-8", errors="replace")
-    except FileNotFoundError:
-        agent_exit, agent_output = 127, f"<!-- agent command not found: {argv[0]} -->"
-    except subprocess.TimeoutExpired:
-        agent_exit, agent_output = 124, f"<!-- agent timed out after {args.agent_timeout}s -->"
-    agent_log = work_dir / f"agent-{task['task_id']}.log"
-    agent_log.write_text(agent_output, encoding="utf-8")
-
-    # The isolation boundary is only real if the agent's writes stayed inside
-    # the worktree. Compare the main working tree before and after the agent
-    # ran: any new dirty path there means the agent escaped its sandbox, and a
-    # task that escaped is never merged.
-    escaped = sorted(set(snapshot_main_tree(project_root)) - set(before_dirty))
-    if escaped:
-        raise RunnerError(
-            "The agent modified files outside its worktree; the task is not mergeable.",
-            [
-                _error(
-                    "worktree_escape_detected",
-                    str(project_root),
-                    "The agent left changes in the main working tree: "
-                    + ", ".join(escaped)
-                    + ". Isolation requires the worker to operate inside its worktree.",
-                )
-            ],
-        )
-
-    committed: dict[str, Any] = {"committed": False, "reason": "agent did not run"}
-    commit = worktree.get("commit")
-    if agent_exit == 0:
-        try:
-            committed = commit_task_work(worktree_path, task["task_id"], task["title"])
-        except IsolationError as exc:
-            raise RunnerError(str(exc), exc.findings) from exc
-        commit = committed.get("commit")
-
-    outcome = run_verification(
-        task,
-        project_root,
-        args.timeout,
-        work_dir=worktree_path,
-        branch=branch,
-        commit=commit,
-    )
-
-    merged: dict[str, Any] = {"merged": False, "reason": "verification did not pass"}
-    if outcome["passed"] and agent_exit == 0:
-        try:
-            merged = merge_task_branch(
-                project_root,
-                integration["worktree_rel"],
-                branch,
-                task["task_id"],
-                task["title"],
-                project_root=project_root,
-                evidence={
-                    "passed": True,
-                    "branch": branch,
-                    "commit": commit,
-                },
-            )
-        except IsolationError as exc:
-            raise RunnerError(str(exc), exc.findings) from exc
-
-    result = _envelope(
-        "isolate",
-        findings,
-        {
-            "workflow_id": manifest.get("workflow_id"),
-            "task_id": task["task_id"],
-            "title": task["title"],
-            "branch": branch,
-            "worktree_path": str(worktree_path),
-            "integration_branch": integration["branch"],
-            "context": meta,
-            "agent_exit_code": agent_exit,
-            "agent_log": agent_log.relative_to(project_root).as_posix(),
-            "commit": commit,
-            "verification": outcome,
-            "merged": merged,
-        },
-    )
-    _print(result, args.format)
-    return 0 if result["valid"] and outcome["passed"] and merged.get("merged") else 1
+        return 0 if result["valid"] and outcome["passed"] and merged.get("merged") else 1
+    finally:
+        lock.release()
 
 
 def verb_run(args: argparse.Namespace) -> int:

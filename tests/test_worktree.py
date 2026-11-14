@@ -65,6 +65,115 @@ class IsolationRepoBase(unittest.TestCase):
         return path
 
 
+class IntegrationLockTests(IsolationRepoBase):
+    def test_a_live_holder_blocks_a_second_operation(self) -> None:
+        script = (
+            "import pathlib, sys, time\n"
+            f"sys.path.insert(0, {str(PROJECT_ROOT / 'scripts')!r})\n"
+            "import worktree\n"
+            "worktree.IntegrationLock(pathlib.Path(sys.argv[1])).acquire()\n"
+            "print('held', flush=True)\n"
+            "time.sleep(30)\n"
+        )
+        child = subprocess.Popen(
+            [sys.executable, "-c", script, str(self.repo)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(child.terminate)
+        self.addCleanup(child.wait)
+        self.addCleanup(child.stdout.close)
+        self.addCleanup(child.stderr.close)
+        self.assertEqual(child.stdout.readline().strip(), "held")
+
+        with self.assertRaises(worktree.IsolationError) as caught:
+            worktree.IntegrationLock(self.repo).acquire()
+        self.assertIn(
+            "integration_locked", [finding["code"] for finding in caught.exception.findings]
+        )
+
+    def test_a_lock_whose_holder_is_gone_is_taken_over(self) -> None:
+        path = worktree.lock_path(self.repo)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"pid": 999999, "start_time": "1"}), encoding="utf-8"
+        )
+
+        result = worktree.IntegrationLock(self.repo).acquire()
+        self.assertTrue(result["stale_taken_over"])
+
+    def test_the_lock_is_reentrant_within_one_process(self) -> None:
+        first = worktree.IntegrationLock(self.repo)
+        second = worktree.IntegrationLock(self.repo)
+        first.acquire()
+        result = second.acquire()
+        self.assertTrue(result["reentrant"])
+        first.release()
+        self.assertTrue(worktree.lock_path(self.repo).exists())
+        second.release()
+
+    def test_releasing_the_outermost_holder_removes_the_lock_file(self) -> None:
+        first = worktree.IntegrationLock(self.repo)
+        second = worktree.IntegrationLock(self.repo)
+        first.acquire()
+        second.acquire()
+        first.release()
+        self.assertTrue(worktree.lock_path(self.repo).exists())
+        second.release()
+        self.assertFalse(worktree.lock_path(self.repo).exists())
+
+    def test_worktree_merge_refuses_while_the_lock_is_held(self) -> None:
+        lock = worktree.IntegrationLock(self.repo)
+        lock.acquire()
+        self.addCleanup(lock.release)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "worktree.py"),
+                "merge",
+                "--project-root",
+                str(self.repo),
+                "--task",
+                "TASK-01",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn(
+            "integration_locked", [finding["code"] for finding in payload["findings"]]
+        )
+
+    def test_worktree_prepare_refuses_while_the_lock_is_held(self) -> None:
+        lock = worktree.IntegrationLock(self.repo)
+        lock.acquire()
+        self.addCleanup(lock.release)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "worktree.py"),
+                "prepare",
+                "--project-root",
+                str(self.repo),
+                "--task",
+                "TASK-01",
+                "--title",
+                "Rotate token",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn(
+            "integration_locked", [finding["code"] for finding in payload["findings"]]
+        )
+
+
 class NamingTests(unittest.TestCase):
     def test_branch_name_is_derived_from_task_id_and_title(self) -> None:
         self.assertEqual(

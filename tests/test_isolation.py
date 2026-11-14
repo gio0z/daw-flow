@@ -9,6 +9,7 @@ something when git actually does it.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -217,6 +218,27 @@ class IsolateTests(IsolatedRunBase):
         branches = _git(self.repo, "branch", "--list")
         self.assertNotIn("daw/integration", branches)
         self.assertNotIn("daw/TASK-01", branches)
+
+    def test_isolate_refuses_while_the_lock_is_held(self) -> None:
+        sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+        import worktree
+
+        path = worktree.lock_path(self.repo)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "start_time": worktree.process_start_time(os.getpid()),
+                }
+            ),
+            encoding="utf-8",
+        )
+        code, payload = self.isolate()
+        self.assertEqual(code, 2, payload)
+        self.assertIn(
+            "integration_locked", [finding["code"] for finding in payload["findings"]]
+        )
 
     def test_the_worktree_container_must_be_ignored(self) -> None:
         (self.repo / ".gitignore").write_text("*.log\n", encoding="utf-8")

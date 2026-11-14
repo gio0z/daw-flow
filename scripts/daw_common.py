@@ -437,12 +437,16 @@ def is_durable_evidence_path(path: str) -> bool:
     return True
 
 
+def finding(severity: str, code: str, path: str, message: str) -> dict[str, str]:
+    return {"severity": severity, "code": code, "path": path, "message": message}
+
+
 def make_error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
+    return finding("error", code, path, message)
 
 
 def make_warning(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "warning", "code": code, "path": path, "message": message}
+    return finding("warning", code, path, message)
 
 
 def has_errors(findings: list[dict[str, str]]) -> bool:

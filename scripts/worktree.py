@@ -32,17 +32,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from typing import Any
 
 try:
-    from scripts.daw_common import artifact_dir, compute_sha256, resolve_bounded_path
+    from scripts.daw_common import artifact_dir, compute_sha256, finding, resolve_bounded_path
 except ImportError:
-    from daw_common import artifact_dir, compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
+    from daw_common import artifact_dir, compute_sha256, finding, resolve_bounded_path  # type: ignore[import-not-found]
 
 STATE_SCHEMA_VERSION = 1
 
@@ -57,6 +59,9 @@ INTEGRATION_BRANCH = "daw/integration"
 #: Resolved per project, so a project that keeps evidence at the legacy
 #: ``docs/evidence/`` keeps its state file there too.
 DEFAULT_STATE_PATH = "docs/daw/evidence/runner/isolation.json"
+
+#: Documented default location of the integration lock, relative to the project root.
+DEFAULT_LOCK_PATH = "docs/daw/evidence/runner/integration.lock"
 
 #: Branches this tool must never write to.
 PROTECTED_BRANCHES = ("main", "master", "develop", "trunk")
@@ -75,11 +80,11 @@ class IsolationError(Exception):
 
 
 def _error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
+    return finding("error", code, path, message)
 
 
 def _warning(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "warning", "code": code, "path": path, "message": message}
+    return finding("warning", code, path, message)
 
 
 ISOLATION_LIMITATIONS = [
@@ -666,6 +671,159 @@ def verification_supports_merge(
 
 
 # --------------------------------------------------------------------------
+# Integration lock
+# --------------------------------------------------------------------------
+
+_LOCK_DEPTH: dict[str, int] = {}
+
+
+def lock_path(project_root: pathlib.Path, raw: str | None = None) -> pathlib.Path:
+    """Resolve the integration lock path within the project root."""
+    if not raw:
+        return artifact_dir(project_root, "evidence") / "runner" / "integration.lock"
+    resolved, err = resolve_bounded_path(project_root, raw)
+    if err or resolved is None:
+        raise IsolationError(
+            f"Lock path is not bounded by the project root: {raw} ({err})."
+        )
+    return resolved
+
+
+def process_start_time(pid: int) -> str | None:
+    """Return field 22 from ``/proc/<pid>/stat`` when it can be read."""
+    if pid <= 0:
+        return None
+    try:
+        raw = pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        fields = raw[raw.rfind(")") + 1 :].split()
+        return fields[19]
+    except (IndexError, ValueError):
+        return None
+
+
+def _process_is_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _lock_holder_is_alive(payload: dict[str, Any]) -> bool:
+    pid = payload.get("pid")
+    if not isinstance(pid, int) or pid <= 0 or not _process_is_alive(pid):
+        return False
+    recorded_start = payload.get("start_time")
+    current_start = process_start_time(pid)
+    return current_start is not None and recorded_start == current_start
+
+
+class IntegrationLock:
+    """A process-safe, re-entrant lock for integration-touching operations."""
+
+    def __init__(self, project_root: pathlib.Path, raw: str | None = None) -> None:
+        self.project_root = project_root
+        self.path = lock_path(project_root, raw)
+        self._key = str(self.path)
+
+    def acquire(self) -> dict[str, Any]:
+        depth = _LOCK_DEPTH.get(self._key, 0)
+        if depth:
+            _LOCK_DEPTH[self._key] = depth + 1
+            return {
+                "path": str(self.path),
+                "reentrant": True,
+                "stale_taken_over": False,
+            }
+
+        stale_taken_over = False
+        for attempt in range(2):
+            descriptor: int | None = None
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                descriptor = os.open(
+                    self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644
+                )
+            except FileExistsError:
+                if attempt == 1:
+                    raise self._locked_error()
+                stale_taken_over = True
+                try:
+                    payload = json.loads(self.path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    payload = {}
+                if not isinstance(payload, dict):
+                    payload = {}
+                if _lock_holder_is_alive(payload):
+                    raise self._locked_error(payload.get("pid"))
+                try:
+                    self.path.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            else:
+                if descriptor is None:
+                    raise self._locked_error()
+                payload = {
+                    "pid": os.getpid(),
+                    "start_time": process_start_time(os.getpid()),
+                    "acquired_at": datetime.now(timezone.utc).isoformat(),
+                }
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    json.dump(payload, handle)
+                _LOCK_DEPTH[self._key] = 1
+                return {
+                    "path": str(self.path),
+                    "reentrant": False,
+                    "stale_taken_over": stale_taken_over,
+                }
+        raise self._locked_error()
+
+    def release(self) -> None:
+        depth = _LOCK_DEPTH.get(self._key, 0)
+        if depth <= 1:
+            _LOCK_DEPTH.pop(self._key, None)
+            try:
+                payload = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                payload = {}
+            if isinstance(payload, dict) and payload.get("pid") == os.getpid():
+                try:
+                    self.path.unlink()
+                except FileNotFoundError:
+                    pass
+            return
+        _LOCK_DEPTH[self._key] = depth - 1
+
+    def _locked_error(self, holder_pid: Any = None) -> IsolationError:
+        holder = f" (holder pid {holder_pid})" if holder_pid else ""
+        return IsolationError(
+            f"The integration lock is held by another operation{holder}.",
+            [
+                _error(
+                    "integration_locked",
+                    str(self.path),
+                    f"Integration lock is already held{holder}.",
+                )
+            ],
+        )
+
+    def __enter__(self) -> "IntegrationLock":
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        self.release()
+
+
+# --------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------
 
@@ -818,38 +976,51 @@ def command_prepare(args: argparse.Namespace) -> int:
     project_root = pathlib.Path(args.project_root).resolve()
     if not project_root.is_dir():
         raise IsolationError(f"Project root is not a directory: {project_root}")
-    state_path = resolve_state_path(project_root, args.state)
-    state = load_state(state_path)
-    outcome = prepare_isolation(
-        project_root,
-        args.worktree_root,
-        args.base_ref,
-        args.task,
-        args.title,
-        args.add_ignore,
-    )
-    integration = outcome["integration"]
-    task = outcome.get("task")
-    if task:
-        record_prepared_task(
-            state_path, state, args.task, task, integration, args.base_ref
+    lock = IntegrationLock(project_root, args.lock)
+    lock_result = lock.acquire()
+    try:
+        state_path = resolve_state_path(project_root, args.state)
+        state = load_state(state_path)
+        outcome = prepare_isolation(
+            project_root,
+            args.worktree_root,
+            args.base_ref,
+            args.task,
+            args.title,
+            args.add_ignore,
         )
-    else:
-        state["integration"] = {
-            "branch": integration["branch"],
-            "worktree_path": integration["worktree_path"],
-            "worktree_rel": integration["worktree_rel"],
-            "base_ref": args.base_ref or "HEAD",
-            "base_commit": integration.get("commit"),
+        integration = outcome["integration"]
+        task = outcome.get("task")
+        if task:
+            record_prepared_task(
+                state_path, state, args.task, task, integration, args.base_ref
+            )
+        else:
+            state["integration"] = {
+                "branch": integration["branch"],
+                "worktree_path": integration["worktree_path"],
+                "worktree_rel": integration["worktree_rel"],
+                "base_ref": args.base_ref or "HEAD",
+                "base_commit": integration.get("commit"),
+            }
+            save_state(state_path, state)
+        payload = {
+            "integration": integration,
+            "task": task,
+            "state_path": str(state_path),
         }
-        save_state(state_path, state)
-    payload = {
-        "integration": integration,
-        "task": task,
-        "state_path": str(state_path),
-    }
-    print(json.dumps(payload, indent=2))
-    return 0
+        if lock_result["stale_taken_over"]:
+            payload["findings"] = [
+                _warning(
+                    "integration_lock_stale",
+                    lock_result["path"],
+                    "A stale integration lock was taken over.",
+                )
+            ]
+        print(json.dumps(payload, indent=2))
+        return 0
+    finally:
+        lock.release()
 
 
 def command_list(args: argparse.Namespace) -> int:
@@ -911,54 +1082,63 @@ def command_commit(args: argparse.Namespace) -> int:
 
 def command_merge(args: argparse.Namespace) -> int:
     project_root = pathlib.Path(args.project_root).resolve()
-    repo = require_repo(project_root)
-    state_path = resolve_state_path(project_root, args.state)
-    state = load_state(state_path)
-    task_id = args.task
-    entry = state.get("tasks", {}).get(task_id)
-    if not isinstance(entry, dict):
-        raise IsolationError(f"No isolation record for task {task_id}.")
-    branch = entry.get("branch")
-    if not branch:
-        raise IsolationError(f"Isolation record for task {task_id} has no branch.")
-    if is_protected_branch(branch):
-        raise IsolationError(f"Refusing to merge protected branch {branch}.")
+    lock = IntegrationLock(project_root, args.lock)
+    lock_result = lock.acquire()
+    try:
+        repo = require_repo(project_root)
+        state_path = resolve_state_path(project_root, args.state)
+        state = load_state(state_path)
+        task_id = args.task
+        entry = state.get("tasks", {}).get(task_id)
+        if not isinstance(entry, dict):
+            raise IsolationError(f"No isolation record for task {task_id}.")
+        branch = entry.get("branch")
+        if not branch:
+            raise IsolationError(f"Isolation record for task {task_id} has no branch.")
+        if is_protected_branch(branch):
+            raise IsolationError(f"Refusing to merge protected branch {branch}.")
 
-    commit = branch_commit(repo, branch)
-    evidence = verification_for_task(project_root, state, task_id)
+        commit = branch_commit(repo, branch)
+        evidence = verification_for_task(project_root, state, task_id)
 
-    integration = state.get("integration", {})
-    integration_rel = integration.get("worktree_rel") or integration_worktree_rel(
-        args.worktree_root
-    )
-    outcome = merge_task_branch(
-        repo,
-        integration_rel,
-        branch,
-        task_id,
-        args.title or task_id,
-        project_root=project_root,
-        evidence=evidence,
-    )
-    reason = outcome.get("reason", "")
-    entry["merged"] = True
-    entry["merge_commit"] = outcome["merge_commit"]
-    entry["verified_commit"] = commit
-    save_state(state_path, state)
-    print(
-        json.dumps(
-            {
-                "task_id": task_id,
-                "branch": branch,
-                "commit": commit,
-                "merge_commit": outcome["merge_commit"],
-                "evidence": evidence,
-                "reason": reason,
-            },
-            indent=2,
+        integration = state.get("integration", {})
+        integration_rel = integration.get("worktree_rel") or integration_worktree_rel(
+            args.worktree_root
         )
-    )
-    return 0
+        outcome = merge_task_branch(
+            repo,
+            integration_rel,
+            branch,
+            task_id,
+            args.title or task_id,
+            project_root=project_root,
+            evidence=evidence,
+        )
+        reason = outcome.get("reason", "")
+        entry["merged"] = True
+        entry["merge_commit"] = outcome["merge_commit"]
+        entry["verified_commit"] = commit
+        save_state(state_path, state)
+        payload = {
+            "task_id": task_id,
+            "branch": branch,
+            "commit": commit,
+            "merge_commit": outcome["merge_commit"],
+            "evidence": evidence,
+            "reason": reason,
+        }
+        if lock_result["stale_taken_over"]:
+            payload["findings"] = [
+                _warning(
+                    "integration_lock_stale",
+                    lock_result["path"],
+                    "A stale integration lock was taken over.",
+                )
+            ]
+        print(json.dumps(payload, indent=2))
+        return 0
+    finally:
+        lock.release()
 
 
 def command_remove(args: argparse.Namespace) -> int:
@@ -1000,6 +1180,14 @@ def build_parser() -> argparse.ArgumentParser:
             help=(
                 "Isolation state file (default: the project's evidence directory — "
                 f"{DEFAULT_STATE_PATH} unless the project keeps evidence at docs/evidence/)."
+            ),
+        )
+        sub.add_argument(
+            "--lock",
+            default=None,
+            help=(
+                "Integration lock file (default: the project's evidence directory — "
+                f"{DEFAULT_LOCK_PATH} unless the project keeps evidence at docs/evidence/)."
             ),
         )
 
