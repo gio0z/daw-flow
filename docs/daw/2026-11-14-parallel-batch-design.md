@@ -206,6 +206,8 @@ Both gates are enforced inside merge functions in `worktree.py`.
 
 Clause 4 exists because the record alone is not trustworthy evidence. The record is a *derived summary*, it is mutable, and it lives under `docs/daw/evidence/` — which §6.5 deliberately subtracts from escape detection, so editing it raises no alarm. Without the cross-check, changing one byte in the record turns a red composite green and no check notices. The log is the primary evidence; the record is an index over it, and the gate verifies the index against the evidence it points at. The composite log header also carries the composite branch and commit, so "green at the exact composite commit" is attested in the log itself and not only in the record.
 
+**The base commit is derived, never read from the record.** The completeness reconstruction needs a bound so the base branch's own merge history stays out of it. That bound must come from an independent source, or a one-field edit to the record hides a merged — even red — member and the gate returns green, which is the exact attack this gate exists to stop. The bound is `git merge-base <composite tip> <integration branch tip>`: the composite descends from the base and from nothing else, so their best common ancestor IS the base, and it stays the base even when the integration branch later moves forward with another task's merge. The record still carries `base_commit`, but only as a cross-checked field — the gate requires it to equal the derived base and refuses on mismatch. (Measured: with the bound taken from the record, setting it to a later merge commit hides the later member's merge entirely.)
+
 **A member that produced no commit.** A member whose agent exited `0` and changed nothing is a legitimate outcome ("nothing to do"). Measured: merging such a member's branch into the composite prints `Already up to date.`, exits `0`, and creates **no merge commit** (M6) — so the member leaves no trace in the composite's history, and a naive completeness check would fail the entire batch over a task that correctly changed nothing. Such a member is therefore a **third category**, distinct from green and red:
 
 | Category | Agent exit | Self-verification | Produced a commit | Treatment |
@@ -240,12 +242,14 @@ The fail-closed consequence is documented: an operator editing the main tree *wh
 |---|---|---|
 | Self-verification | `docs/daw/evidence/<task-id>/verify-<n>.log` | command, exit code, branch, commit, cwd (task worktree) |
 | Composite verification (per member) | `docs/daw/evidence/<batch-id>/composite-<n>.log` | command, exit code, cwd (composite worktree) |
-| **Composite record (the gate's input)** | `docs/daw/evidence/<batch-id>/composite-<n>.json` | composite branch, composite commit, per-member task id, command, exit code, log path + SHA-256 |
+| **Composite record (the gate's input)** | `docs/daw/evidence/<batch-id>/composite-<n>.json` | composite branch, composite commit, base commit, per-member task id, command, exit code, log path + SHA-256 |
 | Context pack | `docs/daw/evidence/runner/context-<task-id>.md` | bounded pack, per-file SHA-256 |
 | Agent log | `docs/daw/evidence/runner/agent-<task-id>.log` | agent stdout/stderr |
 | Isolation state | `docs/daw/evidence/runner/isolation.json` | branch/worktree/merged per task, accepted set |
 | Review dispatch package | `docs/daw/evidence/<task-id>/review-dispatch.json` | diff range, evidence digests, per-member sensitivity table, causing findings (§6.12) |
 | Integration lock | `docs/daw/evidence/runner/integration.lock` | pid of the holder |
+
+Every path in this table is relative to the **project's evidence directory**, which is `docs/daw/evidence/` by default and the legacy `docs/evidence/` for a project that already keeps evidence there. The runner resolves it per project through one authority, so the writer and the gate can never disagree about where a log lives.
 
 `batch-id` is `batch-<hash>` where `hash` is the first 10 hex characters of `sha256(base commit + sorted task ids)`. It is a function of inputs, so the same batch on the same base gets the same id — the composite branch name and evidence directory are derived from it.
 

@@ -93,7 +93,7 @@ The first measured defect (M1) was two concurrent `isolate` runs racing on `refs
 - Consumes: nothing from later tasks.
 - Produces:
   - `daw_common.finding(severity: str, code: str, path: str, message: str) -> dict[str, str]`
-  - `worktree.DEFAULT_LOCK_PATH = "docs/daw/evidence/runner/integration.lock"`
+  - `worktree.DEFAULT_LOCK_PATH = "docs/daw/evidence/runner/integration.lock"` — the documented default; `worktree.lock_path(project_root)` resolves it through the project's evidence directory.
   - `worktree.lock_path(project_root: pathlib.Path, raw: str | None = None) -> pathlib.Path`
   - `worktree.process_start_time(pid: int) -> str | None` — field 22 of `/proc/<pid>/stat`, or `None` when it cannot be read.
   - `worktree.IntegrationLock(project_root, raw: str | None = None)` with `acquire() -> dict[str, Any]`, `release() -> None`, and the context-manager protocol (`__enter__` returns self, `__exit__` releases).
@@ -542,7 +542,7 @@ The verb that ties the mechanism together: select a batch, prepare every member'
   7. **Integrate:**
      - zero green members → nothing is integrated. The batch fails if any member was red, and succeeds (accepting every no-op) when every member was a no-op.
      - exactly one green member → merge that member's branch into the integration branch through `worktree.merge_task_branch`, gated by its own green evidence at its commit. No composite is built: there is no combination to verify.
-     - two or more green members → `batch.build_composite` at `base_commit`, then run **every green member's** verification command in the composite worktree, sequentially, in task-id order, each writing `docs/daw/evidence/<batch-id>/composite-<n>.log`; then write the composite record; then `batch.merge_composite_branch`.
+     - two or more green members → `batch.build_composite` at `base_commit`, then run **every green member's** verification command in the composite worktree, sequentially, in task-id order, each writing `composite-<n>.log` into the batch's evidence directory — `daw_common.artifact_dir(project_root, "evidence") / batch_id`, the SAME directory `batch.composite_evidence_dir` bounds the gate against, not a hard-coded path; then write the composite record (which MUST carry `base_commit` = the batch's base commit, so the gate's cross-check against the independently derived base passes); then `batch.merge_composite_branch`.
        - A non-zero composite exit → finding code `batch_composite_verification_failed`; the batch fails and the integration branch is untouched.
        - A merge conflict → finding code `batch_merge_conflict`.
   8. **Record state.** For **every** member, write a state entry: `branch`, `worktree_path`, `worktree_rel`, `merged`, `accepted`, `batch_id`, `commit`, `merge_commit`, and `verified_commit` (the composite commit for a composited member, the member's own commit for the single-green fast path). A green member that was integrated gets `merged: True, accepted: True`. A no-op member gets `merged: False, accepted: True`. A red member gets `merged: False, accepted: False`.
@@ -593,7 +593,7 @@ When a member fails, the runner already knows the facts a reviewer needs — but
 **Interfaces:**
 - Consumes: everything from Task 6.
 - Produces:
-  - `batch.write_review_dispatch(project_root: pathlib.Path, task_id: str, facts: dict[str, Any]) -> pathlib.Path` — writes `docs/daw/evidence/<task-id>/review-dispatch.json` and returns its path.
+  - `batch.write_review_dispatch(project_root: pathlib.Path, task_id: str, facts: dict[str, Any]) -> pathlib.Path` — writes `review-dispatch.json` into the project's evidence directory (`daw_common.artifact_dir(project_root, "evidence") / task_id`) and returns its path.
   - The package's shape (schema version `1`):
 
     | Field | Content |
@@ -616,7 +616,7 @@ When a member fails, the runner already knows the facts a reviewer needs — but
 
   In `tests/test_batch.py`, add class `ReviewDispatchTests(unittest.TestCase)`:
 
-  - `test_a_red_member_produces_a_package_with_its_evidence` — after a batch where one member's agent failed, assert `docs/daw/evidence/<task-id>/review-dispatch.json` exists and names the task id, its agent exit code, and the empty diff range.
+  - `test_a_red_member_produces_a_package_with_its_evidence` — after a batch where one member's agent failed, assert `review-dispatch.json` exists in the project's evidence directory for that task and names the task id, its agent exit code, and the empty diff range.
   - `test_a_red_composite_produces_a_package_for_every_member` — after a red composite, assert a package exists for **every** member of the batch, not only the apparently guilty one.
   - `test_the_package_distinguishes_red_alone_from_red_only_on_the_composite` — assert the row for the member that is green alone and red on the composite carries a non-null composite exit code, and that its id appears in `combination_dependent_task_ids`.
   - `test_the_package_carries_no_verdict` — assert the JSON has no key whose name contains "verdict", "culprit", or "guilty", and that no value is a prose sentence about responsibility.
