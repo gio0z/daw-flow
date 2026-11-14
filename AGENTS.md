@@ -65,6 +65,7 @@
   - [`docs/DESIGN.md`](docs/DESIGN.md): CLI architecture, data flow, and diagnostic design.
   - [`docs/evaluation/guide.md`](docs/evaluation/guide.md): Evaluation harness usage, benchmark protocols, and research basis.
   - [`docs/evaluation/observations.md`](docs/evaluation/observations.md): Empirical baseline findings and benchmark observation records.
+  - [`docs/daw/README.md`](docs/daw/README.md): Where the suite's routes put their output. The 14 canonical document kinds keep their spec home in `docs/specs/`; everything else a route generates — plans, progress records, decision records, evidence, and narrative documents — belongs under `docs/daw/`. A default, not an override: a project's established convention wins.
 
 ## Operational Directives for Agents
 
