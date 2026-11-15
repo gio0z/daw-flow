@@ -2,30 +2,35 @@
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
 import urllib.parse
-from typing import Any
+from typing import Any, Callable
 
 try:
     from scripts.daw_common import (
         CANONICAL_TEMPLATES,
         SCHEMA_VERSION,
+        DuplicateKeyError,
         check_skill_references,
         extract_frontmatter_metadata_version,
         extract_markdown_links,
         parse_frontmatter,
+        parse_strict_json,
         resolve_bounded_path,
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
         CANONICAL_TEMPLATES,
         SCHEMA_VERSION,
+        DuplicateKeyError,
         check_skill_references,
         extract_frontmatter_metadata_version,
         extract_markdown_links,
         parse_frontmatter,
+        parse_strict_json,
         resolve_bounded_path,
     )
 
@@ -46,10 +51,153 @@ PACKAGE_LIMITATIONS = [
     "Structural check does not assess capability or host integration availability; no external skills expected.",
 ]
 
+_PLUGIN_NAME = "deterministic-agentic-workflow"
+
+
+def _read_bounded_json_object(
+    root_path: pathlib.Path,
+    rel_path: str,
+    add_error: Callable[[str, str, str], None],
+) -> dict[str, Any] | None:
+    """Resolve rel_path within root_path and parse it as a strict JSON object."""
+    resolved, err = resolve_bounded_path(root_path, rel_path)
+    if err == "symlink_escapes_root":
+        add_error("symlink_escapes_package", rel_path, f"Manifest path escapes package root: {rel_path}")
+        return None
+    if err:
+        add_error("path_escapes_package", rel_path, f"Manifest path escapes package root: {rel_path}")
+        return None
+    if resolved is None or not resolved.is_file():
+        add_error("invalid_plugin_manifest", rel_path, f"Manifest exists but is not a regular file: {rel_path}")
+        return None
+    try:
+        raw_text = resolved.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        add_error("utf8_decode_error", rel_path, f"{rel_path} could not be decoded as UTF-8.")
+        return None
+    except OSError:
+        add_error("file_read_error", rel_path, f"Failed to read {rel_path}.")
+        return None
+    try:
+        data = parse_strict_json(raw_text)
+    except (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError) as exc:
+        add_error("invalid_plugin_json", rel_path, f"Invalid JSON in {rel_path}: {exc}")
+        return None
+    if not isinstance(data, dict):
+        add_error("invalid_plugin_json", rel_path, f"{rel_path} must be a JSON object.")
+        return None
+    return data
+
+
+def _check_bounded_manifest_path(
+    root_path: pathlib.Path,
+    manifest_rel: str,
+    candidate_rel: str,
+    add_error: Callable[[str, str, str], None],
+) -> None:
+    """Verify a relative path declared inside a plugin manifest stays within root_path."""
+    _, err = resolve_bounded_path(root_path, candidate_rel)
+    if err == "symlink_escapes_root":
+        add_error("symlink_escapes_package", manifest_rel, f"Manifest path escapes package root: {candidate_rel}")
+    elif err:
+        add_error("path_escapes_package", manifest_rel, f"Manifest path escapes package root: {candidate_rel}")
+
+
+_PLUGIN_DIRS = (".claude-plugin", ".cursor-plugin", ".codex-plugin")
+
+
+def _validate_single_plugin_dir(
+    root_path: pathlib.Path,
+    plugin_rel: str,
+    ver_text: str | None,
+    add_error: Callable[[str, str, str], None],
+) -> None:
+    """Validate optional `<plugin_rel>/plugin.json` (and `marketplace.json` if present)."""
+    plugin_dir_raw = root_path / plugin_rel
+    if not (plugin_dir_raw.exists() or plugin_dir_raw.is_symlink()):
+        return
+    plugin_dir, dir_err = resolve_bounded_path(root_path, plugin_rel)
+    if dir_err == "symlink_escapes_root":
+        add_error("symlink_escapes_package", plugin_rel, "Plugin directory escapes package root or cannot be safely resolved.")
+        return
+    if dir_err:
+        add_error("path_escapes_package", plugin_rel, "Plugin directory escapes package root or cannot be safely resolved.")
+        return
+    if plugin_dir is None or not plugin_dir.is_dir():
+        return
+
+    plugin_json_rel = f"{plugin_rel}/plugin.json"
+    plugin_raw = plugin_dir / "plugin.json"
+    if plugin_raw.exists() or plugin_raw.is_symlink():
+        plugin_data = _read_bounded_json_object(root_path, plugin_json_rel, add_error)
+        if plugin_data is not None:
+            plugin_name = plugin_data.get("name")
+            if not isinstance(plugin_name, str) or plugin_name != _PLUGIN_NAME:
+                add_error(
+                    "plugin_name_mismatch",
+                    plugin_json_rel,
+                    f"plugin.json 'name' must be '{_PLUGIN_NAME}'.",
+                )
+            plugin_version = plugin_data.get("version")
+            if not isinstance(plugin_version, str) or not plugin_version.strip():
+                add_error(
+                    "plugin_version_mismatch",
+                    plugin_json_rel,
+                    "plugin.json 'version' must be a non-empty string.",
+                )
+            elif ver_text is not None and plugin_version != ver_text:
+                add_error(
+                    "plugin_version_mismatch",
+                    plugin_json_rel,
+                    "plugin.json 'version' does not match package VERSION.",
+                )
+            skills_val = plugin_data.get("skills")
+            if skills_val is not None:
+                if not isinstance(skills_val, list) or any(not isinstance(s, str) for s in skills_val):
+                    add_error(
+                        "invalid_plugin_json",
+                        plugin_json_rel,
+                        "plugin.json 'skills' must be a list of relative paths.",
+                    )
+                else:
+                    for entry in skills_val:
+                        _check_bounded_manifest_path(root_path, plugin_json_rel, entry, add_error)
+
+    mkt_json_rel = f"{plugin_rel}/marketplace.json"
+    marketplace_raw = plugin_dir / "marketplace.json"
+    if marketplace_raw.exists() or marketplace_raw.is_symlink():
+        mkt_data = _read_bounded_json_object(root_path, mkt_json_rel, add_error)
+        if mkt_data is not None and isinstance(mkt_data.get("plugins"), list):
+            for entry in mkt_data["plugins"]:
+                if not isinstance(entry, dict):
+                    continue
+                if isinstance(entry.get("source"), str):
+                    _check_bounded_manifest_path(
+                        root_path, mkt_json_rel, entry["source"], add_error
+                    )
+                entry_ver = entry.get("version")
+                if entry_ver is not None and ver_text is not None and entry_ver != ver_text:
+                    add_error(
+                        "plugin_version_mismatch",
+                        mkt_json_rel,
+                        "marketplace.json plugin 'version' does not match package VERSION.",
+                    )
+
+
+def _validate_claude_plugin(
+    root_path: pathlib.Path,
+    ver_text: str | None,
+    add_error: Callable[[str, str, str], None],
+) -> None:
+    """Validate optional plugin manifest directories (`.claude-plugin`, `.cursor-plugin`, `.codex-plugin`)."""
+    for plugin_rel in _PLUGIN_DIRS:
+        _validate_single_plugin_dir(root_path, plugin_rel, ver_text, add_error)
+
 
 def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
     root_path = root_path.resolve()
     findings: list[dict[str, str]] = []
+    ver_text: str | None = None
 
     def add_error(code: str, path: str, message: str) -> None:
         findings.append({"severity": "error", "code": code, "path": path, "message": message})
@@ -135,7 +283,7 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
                             "SKILL.md:name",
                             "Frontmatter 'name' must be lowercase kebab-case (alphanumeric and hyphens, no leading/trailing/consecutive hyphens) and <= 64 characters.",
                         )
-                    elif name_val != root_path.name:
+                    elif name_val != root_path.name and not (name_val == _PLUGIN_NAME and root_path.name == "daw-flow"):
                         add_error(
                             "frontmatter_name_mismatch",
                             "SKILL.md:name",
@@ -303,6 +451,15 @@ def validate_package(root_path: pathlib.Path) -> dict[str, Any]:
 
             if not (resolved_abs.is_file() or resolved_abs.is_dir()):
                 add_error("broken_relative_link", f"{rel_md}:{line_no}", "Link destination does not exist.")
+
+    if ver_text is None:
+        v_file, v_err = resolve_bounded_path(root_path, "VERSION")
+        if v_err is None and v_file is not None and v_file.is_file():
+            try:
+                ver_text = v_file.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeError):
+                pass
+    _validate_claude_plugin(root_path, ver_text, add_error)
 
     valid = not any(f["severity"] == "error" for f in findings)
     return {

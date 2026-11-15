@@ -2,9 +2,6 @@
 
 This reference defines the routing engine policy, intent precedence hierarchy, execution pipeline dispatch, and handoff contracts for the Deterministic Agentic Workflow (DAW) suite.
 
-Article Reference: Rama Digital — _Agentic Tapi Deterministic Workflow AI Agent_ (https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent).  
-_Advice separation note:_ Core article principles (generative planning, deterministic mutation, document contracts, verification gates) establish the architectural foundation. Local operational additions in this reference define structured handoff schemas, lifecycle routing, and domain capability delegation for multi-agent CLI and workstation environments.
-
 ---
 
 ## 1. Intent Precedence & Routing Hierarchy

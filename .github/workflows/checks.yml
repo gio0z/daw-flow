@@ -38,3 +38,12 @@ jobs:
         run: python scripts/validate.py package --format json
       - name: Validate suite integrity
         run: python scripts/route.py --check-suite --format json
+      - name: Validate flow mapping
+        run: python scripts/validate.py flow --project-root . --format json
+      - name: Validate project config
+        if: runner.os != 'Windows'
+        run: python scripts/validate.py config AGENTS.md --project-root . --format json
+      - name: Run route evaluation fixture
+        run: python tools/evaluation/route_eval.py tools/evaluation/route_eval_fixture.json
+      - name: Smoke test installer and unified CLI
+        run: python -c "import json, pathlib, subprocess, sys, tempfile; ver = pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); d = tempfile.TemporaryDirectory(); p = d.name; r1 = subprocess.run([sys.executable, 'scripts/daw.py', '--version'], check=True, capture_output=True, text=True); assert ver in r1.stdout; r2 = subprocess.run([sys.executable, 'scripts/install.py', 'install', '--agent', 'codex', '--scope', 'project', '--project-root', p, '--no-aliases', '--json'], check=True, capture_output=True, text=True); assert json.loads(r2.stdout)['status'] == 'installed'; r3 = subprocess.run([sys.executable, 'scripts/install.py', 'status', '--agent', 'codex', '--scope', 'project', '--project-root', p, '--json'], check=True, capture_output=True, text=True); assert json.loads(r3.stdout)['status'] == 'ready'; r4 = subprocess.run([sys.executable, 'scripts/install.py', 'uninstall', '--agent', 'codex', '--scope', 'project', '--project-root', p, '--json'], check=True, capture_output=True, text=True); assert json.loads(r4.stdout)['status'] == 'removed'; d.cleanup()"

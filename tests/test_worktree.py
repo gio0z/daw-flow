@@ -82,10 +82,22 @@ class IntegrationLockTests(IsolationRepoBase):
             stderr=subprocess.PIPE,
             text=True,
         )
-        self.addCleanup(child.terminate)
-        self.addCleanup(child.wait)
-        self.addCleanup(child.stdout.close)
-        self.addCleanup(child.stderr.close)
+
+        def _cleanup_child() -> None:
+            if child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait()
+            if child.stdout is not None:
+                child.stdout.close()
+            if child.stderr is not None:
+                child.stderr.close()
+
+        self.addCleanup(_cleanup_child)
+        assert child.stdout is not None
         self.assertEqual(child.stdout.readline().strip(), "held")
 
         with self.assertRaises(worktree.IsolationError) as caught:
@@ -316,6 +328,55 @@ class TreeStateTests(IsolationRepoBase):
         self.addCleanup(outside.rmdir)
         with self.assertRaises(worktree.IsolationError):
             worktree.snapshot_tree_state(outside)
+
+    def test_owned_paths_are_excluded_before_sha256_hashing(self) -> None:
+        evidence = self.repo / "docs" / "daw" / "evidence" / "T-1"
+        evidence.mkdir(parents=True)
+        (evidence / "verify-1.log").write_text("big log\n", encoding="utf-8")
+        (self.repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+        hashed_paths: list[str] = []
+        original_sha = worktree.compute_sha256
+
+        def tracking_sha(path: pathlib.Path) -> str:
+            hashed_paths.append(path.relative_to(self.repo).as_posix())
+            return original_sha(path)
+
+        original = worktree.compute_sha256
+        worktree.compute_sha256 = tracking_sha
+        try:
+            state = worktree.snapshot_tree_state(
+                self.repo,
+                owned_prefixes=["docs/daw/evidence"],
+            )
+        finally:
+            worktree.compute_sha256 = original
+
+        self.assertEqual(list(state.keys()), ["app.py"])
+        self.assertEqual(hashed_paths, ["app.py"])
+
+    def test_parse_log_header_fields_streams_first_twelve_lines_only(self) -> None:
+        log_path = self.repo / "verify-1.log"
+        lines = [
+            "$ echo ok",
+            "exit_code: 0",
+            "branch: daw/TASK-01",
+            "commit: abc123",
+            "",
+        ]
+        # Pad beyond 12 lines and include a bogus key: value later on.
+        lines.extend(f"noise line {i}" for i in range(10))
+        lines.append("exit_code: 99")
+        lines.append("commit: tampered")
+        log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        fields = worktree.parse_log_header_fields(log_path)
+        self.assertIsNotNone(fields)
+        assert fields is not None
+        self.assertEqual(fields["exit_code"], "0")
+        self.assertEqual(fields["branch"], "daw/TASK-01")
+        self.assertEqual(fields["commit"], "abc123")
+        self.assertIsNone(worktree.parse_log_header_fields(self.repo / "missing.log"))
 
 
 class PrepareTests(IsolationRepoBase):
@@ -617,9 +678,34 @@ class StateMarkerTests(IsolationRepoBase):
         worktree.record_batch_failure(
             self.state_path, self.state, "TASK-01", self.marker()
         )
-        worktree.clear_batch_failure(self.state_path, self.state, "TASK-01")
+        self.assertTrue(
+            worktree.clear_batch_failure(self.state_path, self.state, "TASK-01")
+        )
+        self.assertFalse(
+            worktree.clear_batch_failure(self.state_path, self.state, "TASK-01")
+        )
         reloaded = worktree.load_state(self.state_path)
         self.assertIsNone(worktree.batch_failure_marker(reloaded, "TASK-01"))
+
+    def test_deferred_save_mutates_in_memory_without_writing_disk(self) -> None:
+        worktree.record_task_entry(
+            self.state_path, self.state, "TASK-01", {"merged": False}, save=False
+        )
+        worktree.record_batch_failure(
+            self.state_path, self.state, "TASK-01", self.marker(), save=False
+        )
+        self.assertFalse(self.state_path.exists())
+        worktree.save_state(self.state_path, self.state)
+        reloaded = worktree.load_state(self.state_path)
+        self.assertIsNotNone(worktree.batch_failure_marker(reloaded, "TASK-01"))
+        self.assertTrue(
+            worktree.clear_batch_failure(
+                self.state_path, self.state, "TASK-01", save=False
+            )
+        )
+        self.assertIsNotNone(
+            worktree.batch_failure_marker(worktree.load_state(self.state_path), "TASK-01")
+        )
 
     def test_merge_refuses_a_member_of_a_failed_batch(self) -> None:
         worktree.prepare_isolation(self.repo, ".worktrees", None, "TASK-01", "Rotate token")

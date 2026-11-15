@@ -5,18 +5,19 @@ from __future__ import annotations
 import pathlib
 import re
 import shutil
+import sys
 from typing import Any
 
 try:
     from scripts.daw_common import (
-        SCHEMA_VERSION,
+        build_result as _build_result,
         make_error as _error,
         make_warning as _warning,
         resolve_bounded_path,
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
-        SCHEMA_VERSION,
+        build_result as _build_result,
         make_error as _error,
         make_warning as _warning,
         resolve_bounded_path,
@@ -48,7 +49,19 @@ CONFIG_KEYS = (
 
 WORKSPACES = ("in-place", "isolated")
 _SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
-_PACKAGE_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def _resolve_package_root() -> pathlib.Path:
+    parent = pathlib.Path(__file__).resolve().parent.parent
+    if (parent / "SKILL.md").is_file() and (parent / "VERSION").is_file():
+        return parent
+    shared = pathlib.Path(sys.prefix).resolve() / "share" / "deterministic-agentic-workflow"
+    if (shared / "SKILL.md").is_file() and (shared / "VERSION").is_file():
+        return shared
+    return parent
+
+
+_PACKAGE_ROOT = _resolve_package_root()
 
 
 def _installed_suite_version() -> str | None:
@@ -89,21 +102,6 @@ def _check_daw_version(value: str, findings: list[dict[str, str]]) -> None:
                 f"Project records DAW {value}, newer than installed suite {installed}. Update the installed suite.",
             )
         )
-
-
-def _build_result(
-    check: str,
-    findings: list[dict[str, str]],
-    limitations: list[str],
-) -> dict[str, Any]:
-    valid = not any(f["severity"] == "error" for f in findings)
-    return {
-        "valid": valid,
-        "check": check,
-        "schema_version": SCHEMA_VERSION,
-        "findings": findings,
-        "limitations": limitations,
-    }
 
 
 _CONFIG_LINE_RE = re.compile(r"^-\s+([A-Za-z0-9_-]+):\s*(.*)$")

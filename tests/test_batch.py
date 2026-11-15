@@ -278,27 +278,60 @@ class BatchSelectionTests(unittest.TestCase):
 class CompositeRepoBase(unittest.TestCase):
     """A temporary git repository with two divergent task branches."""
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
         if not GIT_AVAILABLE:
+            cls._template_repo = None
+            return
+        cls._template_dir = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._template_dir.cleanup)
+        repo = pathlib.Path(cls._template_dir.name).resolve() / "repo"
+        repo.mkdir()
+        _git(repo, "init", "-q", ".")
+        _git(repo, "config", "user.email", "test@example.invalid")
+        _git(repo, "config", "user.name", "Batch Test")
+        (repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (repo / ".gitignore").write_text(".worktrees/\n__pycache__/\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-qm", "init")
+        cls._template_base_commit = _git(repo, "rev-parse", "HEAD").strip()
+        cls._template_members = [
+            cls._create_member(repo, cls._template_base_commit, "T-1", "a.py", "A = 1\n"),
+            cls._create_member(repo, cls._template_base_commit, "T-2", "b.py", "B = 1\n"),
+        ]
+        cls._template_batch_id = batch.batch_id(cls._template_base_commit, ["T-1", "T-2"])
+        cls._template_repo = repo
+
+    @staticmethod
+    def _create_member(
+        repo: pathlib.Path, base_commit: str, task_id: str, filename: str, content: str
+    ) -> dict:
+        branch = f"daw/{task_id}-work"
+        _git(repo, "checkout", "-q", "-b", branch, base_commit)
+        (repo / filename).write_text(content, encoding="utf-8")
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-qm", f"task({task_id}): work")
+        commit = _git(repo, "rev-parse", "HEAD").strip()
+        _git(repo, "checkout", "-q", "-")
+        return {
+            "task_id": task_id,
+            "title": f"Task {task_id}",
+            "branch": branch,
+            "commit": commit,
+        }
+
+    def setUp(self) -> None:
+        if not GIT_AVAILABLE or self._template_repo is None:
             self.skipTest("git is not available")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        self.repo = pathlib.Path(self.temp_dir.name).resolve()
-        _git(self.repo, "init", "-q", ".")
-        _git(self.repo, "config", "user.email", "test@example.invalid")
-        _git(self.repo, "config", "user.name", "Batch Test")
-        (self.repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
-        (self.repo / ".gitignore").write_text(".worktrees/\n__pycache__/\n", encoding="utf-8")
-        _git(self.repo, "add", "-A")
-        _git(self.repo, "commit", "-qm", "init")
-        self.base_commit = _git(self.repo, "rev-parse", "HEAD").strip()
-
+        self.repo = pathlib.Path(self.temp_dir.name).resolve() / "repo"
+        shutil.copytree(self._template_repo, self.repo)
+        self.base_commit = self._template_base_commit
         self.worktree_root = ".worktrees"
-        self.members = [
-            self._make_member("T-1", "a.py", "A = 1\n"),
-            self._make_member("T-2", "b.py", "B = 1\n"),
-        ]
-        self.batch_id = batch.batch_id(self.base_commit, ["T-1", "T-2"])
+        self.members = [dict(member) for member in self._template_members]
+        self.batch_id = self._template_batch_id
         # The gate derives the composite's base from the integration branch, so
         # it must exist before a record can be validated.
         self.integration_rel = worktree.integration_worktree_rel(self.worktree_root)
@@ -1067,21 +1100,21 @@ class BatchRepoBase(unittest.TestCase):
 
     plan_template = BATCH_PLAN_TEMPLATE
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
         if not GIT_AVAILABLE:
-            self.skipTest("git is not available")
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp_dir.cleanup)
-        self.root = pathlib.Path(self.temp_dir.name).resolve()
-        self.repo = self.root / "repo"
-        self.repo.mkdir()
-        _git(self.repo, "init", "-q", ".")
-        _git(self.repo, "config", "user.email", "test@example.invalid")
-        _git(self.repo, "config", "user.name", "Batch Test")
-        (self.repo / ".gitignore").write_text(
-            ".worktrees/\n__pycache__/\n", encoding="utf-8"
-        )
-        source = self.repo / "src"
+            cls._template_repo = None
+            return
+        cls._template_dir = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._template_dir.cleanup)
+        repo = pathlib.Path(cls._template_dir.name).resolve() / "repo"
+        repo.mkdir()
+        _git(repo, "init", "-q", ".")
+        _git(repo, "config", "user.email", "test@example.invalid")
+        _git(repo, "config", "user.name", "Batch Test")
+        (repo / ".gitignore").write_text(".worktrees/\n__pycache__/\n", encoding="utf-8")
+        source = repo / "src"
         source.mkdir()
         (source / "__init__.py").write_text("", encoding="utf-8")
         (source / "alpha.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -1090,8 +1123,18 @@ class BatchRepoBase(unittest.TestCase):
         (source / "shared.py").write_text(
             "A = 1\n# -\n# -\n# -\n# -\nB = 1\n", encoding="utf-8"
         )
-        _git(self.repo, "add", "-A")
-        _git(self.repo, "commit", "-qm", "init")
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-qm", "init")
+        cls._template_repo = repo
+
+    def setUp(self) -> None:
+        if not GIT_AVAILABLE or self._template_repo is None:
+            self.skipTest("git is not available")
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.root = pathlib.Path(self.temp_dir.name).resolve()
+        self.repo = self.root / "repo"
+        shutil.copytree(self._template_repo, self.repo)
 
         self.plan = self.repo / "docs" / "plans" / "wf.md"
         self.plan.parent.mkdir(parents=True)
@@ -1949,6 +1992,66 @@ class RunMigrationTests(BatchRepoBase):
         self.assertEqual(len(payload.get("batches", [])), 1)
         self.assertEqual(payload["batches"][0]["members"], ["TASK-ALPHA"])
         self.assertEqual(payload.get("stopped"), "max_tasks")
+
+
+class BatchOptimizationTests(BatchRepoBase):
+    """Verify batched state writes, single state load, and streaming log parsing."""
+
+    def test_verb_batch_loads_state_once_and_saves_state_once_per_phase(self) -> None:
+        try:
+            from scripts import run as runner_module
+        except ImportError:
+            import run as runner_module  # type: ignore[import-not-found]
+        from unittest import mock
+
+        alpha = self.writing_agent("TASK-ALPHA", "src/alpha.py", "VALUE = 2")
+        beta = self.writing_agent("TASK-BETA", "src/beta.py", "VALUE = 2")
+        self.agent(
+            "agent.sh",
+            f"if [ \"$2\" = 'TASK-ALPHA' ]; then exec {alpha}; fi\nexec {beta}",
+        )
+        args = runner_module.build_parser().parse_args(
+            [
+                "batch",
+                "--plan",
+                str(self.plan),
+                "--project-root",
+                str(self.repo),
+                "--agent-command",
+                json.dumps([str(self.root / "agent.sh"), "{prompt_file}", "{task_id}"]),
+                "--format",
+                "json",
+            ]
+        )
+        with (
+            mock.patch.object(
+                runner_module, "load_state", wraps=runner_module.load_state
+            ) as load_spy,
+            mock.patch.object(
+                runner_module, "save_state", wraps=runner_module.save_state
+            ) as save_spy,
+            mock.patch("builtins.print"),
+        ):
+            code = runner_module.verb_batch(args)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(load_spy.call_count, 1)
+        self.assertEqual(save_spy.call_count, 1)
+
+    def test_batch_log_header_fields_reuses_streaming_parser(self) -> None:
+        log = self.root / "composite-1.log"
+        lines = [
+            "$ python3 -c 'pass'",
+            "exit_code: 0",
+            "branch: daw/composite/b1",
+            "commit: deadbeef",
+        ]
+        lines.extend(f"line {i}" for i in range(15))
+        lines.append("exit_code: 1")
+        log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        fields = batch._log_header_fields(log)
+        self.assertEqual(fields["exit_code"], "0")
+        self.assertEqual(fields["commit"], "deadbeef")
 
 
 if __name__ == "__main__":

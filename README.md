@@ -5,7 +5,7 @@ A portable planning, execution, and verification suite for AI coding agents. Pyt
 > **"Otaknya boleh generative, tangannya harus deterministic."**
 > _(Generative cognitive reasoning for context and planning; deterministic execution and verification for system state)._
 
-Based on the architectural principles articulated in Rama Digital's [_Agentic Tapi Deterministic Workflow AI Agent_](https://ramadigital.id/blog/agentic-tapi-deterministic-workflow-ai-agent), this package provides a self-contained engineering workflow suite combining root router dispatch, an explicit 12-module execution architecture (`skills/daw-*/`), the canonical 14-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
+This package provides a self-contained engineering workflow suite combining root router dispatch, an explicit 12-module execution architecture (`skills/daw-*/`), the canonical 14-document specification matrix, capability-based risk gating, and verifiable evidence proof gates.
 
 > **Professional delivery lifecycle:** End-to-end flow — setup -> clarify/spike -> design -> plan -> build with inner loop -> review -> verify -> ship (commit / PR / CI / review-feedback loop) -> release -> retro feeding `AGENTS.md`. Protocols in [Developer Lifecycle](references/developer-lifecycle.md); new intents `refactor`, `maintain`, `spike`, and `ship` (via `daw-ship`) are first-class routes (13 intents, 12 modules total).
 
@@ -15,15 +15,59 @@ Based on the architectural principles articulated in Rama Digital's [_Agentic Ta
 
 ## 1. Quickstart & Invocation
 
-Clone or download the complete repository, then install it into your agent's user skill directory:
+### Interactive Installer (Recommended)
+
+Choose the interactive setup wizard — it detects installed agents on your machine, asks for scope (`user` vs `project`) and target agent(s), and can initialize a valid `<!-- daw-config -->` block in your project's `AGENTS.md` or `CLAUDE.md`:
+
+- **One-liner (no manual clone; fetches into a temp directory and runs the stdlib installer):**
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/gio0z/daw-flow/main/install.sh | bash
+  ```
+- **Zero-clone via `uvx` (`uv`) or `pipx`:**
+  ```bash
+  uvx --from git+https://github.com/gio0z/daw-flow daw install
+  ```
+- **From a local checkout:**
+  ```bash
+  git clone https://github.com/gio0z/daw-flow.git
+  cd daw-flow
+  python3 scripts/install.py    # launches interactive wizard in a TTY (or pass --interactive)
+  ```
+
+### Native Agent Plugins
+
+The suite ships native plugin manifests at `.claude-plugin/`, `.cursor-plugin/`, and `.codex-plugin/`:
+
+- **Claude Code:**
+  ```text
+  /plugin marketplace add https://github.com/gio0z/daw-flow
+  /plugin install deterministic-agentic-workflow@deterministic-agentic-workflow
+  ```
+  Or load a local checkout directly: `claude --plugin-dir /path/to/daw-flow`.
+- **Cursor:**
+  ```text
+  /agent plugin marketplace add https://github.com/gio0z/daw-flow
+  ```
+- **Codex CLI:**
+  ```bash
+  codex plugin marketplace add gio0z/daw-flow
+  codex plugin add deterministic-agentic-workflow@deterministic-agentic-workflow
+  ```
+- **Antigravity CLI:**
+  ```bash
+  agy plugin install https://github.com/gio0z/daw-flow
+  ```
+
+### Non-Interactive CLI & Project Setup
+
+Install directly with flags (non-TTY safe, deterministic, zero network access from `scripts/install.py`):
 
 ```bash
-git clone https://github.com/gio0z/deterministic-agentic-workflow.git
-cd deterministic-agentic-workflow
 python3 scripts/install.py install --agent codex --scope user
+python3 scripts/install.py install --agent claude --scope project --project-root /path/to/project --init-config
 ```
 
-Choose `codex`, `claude`, `gemini`, `cursor`, or `copilot`. For a project installation, use `--scope project --project-root /path/to/project`. On Windows, use `python` if that is your Python 3 command. If directory symlinks are unavailable, add `--no-aliases`; the complete root skill still loads its bundled modules by path.
+Choose `codex`, `claude`, `gemini`, `cursor`, `copilot`, `opencode`, `antigravity`, or `all` (`--agent all` applies `install`, `status`, or `uninstall` across every preset agent for the selected `--scope`). Add `--init-config` on `--scope project` installs to append a validated `<!-- daw-config:start -->` block to `AGENTS.md` (or `CLAUDE.md` if present without `AGENTS.md`). On Windows, use `python` if that is your Python 3 command. If directory symlinks are unavailable, add `--no-aliases`; the complete root skill still loads its bundled modules by path.
 
 Restart or reload skills in your agent, then ask:
 
@@ -33,15 +77,35 @@ Use deterministic-agentic-workflow to fix this bug and verify the result.
 
 Codex also supports `$deterministic-agentic-workflow`; Claude Code exposes `/deterministic-agentic-workflow`. Other clients provide their own skill menus and invocation syntax. Native discovery depends on client version and settings.
 
-Inspect, update from a refreshed checkout, or remove the same installation:
+Inspect, diagnose, link for local development, update from a refreshed checkout, or remove the same installation:
 
 ```bash
+python3 scripts/install.py doctor --scope user --json
 python3 scripts/install.py status --agent codex --scope user
+python3 scripts/install.py install --agent codex --scope user --link
 python3 scripts/install.py install --agent codex --scope user --update
 python3 scripts/install.py uninstall --agent codex --scope user
 ```
 
-`--dry-run` previews an action without writing. Updates and removal refuse changed files, extra files, and unrelated skills. The installer installs the self-contained operational skill package (`SKILL.md`, `LICENSE`, `VERSION`, `skills/`, `templates/`, operational `references/`, and operational `scripts/`), so removing the source checkout does not break the installed agent skill. Developer tooling, tests, fixtures, and documentation remain in the source repository. It never modifies agent configuration or Git hooks, downloads packages, or installs agent CLIs.
+- **`doctor`**: Read-only environment and installation check verifying Python >= 3.10, `git` >= 2.20, symlink support, preset status, and overlapping/duplicate installations at the same scope.
+- **`--link`**: Developer mode that symlinks `<skills_dir>/deterministic-agentic-workflow` (and sibling aliases unless `--no-aliases`) directly to the source checkout so local edits take effect immediately without copying, recording its link receipt inside the target skills directory rather than inside the checkout.
+- **`--dry-run`**: Previews an action without writing. Updates and removal refuse changed files, extra files, and unrelated skills. The installer installs the self-contained operational skill package (`SKILL.md`, `LICENSE`, `VERSION`, `.claude-plugin/`, `.cursor-plugin/`, `.codex-plugin/`, `skills/`, `templates/`, operational `references/`, and operational `scripts/`), so removing a copied source checkout does not break a copied installation. Developer tooling, tests, fixtures, and documentation remain in the source repository. It never modifies agent configuration or Git hooks, or installs agent CLIs. (`install.sh` is an optional bootstrap wrapper that clones the repository only when run outside a checkout.)
+
+### Unified `daw` CLI & `pyproject.toml`
+
+The repository includes a zero-dependency PEP 621 `pyproject.toml` (`requires-python = ">=3.10"`) and `setup.py` bundling the operational suite under `share/deterministic-agentic-workflow/`, exposing the unified `daw` console script (`scripts.daw:main`) for `pip`, `pipx`, `uv tool`, and `uvx` installs, or runnable directly without installation via `python3 scripts/daw.py`:
+
+```bash
+pip install -e .        # or: pipx install . / uv tool install . / uvx --from git+https://github.com/gio0z/daw-flow daw install
+daw --version
+daw --help
+daw install
+daw route --check-suite
+daw validate package --root .
+daw install doctor --scope user
+```
+
+`daw <subcommand> [args...]` dispatches to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, and `derive-tasks` while preserving their arguments and exit codes.
 
 See [installation and compatibility](references/installation.md) for exact paths, platform limits, and custom directories. `status` checks files and module aliases; confirm client discovery in your agent's skill list after installation.
 

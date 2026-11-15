@@ -1,0 +1,16 @@
+{
+  "name": "deterministic-agentic-workflow",
+  "owner": {
+    "name": "Regio Dani Pangestu"
+  },
+  "plugins": [
+    {
+      "name": "deterministic-agentic-workflow",
+      "source": "./",
+      "description": "Deterministic Agentic Workflow (DAW) Suite: 12-module planning, design, build, review, verify, and ship skill bundle.",
+      "version": "0.5.0",
+      "license": "MIT",
+      "repository": "https://github.com/gio0z/daw-flow"
+    }
+  ]
+}

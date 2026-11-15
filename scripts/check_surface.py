@@ -11,6 +11,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+try:
+    from scripts.daw_common import make_error as _error, make_warning as _warning
+except ImportError:
+    from daw_common import make_error as _error, make_warning as _warning  # type: ignore[import-not-found]
+
 SURFACE_UI = "ui"
 SURFACE_NON_UI = "non-ui"
 SURFACES = (SURFACE_UI, SURFACE_NON_UI)
@@ -49,14 +54,6 @@ SURFACE_LIMITATIONS = [
     "Cannot prove the message shown to the operator matches the wire outcome; a fabricated pass is undetectable here.",
     "Viewport pairing is width-based (phone <= 480 px, desktop >= 1024 px); other form factors are not judged.",
 ]
-
-
-def _error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
-
-
-def _warning(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "warning", "code": code, "path": path, "message": message}
 
 
 def infer_ui_scope(scope: Any) -> bool:

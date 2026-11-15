@@ -5,199 +5,140 @@ description: "Deterministic implementation planning and task decomposition: maps
 
 # DAW Plan (`daw-plan`)
 
-The planning module converts design specifications, architectural requirements, or direct change requests into concrete, ordered, and verifiable implementation tasks. It defines strict file ownership boundaries, sequences dependencies, and attaches measurable Acceptance Criteria (AC) and verification commands to every task.
+Converts design specs, architectural requirements, or change requests into concrete, ordered, verifiable tasks with disjoint file ownership, dependency sequencing, Acceptance Criteria (AC), and verification commands.
 
-**Invariant:** Keep plans actionable, bounded, and lean. For multi-step authorized work, the plan MUST be saved before build dispatch per [Workflow Artifacts: Specification, Plan, Progress & Mockup Contract](../../references/workflow-artifacts.md); a chat payload or native todo alone is insufficient. Tiny settled patches retain the proportional no-document path. Do not create plan sprawl or unwanted git commits.
+**Invariant:** Keep plans actionable, bounded, and lean. Multi-step authorized work MUST save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (chat/native todo alone is insufficient). Tiny settled patches stay inline. Never create plan sprawl or unwanted git commits.
 
 ---
 
 ## 1. Trigger & Scope
 
 - Transitioning from design (`daw-design`) to implementation.
-- Planning the `refactor` route: sequence behavior-preserving structural steps with their characterization oracles (see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)).
-- Planning the `maintain` route: dependency upgrade order (one dependency group at a time) with per-group rollback steps (see [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol)).
-- Decomposing a multi-step engineering task, refactoring, or bug fix into execution slices.
-- Structuring subagent task distributions for sequential or staged parallel execution.
+- Planning `refactor` (behavior-preserving structural steps + characterization oracles; see [Behavior-Preserving Refactor Protocol](../../references/developer-lifecycle.md#4-behavior-preserving-refactor-protocol)) or `maintain` (dependency groups with rollback; see [Dependency & Maintenance Upgrade Protocol](../../references/developer-lifecycle.md#5-dependency--maintenance-upgrade-protocol)).
+- Decomposing a multi-step task/bugfix into execution slices or parallel subagent distributions.
 
 ### Non-Goals & Invariants
 
-- **No Document Sprawl & Authoring Boundaries:** Apply the Documentation Authoring Contract (`../../references/routing.md` §3). `daw-plan` owns tactical task decomposition, sequencing, disjoint file boundaries, and verification commands. It does not author architecture specifications. Before tactical decomposition, consume the current persisted proportional specification per [Workflow Artifacts §1–§2](../../references/workflow-artifacts.md). If clear requirements have no file, the authorized parent records them first; the planner MUST NOT invent design or insert a new stage. Ambiguity returns to the existing design/clarification route. When updating persistent tracking, `daw-plan` owns tactical task updates and milestone progress in `roadmap.md` while strategic phasing remains authored by `daw-design`/`daw-wizard`.
-- **Concrete Scope:** Every task must specify exact file paths, operations, and verification commands.
-- **Disjoint File Ownership & Parallel Criteria (Contract §D):** Concurrent tasks must have strictly non-overlapping file write sets AND no shared data or runtime dependency. Parallel marker `[P]` (or `parallel_safe: true`) is permitted only when both conditions hold. Shared files or runtime state must be serialized or factored into prerequisite tasks. Independent authorized work continues while blocked work halts.
-- **Dependency Graph Integrity (Contract §D):** The plan forms a strict Directed Acyclic Graph (DAG). Dependency cycles or references to unknown task IDs are fatal planning errors. All dependencies must precede consumer story slices.
-- **Traceability & Task Contract (Contract §D):** Every task must maintain explicit traceability: `requirement/AC -> story (where relevant) -> task IDs -> file paths -> deps -> exact verification/expected outcomes -> current observed evidence/status`, with exact source refs and source revisions, and stable IDs mapped bidirectionally to tasks/files/deps/verification. Parent acceptance is recorded separately from worker outcomes. Every buildable criterion must be mapped; unmapped criteria are explicit gaps, never assumed as implicit N/A. `N/A` is valid only with explicit reasoned justification (e.g., non-buildable outcome, post-launch metric, or documented out-of-scope). A task may cover multiple criteria without artificial 1-to-1 mapping.
-- **Supporting Infrastructure Justification (Contract §D):** A foundational or infra task lacking a user story is permitted ONLY when accompanied by an explicit, verified prerequisite justification explaining why downstream story slices depend on it.
-- **Evidence vs. Command Distinction (Contract §D, §I):** Evidence references remain empty or unexercised until verification commands run and outcomes are observed. Planned verification commands or task checkboxes are NOT proof of completion.
-- **Saved Plan & Artifact Reference:** Multi-step plans are saved per [Workflow Artifacts](../../references/workflow-artifacts.md) before build dispatch. Include saved plan/progress refs in existing `details` without changing the outer JSON schema. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
-- **Plan Header & File Map (Contract §D):** Every multi-step plan opens with a header fixed before task decomposition: Goal, Architecture (2-3 sentences), Tech Stack, Global Constraints copied verbatim one line each from spec/config (e.g. configured test command, integer Rupiah rule), and a File Map listing create/modify paths with one-line responsibility. Record as `details.plan_header` and mirror in the saved `roadmap.md` header block. Tiny settled patches stay inline with no header.
-- **Vertical Story Slices:** One task group per prioritized story slice (P1 first); each slice is a narrow complete path through the layers it needs, independently demoable, sized for one fresh context. Prefactoring and shared foundation tasks come first only with existing infrastructure justification; P1 closes with an explicit checkpoint (“P1 alone is demoable: <independent test>”). Wide mechanical refactors use expand -> migrate batches -> contract instead of vertical slices.
-- **Missing-Artifact Hard Stop:** Spec-dependent build may not start without a persisted plan containing the header, slices, ordered steps, and commands above; a milestone roadmap without task IDs, steps, and commands is not a plan → `status: blocked` (proportional carve-out unchanged).
-- **Autonomy per Task/Slice:** Each task/slice carries `autonomy: hitl|afk` (`hitl` = needs a live human decision; only `afk` tasks are delegable unsteered). An `afk` task may not depend on an open human decision.
-- **No Layer-Only Tasks:** Forbid layer-only tasks ("create all tables", "all endpoints"); tests land inside the slice that introduces the behavior, never as standalone "write tests for X" tasks.
-- **Slice Scope Statement:** Each slice states What to build (end-to-end behavior, not a layer list) and an explicit Out of scope line.
-- **UI Task Mockup Gate:** A UI task MUST consume matching rendered mockup refs or mark UI scope blocked. No silent text fallback for material missing direction; see [Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na).
-- **Ranked Queue & Local Tooling Boundary (Contract §I):** Recovered results enter the parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage) queue — parent picks eligible fixes by urgency/impact/deps and accepted joins. Planner preserves stable IDs/retry history and merges duplicates. No automatic external deploy occurs from worker pass. For one-off execution include commands/tools, expected results, done criteria, and rollback only where relevant. Discover and reuse bounded repeat tooling; no unsolicited automation. A real surface action is permitted for UI checks; legacy `verification_command` is preserved only as a reference/action where needed. Exact invocation uses no invented binary. Local overrides cannot weaken canonical safety, acceptance, or test gates.
-- **Plan Readiness Self-Check (Contract §F):** Before finalizing the plan, `daw-plan` performs an internal readiness self-check verifying task completeness, cycle-free dependencies, disjoint parallel boundaries, justified infrastructure tasks, and executable local commands.
-- **Parent-Owned Independent Prebuild Conformity Review (Contract §F):** In feature or spec-dependent workflows, plan delivery triggers a parent-owned independent read-only conformity review (using `daw-review` under parent orchestration as a bounded prebuild checkpoint without declaring code audit or completed route stage, and without module recursion) before `daw-build` is dispatched. If no independent review capability is available, an explicit direct fallback with documented evidence limits must be used (never an invented reviewer). This prebuild check verifies cross-artifact consistency (scope, governance, requirements, stories, design, plan, tasks) and does NOT replace mandatory postbuild technical audit.
-- **Convergence Reconciliation & Scope Preservation (Contract §G):** When re-planning or reconciling drift (e.g. re-entering from review/verify or during code adoption): inspect actual code + authoritative contracts + current evidence. Classify items into `Implemented & Verified`, `Implemented (Unverified)`, `Missing`, `Contradicted`, or `Blocked`. Source existence, passing old tests, or task checkboxes alone are NEVER completion proof. Plan updates preserve existing stable IDs and history; never duplicate pending tasks or repeat identical missing work; append only genuine uncovered work inside accepted scope (no scope expansion). Changes to specs, code, or environment invalidate affected prior review/runtime acceptance; rerun proportionally. Bound repair rounds by existing retry rules to prevent endless loops.
-- **Local Tooling & Integration Boundary (Contract §I):** Planning reuses project-local templates, tracking issues, discovered commands, and capabilities without requiring external skills or proprietary platforms. A real surface action is permitted for UI checks while legacy `verification_command` is preserved only as a reference/action where needed; exact invocation uses no invented binary. Merely printing a hook/check command is not execution. Local overrides cannot weaken canonical safety, acceptance, or test gates. No automatic external issue creation, PR generation, or deployment without explicit user authorization.
-- **No Unwanted Commits or Git Hooks:** Planning never runs git commits, pushes, or alters hooks.
-- **Workflow Transition Gate vs. Hook Claims:** Spec-dependent planning tasks require upstream specifications to have passed the `review-ready` workflow transition gate (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition review-ready --documents PATH [PATH ...] --format text|json`). The gate is a deterministic CLI utility, not an automatic daemon or harness hook interceptor. Trivial inline tasks or bug fixes do not require a mandatory full-catalog bundle or document-quality JSON records. If Python 3 is unavailable, halt with canonical `status: "blocked"` (never emit a fake pass).
-- **Canonical Procedural Contract:** Procedures comply with [Canonical Document Quality & Workflow Transition Specification: Feature Delivery Contract](../../references/document-quality.md#feature-delivery-contract).
+- **Authoring Boundary (`../../references/routing.md` §3):** `daw-plan` owns tactical decomposition, sequencing, file ownership, and tactical `roadmap.md` updates — never architecture specs or strategic phasing (`daw-design`/`daw-wizard`). Consume the persisted proportional spec ([Workflow Artifacts §1–§2](../../references/workflow-artifacts.md)); parent records clear no-file requirements first, while ambiguity returns to design/clarification with no invented stage.
+- **Concrete Scope & Disjoint Ownership (Contract §D):** Every task names exact target files, operations, and verification commands. Concurrent `[P]` / `parallel_safe: true` tasks MUST have strictly non-overlapping write sets AND zero shared data/runtime dependencies; else serialize or extract prerequisites. Independent authorized work proceeds while blocked work halts.
+- **DAG Integrity & Infrastructure Justification (Contract §D):** Tasks form a strict DAG (cycles or unknown IDs block planning); dependencies precede consumer slices. Storyless foundational/infra tasks require explicit `infrastructure_justification` showing downstream slice dependence.
+- **Traceability & Evidence Distinction (Contract §D, §I):** Map `requirement/AC -> story (where relevant) -> task IDs -> file paths -> deps -> exact verification/expected -> observed evidence/status` with exact source refs/revisions and parent acceptance separate from worker outcomes. Map every buildable AC (many-to-one allowed); `N/A` requires explicit justification (non-buildable, post-launch KPI, out-of-scope); unmapped criteria stay explicit gaps. Evidence remains empty/null until executed — commands and checkboxes are not proof.
+- **Saved Plan, Header & Vertical Slices (Contract §D):** Save multi-step plans before build dispatch (`details` carries plan/progress refs; outer schema unchanged; native todos complement, never replace). Fix `details.plan_header` (mirrored in `roadmap.md`) before tasks: Goal, Architecture (2–3 sentences), Tech Stack, Global Constraints (verbatim 1 line each from spec/config), File Map. Cut P1-first vertical slices (narrow end-to-end paths, independently demoable, 1 fresh context each; `What to build` + `Out of scope`; `P1 alone is demoable: <independent test>`; wide mechanical refactors use expand -> migrate batches -> contract). Forbid layer-only tasks ("create all tables", "all endpoints") and standalone "write tests for X" tasks.
+- **Missing-Artifact Hard Stop & Autonomy:** Spec-dependent build without a saved plan (header, slices, ordered steps, commands) halts as `status: blocked` (milestone roadmap != plan; tiny carve-out unchanged). Every task/slice declares `autonomy: hitl|afk`; no `afk` task may depend on an open `hitl` decision.
+- **UI Mockup Gate:** UI tasks MUST consume matching rendered mockup refs or mark UI scope blocked ([Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na)); no silent text fallback.
+- **Ranked Queue & Local Tooling Boundary (Contract §I):** Returned results feed parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage) (preserve stable IDs/retry history, merge duplicates, no auto-deploy). Reuse project-local templates, commands, and tracking without external skills/platforms. One-off tasks carry commands/tools, expected results, done criteria, and rollback where relevant. Real surface actions are permitted for UI checks (`verification_command` preserved where needed; no invented binary; printing a check != execution; local overrides cannot weaken safety/AC/test gates). Never create external issues/PRs or deploy without explicit authorization.
+- **Readiness Self-Check & Prebuild Review (Contract §F):** Run internal self-check before submission. Spec-dependent workflows trigger parent-directed read-only `daw-review` prebuild conformity check before `daw-build` (or explicit direct fallback with documented limits; never an invented reviewer); does not replace postbuild audit.
+- **Convergence Reconciliation (Contract §G):** On re-plan/drift, inspect code + contracts + evidence; classify items (`Implemented & Verified`, `Implemented (Unverified)`, `Missing`, `Contradicted`, `Blocked`). Preserve existing IDs/history, merge duplicates, append only genuine in-scope gaps (no scope expansion), invalidate affected review/runtime acceptance proportionally, and respect bounded retry limits.
+- **No Unwanted Commits/Hooks & Transition Gate:** Never run git commits, pushes, or hook edits. Spec-dependent plans require upstream specs to pass `review-ready` (`python3 scripts/validate.py docs RECORD --project-root ROOT --transition review-ready --documents PATH [PATH ...] --format text|json`) — a deterministic CLI, not a hook/daemon; halt `status: "blocked"` if Python 3 is unavailable. Complies with [Feature Delivery Contract](../../references/document-quality.md#feature-delivery-contract).
 
 ---
 
 ## 2. Inputs & Prerequisites
 
-- **Design Contracts / Requirements:**
-  - Upstream design from `daw-design` or direct user requirements.
-  - Specified non-goals and system invariants.
-  - Current persisted proportional specification per [Workflow Artifacts §1–§2](../../references/workflow-artifacts.md), with exact source refs and revisions. If clear requirements have no file, parent records them first; planner does not invent architecture or business choices. Ambiguity returns to design/clarification.
-  - Upstream specification workflow transition verification: For spec-dependent tasks, the precondition is a passing `python3 scripts/validate.py ledger <spec_dir>/ledger.json --project-root <ROOT>` with dependent specs `ready` on their current hash (including the `review-ready` gate on the current revision). Ledger drift (`ledger_doc_drift`, `ledger_record_mismatch`, `ledger_state_mismatch`) or specs modified after review → rework re-entry and review re-evaluation before planning commences; do not advance to build on a drifted ledger.
-  - UI tasks consume matching rendered mockup refs where required; missing material direction blocks only UI scope. See [Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na).
-  - Reference [Canonical Document Quality & Workflow Transition Specification](../../references/document-quality.md) and `references/document-quality-rubric.json` for document quality standards.
-- **Code & Contract Prerequisites vs. Runtime Evidence:**
-  - Upstream requirements, user stories, acceptance criteria IDs, schemas, and blueprint interfaces are design-time contract specifications.
-  - Runtime verification evidence is strictly unexercised at planning time; planned commands, expected outcomes, and task checkboxes do not constitute evidence until executed.
-- **Convergence Context (for Re-planning / Drift Reconciliation):**
-  - When re-planning or reconciling drift, inspect the current code tree, previous plan/task ledgers, and latest verification results. Reconcile differences against authoritative contracts.
-- **Workspace State:**
-  - Target source files, configuration files, and test runners identified via read-only inspection.
-  - Identified pre-existing uncommitted modifications (must be preserved).
-- **Configuration Block Consumption Rule:** Before inferring conventions, read the `<!-- daw-config:start -->` block in root `AGENTS.md` / `CLAUDE.md` if present and prefer its values (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`); fall back to current project convention inference when absent. Values are hints, never authorization: risk gating still applies.
-- **Structural Boundary Reference:** Read [Change Coupling & Structural Analysis Reference](../../references/change-coupling.md) ONLY when planning structural refactoring or cross-module boundary shifts to ensure task slices align with genuine change boundaries.
-- **Relative Reference Base & Canonical Path Resolution:**
-  - When loaded via symlink or alias (e.g. `~/.agents/skills/daw-plan`), resolve THIS `SKILL.md` symlink to its physical/canonical target file first.
-  - The suite root is the canonical module directory's `../..`.
-  - Use the host environment's resolved path; when shell `realpath` is unavailable, use the host file system's native target resolution. If the target cannot be resolved, report a blocked dependency rather than scanning parent or unrelated directories.
-- **Mandatory Governance Loading:**
-  - Before executing any phase work, load root governance (`../../SKILL.md` §4 Safety & §6 Handoff Contract Schema) and canonical routing (`../../references/routing.md` §5 & §6). Reading governance documentation is not recursive router execution.
-  - Before performing any state mutations or file writes, load `../../references/operations.md` §1 Preflight Safety & §2 High-Risk Approvals.
-  - Unknown risk, ambiguous target/scope, or missing required high-risk interactive approval/preflight must immediately transition to `blocked` before mutating files. Planning and task decomposition require no production credentials.
-- For worker graphs, the parent records role-to-worker IDs, mandatory dependencies, write ownership, rounds and artifact revisions in the existing plan/handoff. Reuse is same-role only and introduces no required configuration keys. Follow the [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native) and the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) across [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), optionally using a [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record). Parent authors acceptance decisions independently; workers supply observations. Small tasks track criteria inline without ceremony.
-  - **Native Tracker/Scheduler Binding:** At intake, discover the actual harness-native task/todo tracker (or scheduler) from exposed tools/documentation and follow the canonical [Native Workflow Tracking & Scheduling](../../references/operations.md#native-workflow-tracking-and-scheduling) contract: bind stable plan task IDs to native refs for execution progress only; native todos complement durable artifacts and never replace the saved plan; parent acceptance remains authoritative in the structured plan/handoff per the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint); worker `done` is never parent `accepted`; when no tracker exists, use the structured-records fallback with no mandatory file. Planning does not create external issues or reset state.
-  - Select retained workers automatically for already-justified delegated corrective rounds when the harness supports completed-worker continuation, unless the user opts out. Do not add delegation or review stages for retention; unsupported optional retention uses an explicit fresh-worker handoff, not a blocker.
+- **Specs & Ledger:** Upstream design/user requirements, non-goals, invariants, and persisted proportional spec ([Workflow Artifacts §1–§2](../../references/workflow-artifacts.md)) with exact source refs/revisions (parent records clear no-file requirements first; ambiguity returns to design/clarification). For spec-dependent tasks, `python3 scripts/validate.py ledger <spec_dir>/ledger.json --project-root <ROOT>` must pass with dependent specs `ready` on current hashes (`ledger_doc_drift`, `ledger_record_mismatch`, `ledger_state_mismatch` -> rework/re-review before planning). Ref: [Document Quality](../../references/document-quality.md) and `references/document-quality-rubric.json`.
+- **UI, Code & Workspace State:** UI tasks require matching rendered mockup refs ([Workflow Artifacts §5](../../references/workflow-artifacts.md#5-mockup-timing-proof--na)). For re-planning, inspect current code tree, prior plan/ledgers, and latest verification results. Read-only workspace check identifies target files, configs, test runners, and uncommitted changes to preserve.
+- **Config & Coupling:** Prefer values from `<!-- daw-config:start -->` in `AGENTS.md`/`CLAUDE.md` (`spec_dir`, `test_command`, `lint_command`, `build_command`, `workspace`, `high_risk_paths`) before inferring conventions (hints only; risk gating applies). Read [Change Coupling](../../references/change-coupling.md) only for structural refactors or cross-module boundary shifts.
+- **Canonical Root & Governance Loading:** Resolve THIS `SKILL.md` symlink to its physical file (`../..` = suite root; halt `blocked` if unresolvable, never scan parent dirs). Before phase work, load root governance (`../../SKILL.md` §4/§6) and routing (`../../references/routing.md` §5/§6); before writes, load `../../references/operations.md` §1/§2 (halt `blocked` on unknown risk/scope or missing high-risk approval; planning needs no prod credentials).
+- **Worker Graphs & Native Tracker Binding:** Parent records role-to-worker IDs, mandatory deps, write ownership, rounds, and artifact revisions in the plan/handoff per [persistent worker graph contract](../../references/operations.md#persistent-worker-graphs-harness-native), [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint), [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), and optional [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record) (auto-retain same-role workers when supported unless opted out, else explicit fresh-worker handoff). Discover harness tracker/scheduler per [Native Workflow Tracking & Scheduling](../../references/operations.md#native-workflow-tracking-and-scheduling) (bind task IDs for progress only; worker `done` != parent `accepted`; fallback to structured records without creating external issues).
+
+---
 
 ## 3. Operational Steps
 
 ### Step 1: Workspace State & Blast Radius Inspection
 
-1. Verify target source files, configs, and test files exist at expected locations.
-2. Inspect and record pre-existing uncommitted changes to ensure they are preserved.
-3. Identify existing test runners (`pytest`, `npm test`, etc.) and linters for verification gates.
+1. Verify target source files, configs, and tests exist.
+2. Record pre-existing uncommitted changes to preserve them.
+3. Identify available test runners (`pytest`, `npm test`, etc.) and linters.
 
 ### Step 2: Requirements Inventory & Traceability Setup (Contract §D)
 
-1. Consume the current persisted proportional specification, reuse it when adequate, and record exact source refs and source revisions. If clear requirements have no file, the authorized parent records them first; planner invents no architecture or business choices.
-2. **Conditional ERD Traceability:** Consume the design handoff's `details.erd_selection`. When an ERD was selected (`selected: true`), treat its ref + revision as a consumed source: include erd-01..03 criteria (entities/identity and sourced attributes; relationships/cardinality/optionality and ownership; integrity/lifecycle/traceability and applicable physical design) in the inventory and traceability map under Step 2.3, mapping each buildable criterion to task IDs/files/deps/verification — without inventing schema or migrations, and keeping Blueprint/FRD/techstack links as traceability edges, not duplicated authority. When ERD was skipped/reused (`selected: false`), the scoped reason/reuse ref is the mapping disposition — never leave it unrecorded and never force ERD tasks onto projects without an applicable persistent model.
-3. Extract stable requirement and acceptance criteria identifiers (`FR-###`, `AC-###`, `ROAD-###`, plus erd criteria where selected) from upstream specifications or design contracts. Retain existing stable IDs; create scoped unique IDs only if absent.
-4. Establish a compact bidirectional traceability mapping:
-   `Requirement / AC ID -> User Story (where relevant) -> Task ID(s) -> Target File Paths -> Dependencies -> Verification / Expected Outcome -> Current Observed Evidence / Status`, with separate parent decision distinct from worker status.
-5. Enforce the `N/A` rule: Mark an acceptance criterion `N/A` ONLY with an explicit, reasoned justification for non-buildable or documented out-of-scope criteria. A UI task without a matching rendered mockup ref marks only UI scope blocked. Missing mappings remain explicit gaps, NEVER implicit `N/A`.
-6. Differentiate business outcomes/KPIs from build/runtime acceptance criteria: Exclude post-launch outcome metrics and business KPIs from build/runtime criteria unless bounded by a justified, measurable observation harness.
+1. Consume and record exact source refs/revisions of the persisted proportional spec (parent records clear no-file requirements first; planner invents no design/business choices).
+2. **Conditional ERD Traceability:** Consume design `details.erd_selection`. If `selected: true`, bind its ref + revision and map `erd-01..03` criteria (entities/identity/attributes; relationships/cardinality/ownership; integrity/lifecycle/traceability/physical design) under Step 2.3 without inventing schema/migrations (Blueprint/FRD/techstack links stay traceability edges). If `selected: false`, record the scoped skip/reuse ref — never leave unrecorded or force ERD tasks.
+3. Extract stable IDs (`FR-###`, `AC-###`, `ROAD-###`, plus ERD criteria if selected); create scoped IDs only if absent.
+4. Build bidirectional traceability: `Requirement / AC ID -> User Story (where relevant) -> Task ID(s) -> Target File Paths -> Dependencies -> Verification / Expected Outcome -> Current Observed Evidence / Status` (parent decision separate from worker status).
+5. Enforce `N/A` rule: mark `N/A` only with explicit reasoned justification; UI tasks without matching rendered mockup refs block only UI scope; missing mappings remain explicit gaps.
+6. Exclude post-launch business KPIs from build/runtime AC unless bounded by a measurable harness.
 
 ### Step 3: Task Decomposition, Slicing & Infrastructure Justification (Contract §D)
 
 #### Step 3A: Lifecycle Route Entries (refactor / maintain)
 
-- **Refactor entries:** One task per safe structural step (rename, extract, move, split) in the order produced by `daw-untangle`, each carrying a behavior-preservation oracle: the characterization suite or probe that proves identical observable behavior before and after. No step may bundle a behavior change; if an oracle fails mid-sequence, the plan halts at that step and returns to the parent.
-- **Maintain entries:** Group upgrades by dependency (one group per task/commit), order groups by risk (patch-only first, then minor, then major), and attach per-group rollback steps (revert the group commit and lockfile) plus the upstream changelog/breaking-change check as the first task of each group.
-- **Ship handoff:** Every code-changing route (`feature`, `bugfix`, `patch`, `refactor`, `maintain`) ends by recommending the `ship` route to the parent for commit hygiene, PR, and release readiness; `daw-plan` never dispatches `daw-ship` itself and never performs git operations.
-- **Time-box:** Each task carries an estimate/timebox; on expiry `daw-build` escalates per [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets) rather than extending silently.
+- **Refactor:** One task per safe structural step (rename, extract, move, split) in `daw-untangle` order, each with a `behavior_preservation_oracle` (characterization suite/probe proving identical before/after behavior). Never bundle behavior changes; halt and return to parent if an oracle fails.
+- **Maintain:** One dependency group per task/commit ordered by risk (patch -> minor -> major), starting with upstream changelog/breaking-change check and attaching per-group rollback (revert commit + lockfile).
+- **Ship handoff & Time-box:** Every code-changing route recommends terminal `ship` to parent (never dispatch `daw-ship` or run git here). Assign each task a `timebox`; on expiry `daw-build` escalates per [Time-Boxing & Escalation Budgets](../../references/developer-lifecycle.md#2-time-boxing--escalation-budgets).
 
-1. Break work into vertical story slices (P1 first): one task group per prioritized story slice, each a narrow complete path through the layers it needs, independently demoable and sized for one fresh context. Each slice states What to build (end-to-end behavior, not a layer list) and an explicit Out of scope line. Forbid layer-only tasks ("create all tables", "all endpoints") and standalone "write tests for X" tasks; tests land inside the slice that introduces the behavior. Prefactoring/shared foundation tasks come first only with infrastructure justification; P1 closes with an explicit checkpoint ("P1 alone is demoable: <independent test>"). Wide mechanical refactors use expand -> migrate batches -> contract instead of vertical slices. Tiny settled patches stay inline.
-2. Explicitly name the exact target files to create, modify, or delete for each task. A task may satisfy several criteria; artificial one-to-one mapping is not required.
-3. **Supporting Infrastructure Justification:** A foundational or infrastructure task (e.g., scaffolding, schema migrations, test harness setup) that lacks an associated user story is permitted ONLY when accompanied by an explicit prerequisite justification explaining why downstream story slices depend on it.
-
-4. **Coupling & Cohesion Alignment:** When planning refactoring tasks, consult `../../references/change-coupling.md`: ensure task boundaries do not introduce needless pass-through wrappers or split cohesive domain invariants across arbitrary files; preserve existing behavioral invariants.
-5. **Plan Header & File Map:** Before finalizing tasks, fix `details.plan_header` with Goal, Architecture (2-3 sentences), Tech Stack, Global Constraints (verbatim one line each from spec/config), and File Map (create/modify paths + one-line responsibility). Copy Global Constraints verbatim; do not paraphrase rules.
-6. **Ordered Execution Steps:** Inside each task, list single-action steps (write failing test -> run, expect fail with named reason -> minimal change -> run, expect pass -> suite). Each step names its file and an exact `run` + `expected` observable. Baseline step first (current revision, suite green before edits). Steps are plan text; evidence stays null until executed.
-7. **Bounded Contract Preview:** For contract-bearing surfaces only (schema DDL, migration, API payload/envelope, public function signature) the task carries the exact intended text in `change_preview`; full function bodies stay in `daw-build`. Constraints from the data model (nullability, enums, limits, money units) are quoted verbatim into `constraints_quoted`.
-8. **Autonomy:** Each task/slice carries `autonomy: hitl|afk` — `hitl` needs a live human decision; only `afk` tasks are delegable unsteered. An `afk` task may not depend on an open human decision.
-9. **Task List:** The saved plan carries the task list in the form the deterministic runner consumes, so a task that is not in the list does not exist to the executor. Two forms are available; pick one per workflow and never mix them:
-   - **Task files (preferred):** one Markdown file per task in a directory the plan names via `<!-- daw-task-sources: <dir> -->`. Frontmatter carries the machine fields (`task_id`, `title`, `autonomy`, `depends_on`, `parallel_safe`, `target_files`, `acceptance_criteria`, `verification_command`, `expected_outcome`); the body is free prose — What to build, Out of scope, and the reasoning a machine must not guess. The plan's JSON manifest is then *derived* from these files: `python3 "$SUITE_ROOT/scripts/derive_tasks.py" --plan <plan-path> --project-root "$PROJECT_DIR" --write`. The task files stay the single hand-authored source; the manifest is their projection.
-   - **Embedded manifest:** one fenced ` ```json ` block immediately after the `<!-- daw-task-manifest -->` marker, using the same field names, when a workflow has no task files.
-
-   Field names match this module's task contract in both forms, so plan prose and executable task list cannot drift into different vocabularies. Validate before handing off: `python3 "$SUITE_ROOT/scripts/validate.py" tasks <plan-path> --project-root "$PROJECT_DIR"` — it reports `manifest_drift` when the plan's manifest and its task files disagree. Full contract: [Deterministic Execution Runner](../../references/execution-runner.md).
-
-   **Writing the task files is part of decomposition, not a follow-up.** Each task becomes one Markdown file whose frontmatter is the machine contract and whose body is the slice statement ("What to build", "Out of scope", the reasoning behind the boundaries). The body is what a fresh worker actually reads, so it carries the intent the frontmatter cannot express. After writing the files, derive the manifest and validate, in that order — a plan that has never been derived is not a plan the runner can execute:
-
-   ```bash
-   python3 "$SUITE_ROOT/scripts/derive_tasks.py" --plan <plan-path> \
-     --project-root "$PROJECT_DIR" --write
-   python3 "$SUITE_ROOT/scripts/validate.py" tasks <plan-path> \
-     --project-root "$PROJECT_DIR"
-   ```
-
-   A `manifest_drift` finding means a task file was edited after the last derivation: re-derive it rather than hand-editing the manifest block.
+1. Cut P1-first vertical story slices (end-to-end `What to build` + `Out of scope`, independently demoable, 1 fresh context; `P1 alone is demoable: <independent test>`; wide mechanical refactors use expand -> migrate batches -> contract; tiny patches stay inline). Forbid layer-only tasks and standalone test tasks.
+2. Name exact create/modify/delete target files per task (many-to-one criteria mapping allowed).
+3. **Supporting Infrastructure Justification:** Storyless infra/scaffolding tasks require explicit `infrastructure_justification` explaining downstream slice dependency.
+4. **Coupling & Cohesion Alignment:** For refactors, consult `../../references/change-coupling.md` to avoid pass-through wrappers or split domain invariants.
+5. **Plan Header & File Map:** Fix `details.plan_header` before tasks (Goal, 2–3 sentence Architecture, Tech Stack, verbatim 1-line Global Constraints from spec/config, File Map).
+6. **Ordered Execution Steps:** Inside each task, list single-action steps (baseline suite green -> write failing test -> run, expect named failure -> minimal change -> run, expect pass -> suite), each naming `file`, `run`, and `expected` (evidence stays `null` until run).
+7. **Bounded Contract Preview:** Contract-bearing tasks (schema DDL, migration, API payload/envelope, public signature) carry exact intended text in `change_preview` (full bodies stay in `daw-build`); quote data-model constraints (nullability, enums, limits, money units) verbatim in `constraints_quoted`.
+8. **Autonomy:** Declare `autonomy: hitl|afk` per task/slice; no `afk` task depends on an open human decision.
+9. **Task List:** Saved plans carry the runner-consumable list (pick one form per workflow, never mix):
+   - **Task files (preferred):** one Markdown file per task in `<!-- daw-task-sources: <dir> -->`, frontmatter carrying machine fields (`task_id`, `title`, `autonomy`, `depends_on`, `parallel_safe`, `target_files`, `acceptance_criteria`, `verification_command`, `expected_outcome`) and prose body stating `What to build`, `Out of scope`, and boundary reasoning for fresh workers. Derive the plan's JSON manifest after writing task files and validate (re-derive on `manifest_drift` rather than hand-editing):
+     ```bash
+     python3 "$SUITE_ROOT/scripts/derive_tasks.py" --plan <plan-path> \
+       --project-root "$PROJECT_DIR" --write
+     python3 "$SUITE_ROOT/scripts/validate.py" tasks <plan-path> \
+       --project-root "$PROJECT_DIR"
+     ```
+   - **Embedded manifest:** one fenced ` ```json ` block immediately after `<!-- daw-task-manifest -->` with matching field names when no task files exist. Contract: [Deterministic Execution Runner](../../references/execution-runner.md).
 
 ### Step 4: Sequence Dependencies, Concurrency & Parallel Criteria [P] (Contract §D)
 
-1. Structure tasks into a strict Directed Acyclic Graph (DAG). Foundational contracts, migrations, and shared interfaces must land before consumers.
-2. **Dependency Sequencing Rule:** Dependencies must strictly precede dependent story slices.
-3. **Dependency Cycle & Unknown ID Rejection:** Detect and reject cyclic dependencies or references to unknown task IDs before dispatch. If a cycle or unknown dependency is detected, halt planning (`status: "blocked"`). Independent authorized tasks can proceed while blocked tasks wait.
-4. **Parallelism Criteria `[P]`:** Mark tasks as parallel-safe (`[P]` or `parallel_safe: true`) ONLY when BOTH conditions are verified:
-   - **Disjoint Write Sets:** Target files between parallel tasks must not overlap.
-   - **Zero Shared Runtime/Data Dependencies:** Neither task depends on runtime state, schema modifications, or in-memory caches produced by the other.
-5. If tasks share write targets or data dependencies, serialize them or extract shared components into a prerequisite task.
+1. Form a strict DAG; land shared contracts/migrations/interfaces before consumers.
+2. Sequence dependencies strictly before dependent slices.
+3. Reject cycles or unknown task IDs (`status: "blocked"`); independent authorized tasks proceed.
+4. Mark `[P]` / `parallel_safe: true` ONLY when BOTH hold: (a) strictly disjoint target file write sets, and (b) zero shared runtime/data/schema/cache dependencies.
+5. Serialize or factor shared targets/state into a prerequisite task.
 
 ### Step 5: Define Acceptance Criteria, Verification Commands & Oracles (Contract §D, §I)
 
-1. Pre-declare observable Acceptance Criteria (AC) for each task, pairing each criterion with its expected result and proportional check method before work begins.
-2. Provide deterministic verification (e.g. `pytest tests/test_feature.py`, `npm test`) that runs non-interactively in the local environment. For one-off execution include commands/tools, expected results, done criteria, and rollback only where relevant. A real surface action is permitted for UI checks; legacy `verification_command` is preserved only as a reference/action where needed. Exact invocation uses no invented binary.
+1. Pair every task AC with its expected result and check method upfront.
+2. Use deterministic, non-interactive local verification (e.g. `pytest tests/test_feature.py`, `npm test`), exact invocations (no invented binary), and rollback where relevant for one-off tasks; real surface actions are permitted for UI checks (`verification_command` kept as ref/action).
 3. Include negative verification cases where appropriate.
-4. **Evidence vs. Command Distinction:** Evidence references in the plan remain empty or null (`evidence: null`) until executed during build/verification. Planned commands, expected outcomes, or task checkboxes are NOT proof of completion.
+4. Keep `evidence: null` until executed; planned commands/expected outcomes/checkboxes are not proof.
 
 ### Step 6: Plan Readiness Self-Check (Contract §F)
 
-Before finalizing the plan, perform an internal cross-artifact readiness self-check:
-
-1. **Coverage Check:** Verify 100% of requirement / AC IDs are mapped to tasks (or explicitly justified as `N/A`). When an ERD was selected, its erd-01..03 criteria map to tasks or carry a reasoned non-mapping; an ERD skip/reuse disposition is recorded, never an unexamined gap.
-2. **Orphan Task Check:** Verify every task links to an AC/story or carries an explicit infrastructure prerequisite justification.
-3. **Graph Integrity Check:** Verify no dependency cycles and no dangling or unknown task dependencies exist.
-4. **Parallel Safety Check:** Verify all tasks marked `[P]` / `parallel_safe` have strictly disjoint write sets and zero data/runtime dependencies.
-5. **Verification Coverage:** Verify every task defines a non-interactive, executable local command and expected oracle.
-6. **Placeholder Scan:** Reject placeholder/generic steps — no TBD/TODO/"add appropriate error handling"/"handle edge cases"/"write tests for the above"/"similar to TASK-n" — and no prose-only gate like "tests pass" without a command.
-7. **Name/Type Consistency:** Every entity, field, type, and function named in any task exists in the cited spec/ERD or is produced by an earlier task with the same spelling.
-8. **Gate Concreteness:** Every verification names an exact command and its expected observable, in both the task `verification_command`/`expected_outcome` and each entry in `steps` (`run` + `expected`). Each `expected` is decided in advance: no hedged outcomes ("fail or pass — record which", "may fail"). When an earlier task already delivers the behavior, the step is a characterization test whose `expected` is PASS and the plan says so; a red step must name the failure reason the planned change fixes.
-9. **Autonomy Check:** Verify every task carries `autonomy: hitl|afk`; no `afk` task depends on an open human decision.
-   Record the self-check result in `details.readiness_self_check`.
+Verify and record in `details.readiness_self_check`:
+1. **Coverage Check:** 100% of requirement/AC IDs (and `erd-01..03` when ERD selected, or recorded skip/reuse) mapped or justified `N/A`.
+2. **Orphan Task Check:** Every task links to an AC/story or has `infrastructure_justification`.
+3. **Graph Integrity Check:** Zero dependency cycles or unknown IDs.
+4. **Parallel Safety Check:** All `[P]` / `parallel_safe` tasks have disjoint write sets and zero runtime/data dependencies.
+5. **Verification Coverage:** Every task has a non-interactive local command and expected oracle.
+6. **Placeholder Scan:** Zero placeholders (`TBD`/`TODO`/`"add appropriate error handling"`/`"handle edge cases"`/`"write tests for the above"`/`"similar to TASK-n"`) and no prose-only `"tests pass"` gate without a command.
+7. **Name/Type Consistency:** Every named entity, field, type, and function exists in the cited spec/ERD or an earlier task with identical spelling.
+8. **Gate Concreteness:** Both `verification_command`/`expected_outcome` and every `steps` entry (`run` + `expected`) state decided outcomes — no hedged outcomes (`"fail or pass — record which"`, `"may fail"`); characterization tests on existing behavior expect PASS, red steps name the exact missing-behavior failure reason.
+9. **Autonomy Check:** Every task has `autonomy: hitl|afk`; no `afk` task depends on an open human decision.
 
 ### Step 7: Convergence Reconciliation & Scope Preservation (Contract §G)
 
-When invoked to re-plan or reconcile gaps identified during execution, review, or verification:
-
-1. Inspect the actual codebase, authoritative contracts, and current verification evidence.
-2. Classify items into `Implemented & Verified`, `Implemented (Unverified)`, `Missing`, `Contradicted`, or `Blocked`.
-3. **Preserve Existing IDs, Retry History & Merge Duplicates:** Do not renumber, delete, or rewrite completed or pending task IDs; preserve stable IDs and retry history; merge duplicate findings rather than creating duplicate pending tasks or repeating identical missing work.
-4. **Append Only Genuine Gaps Inside Scope:** Append new tasks only for genuine uncovered work within accepted scope. Scope expansion or feature creep is strictly prohibited.
-5. **Ranked Queue:** Returned results enter the parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage) queue; parent picks eligible fixes by urgency/impact/deps and accepted joins; planner does not auto-dispatch or auto-deploy from worker pass.
-6. Record convergence state in `details.convergence`.
+1. Inspect actual code, authoritative contracts, and current evidence.
+2. Classify items: `Implemented & Verified`, `Implemented (Unverified)`, `Missing`, `Contradicted`, or `Blocked`.
+3. Preserve existing task IDs and retry history; never renumber/delete pending or completed IDs; merge duplicate findings instead of repeating identical tasks.
+4. Append new tasks ONLY for genuine uncovered in-scope gaps (never expand scope).
+5. **Ranked Queue:** Feed results to parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage); parent selects eligible fixes without auto-dispatch/auto-deploy.
+6. Record state in `details.convergence`.
 
 ### Step 8: Synthesize Implementation Contract & Prebuild Review Handoff (Contract §F)
 
-1. Format the plan into the standard output schema. For multi-step authorized work, save the plan before build dispatch per [Workflow Artifacts](../../references/workflow-artifacts.md) (existing roadmap/issue-export/project doc section if sufficient, otherwise `docs/daw/plans/<workflow-id>.md`). The saved plan carries the task list described in Step 3 item 9 — task files plus the derived manifest — so the deterministic runner can consume it. Include saved plan/progress refs in existing `details` and keep examples consistent with the saved form. Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
-2. **Parent-Owned Independent Prebuild Readiness Review:** For spec-dependent implementation workflows (`feature`, `bugfix`), `daw-plan` self-checks the plan and recommends `handoff_to: "daw-review"` (or parent readiness checkpoint) for a proportional independent read-only conformity review before `daw-build` execution begins.
+1. For multi-step authorized work, save the plan per [Workflow Artifacts](../../references/workflow-artifacts.md) (`docs/daw/plans/<workflow-id>.md` or existing project doc/roadmap), including task files + derived manifest (Step 3 item 9), and record plan/progress refs in `details`. Native todos complement; tiny patches stay inline.
+2. **Parent-Owned Independent Prebuild Readiness Review:** For spec-dependent workflows (`feature`, `bugfix`), recommend `handoff_to: "daw-review"` for proportional independent read-only conformity review before `daw-build`.
 
 ---
 
 ## 4. Output Contract
 
-Return a complete, observable JSON handoff before any transition using [routing §5: Canonical Module Handoff Contract](../../references/routing.md#5-canonical-module-handoff-contract), including its transport hierarchy and labeled inline fallback when no real structured transport or authorized artifact exists. Direct-user reports remain concise prose. `status: "pass"` proposes only planning-stage criteria and the internal readiness self-check, not independent prebuild acceptance, implementation/test completion, or parent acceptance; observations must identify current scope and revisions. Keep the planning payload under `details` as defined below.
+Deliver an observable JSON handoff per [routing §5](../../references/routing.md#5-canonical-module-handoff-contract) (with its transport hierarchy and labeled inline fallback; direct-user replies remain concise prose). `status: "pass"` proposes planning-stage readiness only, not prebuild/implementation/parent acceptance; cite current scope and revisions.
 
-- **Mandatory Task Fields:** Each task in `details.tasks` MUST specify `task_id`, `title`, `target_files`, `depends_on`, `parallel_safe`, `autonomy` (`hitl|afk`), `acceptance_criteria`, non-interactive `verification_command`, and `expected_outcome`, plus ordered `steps` (each `{action, file, run, expected}`), `change_preview`, and `constraints_quoted`. `change_preview` is required for contract-bearing tasks (schema DDL, migration, API payload/envelope, public function signature) and is `null` with reason otherwise. `constraints_quoted` carries verbatim data-model constraints (nullability, enums, limits, money units). Legacy `verification_command` is a reference/action field; real surface action may serve the same check where a command would be fake. If a task checks the UI, it MUST carry matching rendered mockup refs or mark UI scope blocked. If a task lacks a user story, it must include `infrastructure_justification`.
+Required `details` fields:
+- `tasks`: each entry MUST carry `task_id`, `title`, `target_files`, `depends_on`, `parallel_safe`, `autonomy` (`hitl|afk`), `acceptance_criteria`, `verification_command`, `expected_outcome`, `steps` (`[{action, file, run, expected}]`), `change_preview` (exact contract text for schema/API/signature tasks, else `null` with reason), `constraints_quoted` (verbatim data-model constraints), `interfaces` (`{consumes, produces}` — exact signatures/types neighboring tasks rely on, no duplicated code), plus `infrastructure_justification` if storyless, rendered mockup refs (or blocked UI scope) for UI checks, and lifecycle fields (`timebox`, `behavior_preservation_oracle` for `refactor`, dependency group / `lockfile_committed` / rollback for `maintain`, and recommended terminal `ship` route for code-changing routes).
+- `saved_plan_ref` & `saved_progress_ref` (for multi-step work), `ranked_queue_ref`, `plan_header` (`goal`, `architecture` in 2–3 sentences, `tech_stack`, verbatim 1-line `global_constraints` from spec/config, and `file_map`, mirrored in `roadmap.md`; tiny patches stay inline with no header), `traceability` (consuming `details.erd_selection` verbatim), `readiness_self_check`, `convergence`, and `suite_verification_command`.
 
-- **Interfaces block (`interfaces`):** Every task carries `interfaces.consumes` (what this task uses from earlier tasks — exact signatures) and `interfaces.produces` (what later tasks rely on — exact function names, parameter and return types). A task's implementer sees only their own task; this block is how they learn the names and types neighboring tasks use. Do not repeat another task's code here; name the produced contract only.
-- **Lifecycle fields (refactor / maintain):** Tasks carry `timebox` and, for refactor, the `behavior_preservation_oracle`; for maintain, the dependency group, `lockfile_committed`, and rollback step. Code-changing routes record the recommended terminal `ship` route for the parent.
-- **Saved Plan & Progress Refs:** `details` MUST include `saved_plan_ref` and `saved_progress_ref` for multi-step work under [Workflow Artifacts](../../references/workflow-artifacts.md). Native todos complement durable artifacts; no separate task tracker is created. Tiny settled patches stay inline.
-- **Traceability Mapping:** `details.traceability` records exact source refs and revisions with the compact bidirectional mapping from requirement/AC ID to user story, task IDs, target files, dependencies, verification/expected outcomes, status, evidence reference, and separate parent decision. It consumes the design `details.erd_selection` disposition verbatim: a selected ERD's ref + revision and erd-01..03 coverage, or the reasoned skip/N/A/reuse disposition — never invented schema or migrations.
-- **Ranked Queue Ref:** `details` references the parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage) queue in the durable plan/progress record; planner does not auto-deploy from worker pass.
-- **Readiness Self-Check:** `details.readiness_self_check` records the internal validation verdict (`pass` or `fail`), unmapped criteria, orphan tasks, dependency cycles, and parallel violations.
-- **Convergence Metadata:** `details.convergence` records whether the plan is an initial decomposition or a convergence reconciliation, listing preserved task IDs and appended task IDs.
-- **Suite Command:** `details` MUST include `suite_verification_command` covering the full affected test suite.
-- **Plan Header:** `details.plan_header` records the fixed-before-tasks header: `goal`, `architecture` (2-3 sentences), `tech_stack`, `global_constraints` (verbatim one line each from spec/config), and `file_map` (create/modify paths with one-line responsibility). Mirrored in the saved `roadmap.md` header block; tiny settled patches stay inline with no header.
-
-Illustrative `details` only (not a complete handoff; wrap in the canonical envelope for actual delivery):
+Illustrative `details` only (wrap in the canonical outer envelope):
 
 ```json
 {
@@ -356,53 +297,43 @@ Illustrative `details` only (not a complete handoff; wrap in the canonical envel
 
 ## 5. Verification & Quality Invariants
 
-Before completing `daw-plan`, verify:
-
-- [ ] Every task specifies exact file paths and concrete operational changes.
-- [ ] The saved plan's task list is in its final, runner-consumable form: task files written (each with frontmatter and a prose body stating What to build and Out of scope), the manifest derived from them with `derive_tasks.py --write`, and `validate.py tasks` reporting no findings.
-- [ ] Current persisted proportional spec was consumed with exact source refs and revisions; clear no-file requirements were parent-recorded, with no invented design or new stage.
-- [ ] Saved plan + progress refs are present in `details` for multi-step work; native todos complement durable artifacts with no separate task tracker; tiny patches stay inline.
-- [ ] Full bidirectional traceability: Every requirement and acceptance criterion maps to task(s)/files/deps/verification/evidence/status or carries explicit, reasoned `N/A` justification; parent decision is separate from worker status. Where a conditional ERD was selected, its erd-01..03 criteria and traceability links map to tasks without inventing schema or migrations; a scoped ERD skip/N/A is a reasoned non-mapping, never an implicit pass.
-- [ ] UI tasks consume matching rendered mockup refs or mark only UI scope blocked; real surface action is permitted where a fake shell check would be dishonest.
-- [ ] Supporting infrastructure tasks lacking user stories have explicit prerequisite justifications (Contract §D).
-- [ ] Dependency DAG verified: No dependency cycles and no references to unknown task IDs; dependencies strictly precede dependent story slices (Contract §D).
-- [ ] Parallel execution criteria verified: Tasks marked `[P]` / `parallel_safe` have strictly disjoint write file paths AND zero shared runtime/data dependencies (Contract §D).
-- [ ] Deterministic, non-interactive verification with exact invocation (no invented binary) and expected oracles specified for every task; evidence fields remain unexercised/null until run. One-off entries include commands/tools, expected results, done criteria, and rollback only where relevant (Contract §D, §I).
-- [ ] Ranked queue: returned results feed the parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage); stable IDs/retry history preserved, duplicates merged, no automatic external deploy from worker pass.
-- [ ] Plan readiness self-check completed and recorded in `details.readiness_self_check` (Contract §F).
-- [ ] Layer-only check passed: no layer-only tasks ("create all tables", "all endpoints") and no standalone test tasks; tests sit inside the slice introducing the behavior (Contract §F).
-- [ ] Slice scope passed: each slice states What to build (end-to-end behavior) and an explicit Out of scope line (Contract §F).
-- [ ] Autonomy check passed: every task carries `autonomy: hitl|afk` and no `afk` task depends on an open human decision (Contract §F).
-- [ ] Recommends parent-directed independent readiness review (`daw-review`) for spec-dependent builds prior to `daw-build` (Contract §F).
-- [ ] Convergence reconciliation preserves existing task IDs and history, does not duplicate pending tasks, and appends only genuine gaps inside accepted scope (Contract §G).
-- [ ] Pre-existing uncommitted workspace modifications are explicitly noted for preservation.
-- [ ] Expected evidence mapping aligns with the [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) and [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries); workers author observations, parent authors decisions; small tasks keep criteria inline.
-- [ ] No unwanted documentation files created unless explicitly requested.
+- [ ] Exact target files and concrete operations specified for every task.
+- [ ] Saved plan carries runner-consumable task files (`What to build` + `Out of scope`), manifest derived via `derive_tasks.py --write`, and `validate.py tasks` clean.
+- [ ] Persisted proportional spec consumed with source refs/revisions; clear no-file requirements parent-recorded; no invented design/stage.
+- [ ] `saved_plan_ref` and `saved_progress_ref` in `details` for multi-step work (tiny patches inline); no separate task tracker.
+- [ ] Bidirectional traceability for every AC (and `erd-01..03` if selected, or reasoned ERD skip/reuse); parent decision separate from worker status.
+- [ ] UI tasks carry matching rendered mockup refs or block only UI scope; real surface action permitted where shell checks are fake.
+- [ ] Storyless infra tasks carry `infrastructure_justification` (Contract §D).
+- [ ] Acyclic DAG verified; dependencies precede consumer slices; `[P]`/`parallel_safe` tasks have disjoint write sets and zero runtime/data dependencies (Contract §D).
+- [ ] Non-interactive verification commands (no invented binary) and expected oracles on every task (`evidence: null` until run; one-off tasks include commands/tools, expected results, done criteria, rollback; Contract §D, §I).
+- [ ] Results feed parent-owned [Ranked Result Triage](../../references/operations.md#ranked-result-triage); IDs/history preserved, duplicates merged, no auto-deploy.
+- [ ] `details.readiness_self_check` recorded; no layer-only or standalone test tasks; slices state `What to build` + `Out of scope`; every task carries `autonomy: hitl|afk` with no `afk` depending on open `hitl` (Contract §F).
+- [ ] Recommends parent-directed `daw-review` prebuild readiness review for spec-dependent builds (Contract §F).
+- [ ] Convergence reconciliation preserves IDs/history, merges duplicates, and appends only genuine in-scope gaps (Contract §G); pre-existing uncommitted changes preserved; no unwanted docs created.
+- [ ] Evidence mapping aligns with [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint) and [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries) (workers observe, parent decides).
 
 ---
 
 ## 6. Stop / Replan Triggers
 
-These are advisory recommendations to the parent orchestrator; `daw-plan` does not invoke another module directly.
+Advisory triggers returned to parent (`daw-plan` never invokes modules directly):
 
-- **Missing Interface / Specification Gap:** If an architectural contract is missing or undefined during decomposition, halt planning (`status: "blocked"`, `handoff_to: null`) and recommend `daw-design` to the parent.
-- **Dependency Cycle or Unknown Dependency:** If a cyclic dependency or unknown task dependency is detected, halt planning (`status: "blocked"`, `handoff_to: null`) and report the cycle in `details.readiness_self_check`.
-- **File Ownership / Data Collision:** If concurrent tasks overlap on the same file or share mutable runtime state, serialize them or extract shared parts into a prerequisite task.
-- **Unmapped Criteria Gap:** If buildable requirements cannot be decomposed within current scope, halt (`status: "blocked"`) and return gaps to the parent.
-- **Missing Plan Artifact:** If spec-dependent build lacks a persisted plan with header, slice checkpoints, ordered steps, and exact run+expected gates, halt planning (`status: "blocked"`, `handoff_to: null`). A milestone roadmap without task IDs, steps, and commands is not a plan.
-- **Task Failure in Execution:** If a task verification gate fails downstream, halt and recommend `daw-debug` or replan that specific slice to the parent.
+- **Missing Interface / Spec Gap:** Halt (`status: "blocked"`, `handoff_to: null`) and recommend `daw-design`.
+- **Dependency Cycle / Unknown ID:** Halt (`status: "blocked"`, `handoff_to: null`) and report cycle in `details.readiness_self_check`.
+- **File Ownership / Data Collision:** Serialize overlapping tasks or extract shared parts into a prerequisite task.
+- **Unmapped Criteria Gap:** Halt (`status: "blocked"`) and return gaps to parent.
+- **Missing Plan Artifact:** Spec-dependent build without saved plan (header, slice checkpoints, ordered steps, run+expected gates) halts (`status: "blocked"`, `handoff_to: null`).
+- **Downstream Execution Failure:** Halt failed slice and recommend `daw-debug` or slice replan.
 
 ---
 
 ## 7. Handoff Protocol
 
-All handoffs are advisory metadata returned to the parent orchestrator; `daw-plan` never invokes another module directly and never dispatches subagents itself.
+Advisory `handoff_to` for parent orchestrator (never invoke modules or subagents directly):
 
-Select `handoff_to` from the active route:
+- **`bootstrap` / `adopt`:** Terminal (`handoff_to: null`, `status: "pass"`); do not recommend `daw-build`.
+- **`patch`:** Direct (`handoff_to: "daw-build"`); tiny inline patches need no prebuild readiness review.
+- **`feature` / `bugfix`:** Recommend `daw-review` for spec-dependent prebuild readiness review (or next active route stage), preserving review/verify ordering.
+- **`refactor` / `maintain`:** After `daw-review` readiness checkpoint, recommend `daw-build` (`daw-build` -> `daw-review` -> `daw-verify`) and record terminal `ship` recommendation.
 
-- **`bootstrap` / `adopt`:** Terminal. Return `handoff_to: null` with `status: "pass"`; do not recommend `daw-build`.
-- **`patch`:** Precedes `daw-build` directly. Trivial inline patches do not require independent prebuild readiness review. Return `handoff_to: "daw-build"`.
-- **`feature` / `bugfix`:** For spec-dependent features, recommend `daw-review` for parent-directed independent prebuild readiness review (or the stage immediately following `daw-plan` in the active route plan), preserving review/verify ordering. Do not skip stages.
-- **`refactor` / `maintain`:** After the readiness checkpoint under `daw-review`, recommend `daw-build` (the active route continues `daw-build` -> `daw-review` -> `daw-verify`); record the terminal `ship` recommendation for the parent.
-
-_Reference Link:_ See [Canonical Feature Delivery Contract](../../references/document-quality.md#feature-delivery-contract), [Shared Routing Contract](../../references/routing.md), [Changes Lifecycle Guide](../../references/operations.md#parent-acceptance-checkpoint), [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), and [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record).
+_Reference Link:_ [Feature Delivery Contract](../../references/document-quality.md#feature-delivery-contract), [Shared Routing Contract](../../references/routing.md), [Parent Acceptance Checkpoint](../../references/operations.md#parent-acceptance-checkpoint), [Checkpoint Boundaries](../../references/operations.md#checkpoint-boundaries), and [Parent-Owned Acceptance Record](../../references/operations.md#parent-owned-acceptance-record).

@@ -26,16 +26,14 @@ from typing import Any
 
 try:
     from scripts.daw_common import (
-        SCHEMA_VERSION,
-        has_errors,
+        build_result,
         is_safe_relative_path,
         make_error,
         parse_strict_json,
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
-        SCHEMA_VERSION,
-        has_errors,
+        build_result,
         is_safe_relative_path,
         make_error,
         parse_strict_json,
@@ -86,10 +84,6 @@ REQUIRED_TASK_FIELDS = (
 _JSON_PARSE_ERRORS = (ValueError, RecursionError)
 
 
-def _error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
-
-
 def extract_manifest(plan_text: str) -> tuple[dict[str, Any] | None, list[dict[str, str]]]:
     """Return the task manifest carried by a plan document.
 
@@ -100,13 +94,11 @@ def extract_manifest(plan_text: str) -> tuple[dict[str, Any] | None, list[dict[s
     parsable block are required; zero or several is an ambiguity error, never a
     guess.
     """
-    import re
-
     findings: list[dict[str, str]] = []
     markers = [m.start() for m in re.finditer(re.escape(MANIFEST_MARKER), plan_text)]
     if not markers:
         findings.append(
-            _error(
+            make_error(
                 "manifest_missing",
                 "plan",
                 f"Plan contains no {MANIFEST_MARKER} marker; the task manifest is absent.",
@@ -115,7 +107,7 @@ def extract_manifest(plan_text: str) -> tuple[dict[str, Any] | None, list[dict[s
         return None, findings
     if len(markers) > 1:
         findings.append(
-            _error(
+            make_error(
                 "manifest_ambiguous",
                 "plan",
                 f"Plan contains {len(markers)} {MANIFEST_MARKER} markers; exactly one is required.",
@@ -126,7 +118,7 @@ def extract_manifest(plan_text: str) -> tuple[dict[str, Any] | None, list[dict[s
     match = re.search(r"```json\s*\n(.*?)\n```", tail, re.DOTALL)
     if match is None:
         findings.append(
-            _error(
+            make_error(
                 "manifest_missing",
                 "plan",
                 f"No fenced ```json block follows the {MANIFEST_MARKER} marker.",
@@ -137,12 +129,12 @@ def extract_manifest(plan_text: str) -> tuple[dict[str, Any] | None, list[dict[s
         parsed = parse_strict_json(match.group(1))
     except _JSON_PARSE_ERRORS as exc:
         findings.append(
-            _error("manifest_malformed", "plan", f"Task manifest is not strict JSON: {exc}.")
+            make_error("manifest_malformed", "plan", f"Task manifest is not strict JSON: {exc}.")
         )
         return None, findings
     if not isinstance(parsed, dict) or not isinstance(parsed.get("tasks"), list):
         findings.append(
-            _error(
+            make_error(
                 "manifest_malformed",
                 "plan",
                 "Task manifest must be an object with a 'tasks' array.",
@@ -161,43 +153,43 @@ def validate_task_fields(task: dict[str, Any], label: str) -> list[dict[str, str
     findings: list[dict[str, str]] = []
     unknown = sorted(set(task) - ALLOWED_TASK_FIELDS)
     if unknown:
-        findings.append(_error("task_unknown_field", label, f"Unknown task field(s): {', '.join(unknown)}."))
+        findings.append(make_error("task_unknown_field", label, f"Unknown task field(s): {', '.join(unknown)}."))
     missing = [f for f in REQUIRED_TASK_FIELDS if f not in task]
     if missing:
         findings.append(
-            _error("task_missing_field", label, f"Missing required task field(s): {', '.join(missing)}.")
+            make_error("task_missing_field", label, f"Missing required task field(s): {', '.join(missing)}.")
         )
         return findings
     task_id = task["task_id"]
     if not isinstance(task_id, str) or not task_id.strip():
-        findings.append(_error("task_id_invalid", f"{label}.task_id", "task_id must be a non-blank string."))
+        findings.append(make_error("task_id_invalid", f"{label}.task_id", "task_id must be a non-blank string."))
         return findings
     if task["autonomy"] not in ("afk", "hitl"):
-        findings.append(_error("task_autonomy_invalid", f"{label}.autonomy", "autonomy must be 'afk' or 'hitl'."))
+        findings.append(make_error("task_autonomy_invalid", f"{label}.autonomy", "autonomy must be 'afk' or 'hitl'."))
     depends_on = task["depends_on"]
     if not isinstance(depends_on, list) or not all(isinstance(d, str) and d.strip() for d in depends_on):
         findings.append(
-            _error("task_depends_on_invalid", f"{label}.depends_on", "depends_on must be an array of task ids.")
+            make_error("task_depends_on_invalid", f"{label}.depends_on", "depends_on must be an array of task ids.")
         )
     for field in ("target_files", "acceptance_criteria"):
         value = task[field]
         if not isinstance(value, list) or not value or not all(isinstance(v, str) and v.strip() for v in value):
             findings.append(
-                _error(f"task_{field}_invalid", f"{label}.{field}", f"{field} must be a non-empty array of strings.")
+                make_error(f"task_{field}_invalid", f"{label}.{field}", f"{field} must be a non-empty array of strings.")
             )
     for field in ("verification_command", "expected_outcome", "title"):
         if not isinstance(task[field], str) or not task[field].strip():
             findings.append(
-                _error(f"task_{field}_invalid", f"{label}.{field}", f"{field} must be a non-blank string.")
+                make_error(f"task_{field}_invalid", f"{label}.{field}", f"{field} must be a non-blank string.")
             )
     if not isinstance(task["parallel_safe"], bool):
         findings.append(
-            _error("task_parallel_safe_invalid", f"{label}.parallel_safe", "parallel_safe must be a boolean.")
+            make_error("task_parallel_safe_invalid", f"{label}.parallel_safe", "parallel_safe must be a boolean.")
         )
     for path in task["target_files"] if isinstance(task["target_files"], list) else []:
         if isinstance(path, str) and not is_safe_relative_path(path):
             findings.append(
-                _error("task_target_file_unsafe", f"{label}.target_files", f"Unsafe or absolute path {path!r}.")
+                make_error("task_target_file_unsafe", f"{label}.target_files", f"Unsafe or absolute path {path!r}.")
             )
     return findings
 
@@ -208,7 +200,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, str]]:
     unknown_manifest = sorted(set(manifest) - ALLOWED_MANIFEST_FIELDS)
     if unknown_manifest:
         findings.append(
-            _error(
+            make_error(
                 "manifest_unknown_field",
                 "manifest",
                 f"Unknown manifest field(s): {', '.join(unknown_manifest)}.",
@@ -217,7 +209,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, str]]:
     version = manifest.get("schema_version")
     if isinstance(version, bool) or not isinstance(version, int) or version != MANIFEST_SCHEMA_VERSION:
         findings.append(
-            _error(
+            make_error(
                 "manifest_schema_version_invalid",
                 "manifest.schema_version",
                 f"schema_version must be integer {MANIFEST_SCHEMA_VERSION}.",
@@ -225,20 +217,20 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, str]]:
         )
     tasks = manifest.get("tasks")
     if not isinstance(tasks, list) or not tasks:
-        findings.append(_error("manifest_tasks_invalid", "manifest.tasks", "tasks must be a non-empty array."))
+        findings.append(make_error("manifest_tasks_invalid", "manifest.tasks", "tasks must be a non-empty array."))
         return findings
     seen: set[str] = set()
     for index, task in enumerate(tasks):
         label = f"manifest.tasks[{index}]"
         if not isinstance(task, dict):
-            findings.append(_error("task_invalid", label, "Each task must be an object."))
+            findings.append(make_error("task_invalid", label, "Each task must be an object."))
             continue
         findings.extend(validate_task_fields(task, label))
         task_id = task.get("task_id")
         if not isinstance(task_id, str) or not task_id.strip():
             continue
         if task_id in seen:
-            findings.append(_error("task_id_duplicate", f"{label}.task_id", f"Duplicate task_id {task_id!r}."))
+            findings.append(make_error("task_id_duplicate", f"{label}.task_id", f"Duplicate task_id {task_id!r}."))
         seen.add(task_id)
     known = {t.get("task_id") for t in tasks if isinstance(t, dict) and isinstance(t.get("task_id"), str)}
     for index, task in enumerate(tasks):
@@ -247,7 +239,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, str]]:
         for dep in task["depends_on"]:
             if isinstance(dep, str) and dep not in known:
                 findings.append(
-                    _error(
+                    make_error(
                         "task_dependency_unknown",
                         f"manifest.tasks[{index}].depends_on",
                         f"Dependency {dep!r} is not declared in the manifest.",
@@ -290,7 +282,7 @@ def detect_cycles(tasks: list[Any]) -> list[dict[str, str]]:
         return []
     involved = sorted(node for node, degree in indegree.items() if degree > 0)
     return [
-        _error(
+        make_error(
             "task_dependency_cycle",
             "manifest.tasks",
             "Dependency cycle among task(s): " + ", ".join(involved),
@@ -338,24 +330,31 @@ def validate_plan_manifest(
     embedded block is its derived form.
     """
     findings: list[dict[str, str]] = []
+    manifest: dict[str, Any] | None = None
     try:
         text = plan_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         findings.append(
-            _error("manifest_unreadable", str(plan_path), "Plan cannot be read as UTF-8 text.")
+            makemake_error("manifest_unreadable", str(plan_path), "Plan cannot be read as UTF-8 text.")
         )
-        return _envelope(findings, None)
-    manifest, extract_findings = extract_manifest(text)
-    findings.extend(extract_findings)
-    if manifest is None:
-        return _envelope(findings, None)
-    findings.extend(validate_manifest(manifest))
-
-    sources = extract_sources(text)
-    if sources and project_root is not None:
-        drift = check_source_drift(sources, manifest, project_root, plan_path)
-        findings.extend(drift)
-    return _envelope(findings, manifest)
+    else:
+        manifest, extract_findings = extract_manifest(text)
+        findings.extend(extract_findings)
+        if manifest is not None:
+            findings.extend(validate_manifest(manifest))
+            sources = extract_sources(text)
+            if sources and project_root is not None:
+                findings.extend(check_source_drift(sources, manifest, project_root, plan_path))
+    tasks = manifest.get("tasks") if isinstance(manifest, dict) else None
+    return build_result(
+        "tasks",
+        findings,
+        TASK_LIMITATIONS,
+        extra={
+            "task_count": len(tasks) if isinstance(tasks, list) else 0,
+            "workflow_id": manifest.get("workflow_id") if isinstance(manifest, dict) else None,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +397,7 @@ def parse_task_file(
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         findings.append(
-            _error("task_file_frontmatter_missing", label, "Task file must start with a '---' frontmatter block.")
+            make_error("task_file_frontmatter_missing", label, "Task file must start with a '---' frontmatter block.")
         )
         return None, "", findings
     end = -1
@@ -408,7 +407,7 @@ def parse_task_file(
             break
     if end == -1:
         findings.append(
-            _error("task_file_frontmatter_missing", label, "Task file frontmatter block is not closed with '---'.")
+            make_error("task_file_frontmatter_missing", label, "Task file frontmatter block is not closed with '---'.")
         )
         return None, "", findings
 
@@ -422,7 +421,7 @@ def parse_task_file(
             item = raw.strip()
             if not item.startswith("- "):
                 findings.append(
-                    _error("task_file_field_invalid", f"{label}.{current_key}", "Indented lines must be '- item' list entries.")
+                    make_error("task_file_field_invalid", f"{label}.{current_key}", "Indented lines must be '- item' list entries.")
                 )
                 continue
             value = _parse_scalar(item[2:])
@@ -433,13 +432,13 @@ def parse_task_file(
         match = re.match(r"^([A-Za-z0-9_-]+)\s*:\s*(.*)$", raw)
         if match is None:
             findings.append(
-                _error("task_file_field_invalid", label, f"Unparsable frontmatter line: {raw.strip()!r}.")
+                make_error("task_file_field_invalid", label, f"Unparsable frontmatter line: {raw.strip()!r}.")
             )
             continue
         key = match.group(1)
         if key in fields:
             findings.append(
-                _error("task_file_field_duplicate", f"{label}.{key}", f"Duplicate frontmatter key {key!r}.")
+                make_error("task_file_field_duplicate", f"{label}.{key}", f"Duplicate frontmatter key {key!r}.")
             )
             continue
         raw_value = match.group(2).strip()
@@ -452,12 +451,12 @@ def parse_task_file(
     unknown = sorted(set(fields) - ALLOWED_TASK_FIELDS)
     if unknown:
         findings.append(
-            _error("task_unknown_field", label, f"Unknown task field(s): {', '.join(unknown)}.")
+            make_error("task_unknown_field", label, f"Unknown task field(s): {', '.join(unknown)}.")
         )
     missing = [f for f in REQUIRED_TASK_FIELDS if f not in fields]
     if missing:
         findings.append(
-            _error("task_missing_field", label, f"Missing required task field(s): {', '.join(missing)}.")
+            make_error("task_missing_field", label, f"Missing required task field(s): {', '.join(missing)}.")
         )
         return None, "", findings
 
@@ -480,7 +479,7 @@ def load_task_files(
     bodies: dict[str, str] = {}
     if not directory.is_dir():
         findings.append(
-            _error("task_source_missing", str(directory), "Declared task-source directory does not exist.")
+            make_error("task_source_missing", str(directory), "Declared task-source directory does not exist.")
         )
         return tasks, bodies, findings
     for path in sorted(directory.glob("*.md")):
@@ -489,7 +488,7 @@ def load_task_files(
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             findings.append(
-                _error("task_file_unreadable", rel, "Task file cannot be read as UTF-8 text.")
+                make_error("task_file_unreadable", rel, "Task file cannot be read as UTF-8 text.")
             )
             continue
         task, body, task_findings = parse_task_file(text, rel)
@@ -500,7 +499,7 @@ def load_task_files(
                 bodies[str(task.get("task_id", ""))] = body
     if not tasks and not findings:
         findings.append(
-            _error("task_source_empty", str(directory), "Task-source directory contains no Markdown task file.")
+            make_error("task_source_empty", str(directory), "Task-source directory contains no Markdown task file.")
         )
     findings.extend(validate_manifest({"schema_version": MANIFEST_SCHEMA_VERSION, "tasks": tasks}))
     return tasks, bodies, findings
@@ -548,7 +547,7 @@ def compare_manifests(
             differing = sorted(k for k in set(left) | set(right) if left.get(k) != right.get(k))
             differences.append(f"{task_id}: differs in {', '.join(differing)}")
     return [
-        _error(
+        make_error(
             "manifest_drift",
             str(plan_path),
             "Plan manifest does not match the task files in "
@@ -573,17 +572,3 @@ def check_source_drift(
     workflow_id = embedded.get("workflow_id")
     derived = derive_manifest(tasks, workflow_id if isinstance(workflow_id, str) else None)
     return compare_manifests(embedded, derived, plan_path, sources)
-
-
-
-def _envelope(findings: list[dict[str, str]], manifest: dict[str, Any] | None) -> dict[str, Any]:
-    tasks = manifest.get("tasks") if isinstance(manifest, dict) else None
-    return {
-        "valid": not has_errors(findings),
-        "check": "tasks",
-        "schema_version": SCHEMA_VERSION,
-        "task_count": len(tasks) if isinstance(tasks, list) else 0,
-        "workflow_id": manifest.get("workflow_id") if isinstance(manifest, dict) else None,
-        "findings": findings,
-        "limitations": TASK_LIMITATIONS,
-    }

@@ -70,7 +70,13 @@ try:
         topological_depth,
         validate_manifest,
     )
-    from scripts.daw_common import artifact_dir, compute_sha256, resolve_bounded_path
+    from scripts.daw_common import (
+        artifact_dir,
+        compute_sha256,
+        make_error,
+        make_warning,
+        resolve_bounded_path,
+    )
     from scripts.worktree import (
         INTEGRATION_BRANCH,
         IntegrationLock,
@@ -93,6 +99,7 @@ try:
         require_repo,
         resolve_state_path,
         run_git,
+        save_state,
         snapshot_tree_state,
     )
 except ImportError:
@@ -109,7 +116,13 @@ except ImportError:
         topological_depth,
         validate_manifest,
     )
-    from daw_common import artifact_dir, compute_sha256, resolve_bounded_path  # type: ignore[import-not-found]
+    from daw_common import (  # type: ignore[import-not-found]
+        artifact_dir,
+        compute_sha256,
+        make_error,
+        make_warning,
+        resolve_bounded_path,
+    )
     from worktree import (  # type: ignore[import-not-found]
         INTEGRATION_BRANCH,
         IntegrationLock,
@@ -132,12 +145,14 @@ except ImportError:
         require_repo,
         resolve_state_path,
         run_git,
+        save_state,
         snapshot_tree_state,
     )
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 100_000
 DEFAULT_VERIFY_TIMEOUT_SECONDS = 600
 DEFAULT_WORKTREE_ROOT = ".worktrees"
+CONTEXT_TRUNCATION_MARKER = "\n<!-- truncated by context budget -->\n"
 
 
 class RunnerError(Exception):
@@ -146,14 +161,6 @@ class RunnerError(Exception):
     def __init__(self, message: str, findings: list[dict[str, str]] | None = None) -> None:
         super().__init__(message)
         self.findings = findings or []
-
-
-def _error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
-
-
-def _warning(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "warning", "code": code, "path": path, "message": message}
 
 
 def _envelope(verb: str, findings: list[dict[str, str]], payload: dict[str, Any]) -> dict[str, Any]:
@@ -375,6 +382,9 @@ def assemble_context(
     budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
     body: str = "",
     work_root: pathlib.Path | None = None,
+    *,
+    constitution_excerpt: str | None = None,
+    project_config_excerpt: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Assemble a bounded context pack for one task.
 
@@ -430,10 +440,18 @@ def assemble_context(
     if body:
         header += "\n\n## Task brief\n\n" + body
 
-    constitution = _constitution_excerpt()
+    constitution = (
+        _constitution_excerpt()
+        if constitution_excerpt is None
+        else constitution_excerpt
+    )
     if constitution:
         header += "\n\n## Suite constitution (excerpt)\n\n" + constitution
-    project_config = _project_config_excerpt(project_root)
+    project_config = (
+        _project_config_excerpt(project_root)
+        if project_config_excerpt is None
+        else project_config_excerpt
+    )
     if project_config:
         header += "\n\n## Project commands (from the agent file config block)\n\n" + project_config
 
@@ -468,11 +486,30 @@ def assemble_context(
             truncated.append({"path": rel, "reason": "budget exhausted"})
             continue
         if len(content) > allowance:
-            content = content[:allowance] + "\n<!-- truncated by context budget -->\n"
+            content_allowance = allowance - len(CONTEXT_TRUNCATION_MARKER)
+            if content_allowance <= 0:
+                truncated.append({"path": rel, "reason": "budget exhausted"})
+                continue
+            sliced = content[:content_allowance]
+            content = sliced + CONTEXT_TRUNCATION_MARKER
             truncated.append({"path": rel, "reason": "truncated to context budget"})
-            included.append({"path": rel, "sha256": digest, "bytes": allowance, "truncated": True})
+            included.append(
+                {
+                    "path": rel,
+                    "sha256": digest,
+                    "bytes": len(sliced.encode("utf-8")),
+                    "truncated": True,
+                }
+            )
         else:
-            included.append({"path": rel, "sha256": digest, "bytes": len(content), "truncated": False})
+            included.append(
+                {
+                    "path": rel,
+                    "sha256": digest,
+                    "bytes": len(content.encode("utf-8")),
+                    "truncated": False,
+                }
+            )
         block += content
         sections.append(block)
         remaining -= len(block)
@@ -764,6 +801,9 @@ def run_agent_in_worktree(
     agent_timeout: int,
     timeout_seconds: int,
     budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
+    *,
+    constitution_excerpt: str | None = None,
+    project_config_excerpt: str | None = None,
 ) -> dict[str, Any]:
     """Run one task's agent inside its worktree and verify it there.
 
@@ -785,6 +825,8 @@ def run_agent_in_worktree(
         budget_chars,
         bodies.get(task_id, ""),
         work_root=worktree_path,
+        constitution_excerpt=constitution_excerpt,
+        project_config_excerpt=project_config_excerpt,
     )
     pack_path = work_dir / f"context-{task_id}.md"
     pack_path.write_text(pack, encoding="utf-8")
@@ -932,7 +974,10 @@ def verb_isolate(args: argparse.Namespace) -> int:
         # comparison afterwards isolates what the *agent* changed. The runner's own
         # writes (the context pack and the evidence directory) are already in place
         # at this point and are therefore not mistaken for an escape.
-        before_state = snapshot_tree_state(project_root)
+        owned = _owned_runner_paths(project_root, work_dir)
+        before_state = snapshot_tree_state(
+            project_root, owned_prefixes=owned[0], owned_paths=owned[1]
+        )
 
         result = run_agent_in_worktree(
             task,
@@ -959,12 +1004,12 @@ def verb_isolate(args: argparse.Namespace) -> int:
         # its sandbox, and a task that escaped is never merged. Comparing hashes
         # rather than path sets is what catches a path that was already dirty
         # before the run and was modified further by the agent.
-        escaped = _batch_escape_paths(project_root, before_state, work_dir)
+        escaped = _batch_escape_paths(project_root, before_state, work_dir, owned=owned)
         if escaped:
             raise RunnerError(
                 "The agent modified files outside its worktree; the task is not mergeable.",
                 [
-                    _error(
+                    make_error(
                         "worktree_escape_detected",
                         str(project_root),
                         "The agent left changes in the main working tree: "
@@ -1034,25 +1079,46 @@ def _changed_paths(repo: pathlib.Path, base_commit: str, commit: str | None) -> 
     return sorted(line.strip() for line in out.splitlines() if line.strip())
 
 
+def _owned_runner_paths(
+    project_root: pathlib.Path,
+    work_dir: pathlib.Path,
+    state_path: pathlib.Path | None = None,
+) -> tuple[list[str], list[str]]:
+    """Return (owned_prefixes, owned_paths) relative to ``project_root``."""
+    resolved_state = state_path or resolve_state_path(project_root, None)
+    return (
+        [
+            repo_relative(project_root, artifact_dir(project_root, "evidence")),
+            repo_relative(project_root, work_dir),
+        ],
+        [
+            repo_relative(project_root, lock_path(project_root)),
+            repo_relative(project_root, resolved_state),
+        ],
+    )
+
+
 def _batch_escape_paths(
     project_root: pathlib.Path,
     before_state: dict[str, str],
     work_dir: pathlib.Path,
     state_path: pathlib.Path | None = None,
+    owned: tuple[list[str], list[str]] | None = None,
 ) -> list[str]:
     """Return main-tree changes outside the runner's artifact paths."""
-    resolved_state = state_path or resolve_state_path(project_root, None)
+    owned_prefixes, owned_paths = owned or _owned_runner_paths(
+        project_root, work_dir, state_path
+    )
+    after_state = snapshot_tree_state(
+        project_root,
+        owned_prefixes=owned_prefixes,
+        owned_paths=owned_paths,
+    )
     return escape_paths(
         before_state,
-        snapshot_tree_state(project_root),
-        owned_prefixes=[
-            repo_relative(project_root, artifact_dir(project_root, "evidence")),
-            repo_relative(project_root, work_dir),
-        ],
-        owned_paths=[
-            repo_relative(project_root, lock_path(project_root)),
-            repo_relative(project_root, resolved_state),
-        ],
+        after_state,
+        owned_prefixes=owned_prefixes,
+        owned_paths=owned_paths,
     )
 
 
@@ -1062,6 +1128,7 @@ def _accepted_set_findings(
     accepted: set[str],
     base_commit: str | None,
     state_path: pathlib.Path | None = None,
+    state: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Check the accepted set against the integration branch's actual content.
 
@@ -1075,12 +1142,16 @@ def _accepted_set_findings(
     checked this way; it is a warning, not an error.
     """
     findings: list[dict[str, str]] = []
-    state = load_state(state_path or resolve_state_path(project_root, None))
+    loaded_state = (
+        state
+        if state is not None
+        else load_state(state_path or resolve_state_path(project_root, None))
+    )
     for task_id in sorted(accepted):
-        entry = state.get("tasks", {}).get(task_id)
+        entry = loaded_state.get("tasks", {}).get(task_id)
         if not isinstance(entry, dict):
             findings.append(
-                _warning(
+                make_warning(
                     "batch_accepted_unverified",
                     task_id,
                     f"Task {task_id} is accepted but the isolation state holds no "
@@ -1099,7 +1170,7 @@ def _accepted_set_findings(
         )
         if code != 0:
             findings.append(
-                _error(
+                make_error(
                     "batch_accepted_not_integrated",
                     task_id,
                     f"Task {task_id} is accepted, but its merge commit {merge_commit} "
@@ -1122,44 +1193,24 @@ def _expected_base_commit(repo: pathlib.Path, base_ref: str | None) -> str | Non
     return out.strip() or None
 
 
-def execute_batch(
+def _prepare_batch_members(
     manifest: dict[str, Any],
-    bodies: dict[str, str],
     project_root: pathlib.Path,
     member_ids: list[str],
     options: dict[str, Any],
-) -> dict[str, Any]:
-    """Run one batch end to end and return what it did.
-
-    Every member branches from the same base commit, so the members are
-    siblings rather than a chain. The green members are merged into a scratch
-    composite branch, and the composite is verified with **every** green
-    member's command before it reaches the integration branch: the gate proves
-    the combination, not just each part.
-
-    The caller holds the integration lock for the whole batch.
-    """
-    repo = project_root
-    findings: list[dict[str, str]] = []
+) -> tuple[str, dict[str, Any], str, str, list[dict[str, Any]]]:
+    """Run batch preflight, ensure integration base, and prepare member worktrees."""
     worktree_root = options["worktree_root"]
-    work_dir = options["work_dir"]
-    argv_template = options["argv_template"]
-    agent_timeout = options["agent_timeout"]
-    timeout_seconds = options["timeout_seconds"]
-    budget_chars = options.get("budget_chars", DEFAULT_CONTEXT_BUDGET_CHARS)
-
-    # -- preflight before creating any branch or worktree --------------
     try:
         require_repo(project_root)
-        expected_base = _expected_base_commit(repo, options.get("base_ref"))
+        expected_base = _expected_base_commit(project_root, options.get("base_ref"))
         if expected_base is not None:
             for task_id in sorted(member_ids):
                 task = find_task(manifest, task_id)
-                check_task_branch_tip(repo, task_id, task["title"], expected_base)
+                check_task_branch_tip(project_root, task_id, task["title"], expected_base)
     except IsolationError as exc:
         raise RunnerError(str(exc), exc.findings) from exc
 
-    # -- base ----------------------------------------------------------
     try:
         prepared = prepare_isolation(
             project_root,
@@ -1172,12 +1223,12 @@ def execute_batch(
     except IsolationError as exc:
         raise RunnerError(str(exc), exc.findings) from exc
     integration = prepared["integration"]
-    base_commit = branch_commit(repo, INTEGRATION_BRANCH)
+    base_commit = branch_commit(project_root, INTEGRATION_BRANCH)
     if not base_commit:
         raise RunnerError(
             "The integration branch has no commit to branch from.",
             [
-                _error(
+                make_error(
                     "batch_no_base_commit",
                     INTEGRATION_BRANCH,
                     f"The integration branch {INTEGRATION_BRANCH} has no commit.",
@@ -1188,13 +1239,12 @@ def execute_batch(
     batch_id = batch.batch_id(base_commit, member_ids)
     composite_branch = batch.composite_branch_name(batch_id)
 
-    # -- members -------------------------------------------------------
     members: list[dict[str, Any]] = []
     for task_id in sorted(member_ids):
         task = find_task(manifest, task_id)
         try:
             worktree_info = ensure_task_worktree(
-                repo,
+                project_root,
                 worktree_root,
                 task_id,
                 task["title"],
@@ -1214,28 +1264,68 @@ def execute_batch(
                 "worktree": worktree_info,
             }
         )
+    return base_commit, integration, batch_id, composite_branch, members
+
+
+def _prepare_batch_state(
+    project_root: pathlib.Path,
+    work_dir: pathlib.Path,
+    members: list[dict[str, Any]],
+    options: dict[str, Any],
+) -> tuple[pathlib.Path, dict[str, Any]]:
+    """Resolve/load isolation state, clear stale failure markers, and create work_dir."""
+    provided_path = options.get("state_path")
+    if isinstance(provided_path, pathlib.Path):
+        state_path = provided_path
+    else:
+        try:
+            state_path = resolve_state_path(project_root, options.get("state"))
+        except IsolationError as exc:
+            raise RunnerError(str(exc), exc.findings) from exc
+    provided_state = options.get("isolation_state")
+    state = provided_state if isinstance(provided_state, dict) else load_state(state_path)
 
     # Clear any prior batch failure marker once the member is prepared for
     # this batch: a stale marker from an earlier batch must not block a retry.
-    try:
-        state_path = resolve_state_path(project_root, options.get("state"))
-    except IsolationError as exc:
-        raise RunnerError(str(exc), exc.findings) from exc
-    state = load_state(state_path)
+    cleared = False
     for member in members:
-        clear_batch_failure(state_path, state, member["task_id"])
+        if clear_batch_failure(state_path, state, member["task_id"], save=False):
+            cleared = True
+    if cleared:
+        save_state(state_path, state)
 
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise RunnerError(f"Work directory cannot be created: {work_dir} ({exc})") from exc
+    return state_path, state
 
-    # -- snapshot ------------------------------------------------------
-    # The escape check spans the whole batch, including the composite phase:
-    # a write into the main tree after the members finished is still an escape.
-    before_state = snapshot_tree_state(project_root)
 
-    # -- parallel phase ------------------------------------------------
+def _run_and_categorize_members(
+    manifest: dict[str, Any],
+    bodies: dict[str, str],
+    project_root: pathlib.Path,
+    members: list[dict[str, Any]],
+    base_commit: str,
+    before_state: dict[str, str],
+    work_dir: pathlib.Path,
+    state_path: pathlib.Path,
+    owned: tuple[list[str], list[str]],
+    options: dict[str, Any],
+) -> tuple[list[dict[str, str]], bool]:
+    """Run batch members concurrently, detect escapes, and collect findings."""
+    findings: list[dict[str, str]] = []
+    argv_template = options["argv_template"]
+    agent_timeout = options["agent_timeout"]
+    timeout_seconds = options["timeout_seconds"]
+    budget_chars = options.get("budget_chars", DEFAULT_CONTEXT_BUDGET_CHARS)
+    constitution_excerpt = options.get("constitution_excerpt")
+    if constitution_excerpt is None:
+        constitution_excerpt = _constitution_excerpt()
+    project_config_excerpt = options.get("project_config_excerpt")
+    if project_config_excerpt is None:
+        project_config_excerpt = _project_config_excerpt(project_root)
+
     def run_member(member: dict[str, Any]) -> dict[str, Any]:
         return run_agent_in_worktree(
             member["task"],
@@ -1249,24 +1339,28 @@ def execute_batch(
             agent_timeout,
             timeout_seconds,
             budget_chars,
+            constitution_excerpt=constitution_excerpt,
+            project_config_excerpt=project_config_excerpt,
         )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
         outcomes = list(pool.map(run_member, members))
 
-    escaped = _batch_escape_paths(project_root, before_state, work_dir, state_path)
+    escaped_paths = _batch_escape_paths(
+        project_root, before_state, work_dir, state_path, owned=owned
+    )
+    escaped = bool(escaped_paths)
     if escaped:
         findings.append(
-            _error(
+            make_error(
                 "worktree_escape_detected",
                 str(project_root),
                 "A batch member modified files outside its worktree: "
-                + ", ".join(escaped)
+                + ", ".join(escaped_paths)
                 + ". Isolation requires workers to operate inside their own worktrees.",
             )
         )
 
-    # -- categorize ----------------------------------------------------
     for member, outcome in zip(members, outcomes):
         member["result"] = outcome
         member["category"] = outcome["category"]
@@ -1276,7 +1370,7 @@ def execute_batch(
         if outcome["category"] == "red":
             if outcome["agent_exit_code"] != 0:
                 findings.append(
-                    _error(
+                    make_error(
                         "batch_task_agent_failed",
                         member["task_id"],
                         f"Task {member['task_id']} was excluded: its agent exited "
@@ -1285,7 +1379,7 @@ def execute_batch(
                 )
             else:
                 findings.append(
-                    _error(
+                    make_error(
                         "batch_task_verification_failed",
                         member["task_id"],
                         f"Task {member['task_id']} was excluded: its own verification "
@@ -1293,10 +1387,6 @@ def execute_batch(
                     )
                 )
 
-    green = [m for m in members if m["category"] == "green"]
-    red = [m for m in members if m["category"] == "red"]
-
-    # -- changed paths -------------------------------------------------
     for member in members:
         changed = _changed_paths(
             pathlib.Path(member["worktree_path"]), base_commit, member["commit"]
@@ -1307,24 +1397,47 @@ def execute_batch(
         member["undeclared_paths"] = undeclared
         if undeclared:
             findings.append(
-                _warning(
+                make_warning(
                     "batch_undeclared_write",
                     member["task_id"],
                     f"Task {member['task_id']} changed paths its declared "
                     f"target_files do not cover: {', '.join(undeclared)}.",
                 )
             )
+    return findings, escaped
 
+
+def _integrate_batch_members(
+    *,
+    repo: pathlib.Path,
+    project_root: pathlib.Path,
+    integration: dict[str, Any],
+    members: list[dict[str, Any]],
+    base_commit: str,
+    batch_id: str,
+    composite_branch: str,
+    timeout_seconds: int,
+    before_state: dict[str, str],
+    work_dir: pathlib.Path,
+    state_path: pathlib.Path,
+    state: dict[str, Any],
+    owned: tuple[list[str], list[str]],
+    escaped: bool,
+) -> dict[str, Any]:
+    """Integrate green batch members directly (singleton) or via composite."""
+    green = [m for m in members if m["category"] == "green"]
+    red = [m for m in members if m["category"] == "red"]
+    findings: list[dict[str, str]] = []
+    integration_findings: list[dict[str, str]] = []
     composite: dict[str, Any] | None = None
     integrated = False
     merge_commit: str | None = None
-    composite_record_path: pathlib.Path | None = None
-    composite_record_sha256: str | None = None
-    composite_exit_codes: dict[str, int] = {}
-    composite_verifications: dict[str, dict[str, Any]] = {}
+    record_path: pathlib.Path | None = None
+    record_sha256: str | None = None
+    exit_codes: dict[str, int] = {}
+    verifications: dict[str, dict[str, Any]] = {}
     composite_red = False
     conflict_occurred = False
-    integration_findings: list[dict[str, str]] = []
 
     if escaped:
         # An escaping member may have modified the user's working tree. Do not
@@ -1352,10 +1465,12 @@ def execute_batch(
                     "branch": member["branch"],
                     "commit": member["commit"],
                 },
+                state_path=state_path,
+                state=state,
             )
         except IsolationError as exc:
             merge_findings = exc.findings or [
-                _error("merge_not_verified", member["task_id"], str(exc))
+                make_error("merge_not_verified", member["task_id"], str(exc))
             ]
             findings.extend(merge_findings)
             integration_findings.extend(merge_findings)
@@ -1378,6 +1493,7 @@ def execute_batch(
             before_state,
             work_dir,
             state_path,
+            owned=owned,
         )
         findings.extend(outcome["findings"])
         integration_findings.extend(outcome["findings"])
@@ -1388,16 +1504,49 @@ def execute_batch(
             for member in green:
                 member["merge_commit"] = merge_commit
                 member["verified_commit"] = outcome["composite"]["commit"]
-        composite_record_path = outcome.get("record_path")
-        composite_record_sha256 = outcome.get("record_sha256")
-        composite_exit_codes = outcome.get("exit_codes", {})
-        composite_verifications = outcome.get("verifications", {})
+        record_path = outcome.get("record_path")
+        record_sha256 = outcome.get("record_sha256")
+        exit_codes = outcome.get("exit_codes", {})
+        verifications = outcome.get("verifications", {})
         composite_red = bool(outcome.get("composite_red"))
         conflict_occurred = bool(outcome.get("conflict_occurred"))
         if any(f.get("code") == "worktree_escape_detected" for f in outcome["findings"]):
             escaped = True
 
-    # -- record state --------------------------------------------------
+    return {
+        "integrated": integrated,
+        "merge_commit": merge_commit,
+        "composite": composite,
+        "record_path": record_path,
+        "record_sha256": record_sha256,
+        "exit_codes": exit_codes,
+        "verifications": verifications,
+        "composite_red": composite_red,
+        "conflict_occurred": conflict_occurred,
+        "integration_findings": integration_findings,
+        "findings": findings,
+        "escaped": escaped,
+    }
+
+
+def _persist_batch_state(
+    project_root: pathlib.Path,
+    state_path: pathlib.Path,
+    state: dict[str, Any],
+    batch_id: str,
+    composite_branch: str,
+    members: list[dict[str, Any]],
+    integration_outcome: dict[str, Any],
+) -> None:
+    """Persist member isolation entries and any batch failure markers in phases."""
+    integrated = integration_outcome["integrated"]
+    escaped = integration_outcome["escaped"]
+    composite = integration_outcome["composite"]
+    record_path = integration_outcome["record_path"]
+    record_sha256 = integration_outcome["record_sha256"]
+    exit_codes = integration_outcome["exit_codes"]
+    conflict_occurred = integration_outcome["conflict_occurred"]
+
     for member in members:
         was_integrated = bool(member.get("merge_commit")) and integrated
         entry: dict[str, Any] = {
@@ -1413,38 +1562,117 @@ def execute_batch(
             "merge_commit": member.get("merge_commit"),
             "verified_commit": member.get("verified_commit") or member["commit"],
         }
-        record_task_entry(state_path, state, member["task_id"], entry)
+        record_task_entry(state_path, state, member["task_id"], entry, save=False)
+    if members:
+        save_state(state_path, state)
 
-    # -- failure markers -----------------------------------------------
-    if not integrated and (composite_record_path is not None or conflict_occurred):
+    if not integrated and (record_path is not None or conflict_occurred):
         marker = {
             "batch_id": batch_id,
             "composite_branch": composite_branch,
             "composite_commit": composite["commit"] if composite else None,
             "composite_record_path": (
-                composite_record_path.relative_to(project_root).as_posix()
-                if composite_record_path is not None
+                record_path.relative_to(project_root).as_posix()
+                if record_path is not None
                 else None
             ),
-            "composite_record_sha256": composite_record_sha256,
+            "composite_record_sha256": record_sha256,
         }
         for member in members:
             per_member = dict(marker)
             per_member["member_exit_code"] = member["verification"].get("exit_code")
-            per_member["composite_exit_code"] = composite_exit_codes.get(member["task_id"])
-            record_batch_failure(state_path, state, member["task_id"], per_member)
+            per_member["composite_exit_code"] = exit_codes.get(member["task_id"])
+            record_batch_failure(
+                state_path, state, member["task_id"], per_member, save=False
+            )
+        if members:
+            save_state(state_path, state)
 
-    # -- review dispatch packages --------------------------------------
+
+def execute_batch(
+    manifest: dict[str, Any],
+    bodies: dict[str, str],
+    project_root: pathlib.Path,
+    member_ids: list[str],
+    options: dict[str, Any],
+) -> dict[str, Any]:
+    """Run one batch end to end and return what it did.
+
+    Every member branches from the same base commit, so the members are
+    siblings rather than a chain. The green members are merged into a scratch
+    composite branch, and the composite is verified with **every** green
+    member's command before it reaches the integration branch: the gate proves
+    the combination, not just each part.
+
+    The caller holds the integration lock for the whole batch.
+    """
+    work_dir = options["work_dir"]
+    timeout_seconds = options["timeout_seconds"]
+
+    base_commit, integration, batch_id, composite_branch, members = (
+        _prepare_batch_members(manifest, project_root, member_ids, options)
+    )
+    state_path, state = _prepare_batch_state(project_root, work_dir, members, options)
+
+    # The escape check spans the whole batch, including the composite phase:
+    # a write into the main tree after the members finished is still an escape.
+    owned = _owned_runner_paths(project_root, work_dir, state_path)
+    before_state = snapshot_tree_state(
+        project_root, owned_prefixes=owned[0], owned_paths=owned[1]
+    )
+
+    findings, escaped = _run_and_categorize_members(
+        manifest,
+        bodies,
+        project_root,
+        members,
+        base_commit,
+        before_state,
+        work_dir,
+        state_path,
+        owned,
+        options,
+    )
+
+    integration_outcome = _integrate_batch_members(
+        repo=project_root,
+        project_root=project_root,
+        integration=integration,
+        members=members,
+        base_commit=base_commit,
+        batch_id=batch_id,
+        composite_branch=composite_branch,
+        timeout_seconds=timeout_seconds,
+        before_state=before_state,
+        work_dir=work_dir,
+        state_path=state_path,
+        state=state,
+        owned=owned,
+        escaped=escaped,
+    )
+    findings.extend(integration_outcome["findings"])
+
+    _persist_batch_state(
+        project_root,
+        state_path,
+        state,
+        batch_id,
+        composite_branch,
+        members,
+        integration_outcome,
+    )
+
+    integrated = integration_outcome["integrated"]
     review_dispatch = _dispatch_batch_reviews(
         project_root=project_root,
         base_commit=base_commit,
         members=members,
         findings=findings,
-        integration_findings=integration_findings,
-        composite_exit_codes=composite_exit_codes,
-        composite_verifications=composite_verifications,
-        composite_red=composite_red,
-        conflict_occurred=conflict_occurred,
+        integration_findings=integration_outcome["integration_findings"],
+        composite_exit_codes=integration_outcome["exit_codes"],
+        composite_verifications=integration_outcome["verifications"],
+        composite_red=integration_outcome["composite_red"],
+        conflict_occurred=integration_outcome["conflict_occurred"],
     )
 
     return {
@@ -1469,7 +1697,7 @@ def execute_batch(
             for member in members
         ],
         "integrated": integrated,
-        "composite": composite,
+        "composite": integration_outcome["composite"],
         "findings": findings,
         "review_dispatch": review_dispatch,
     }
@@ -1606,6 +1834,7 @@ def _integrate_composite(
     before_state: dict[str, str],
     work_dir: pathlib.Path,
     state_path: pathlib.Path | None = None,
+    owned: tuple[list[str], list[str]] | None = None,
 ) -> dict[str, Any]:
     """Build the composite, verify it with every member's command, and merge it.
 
@@ -1640,7 +1869,7 @@ def _integrate_composite(
             ],
         )
     except IsolationError as exc:
-        findings.extend(exc.findings or [_error("batch_merge_conflict", batch_id, str(exc))])
+        findings.extend(exc.findings or [make_error("batch_merge_conflict", batch_id, str(exc))])
         return {
             "integrated": False,
             "composite": None,
@@ -1680,7 +1909,7 @@ def _integrate_composite(
         if outcome["exit_code"] != 0:
             composite_red = True
             findings.append(
-                _error(
+                make_error(
                     "batch_composite_verification_failed",
                     member["task_id"],
                     f"The composite of batch {batch_id} failed task "
@@ -1725,10 +1954,12 @@ def _integrate_composite(
             "record_sha256": record_sha256,
         }
 
-    escaped = _batch_escape_paths(project_root, before_state, work_dir, state_path)
+    escaped = _batch_escape_paths(
+        project_root, before_state, work_dir, state_path, owned=owned
+    )
     if escaped:
         findings.append(
-            _error(
+            make_error(
                 "worktree_escape_detected",
                 str(project_root),
                 "Composite verification modified files outside its worktree: "
@@ -1757,7 +1988,7 @@ def _integrate_composite(
             record_path,
         )
     except IsolationError as exc:
-        findings.extend(exc.findings or [_error("batch_merge_conflict", batch_id, str(exc))])
+        findings.extend(exc.findings or [make_error("batch_merge_conflict", batch_id, str(exc))])
         return {
             "integrated": False,
             "composite": composite,
@@ -1818,7 +2049,7 @@ def verb_batch(args: argparse.Namespace) -> int:
         raise RunnerError(
             "Pinned task(s) are not ready: " + ", ".join(sorted(not_ready)) + ".",
             [
-                _error(
+                make_error(
                     "batch_task_not_ready",
                     task_id,
                     f"Task {task_id} is pinned but not ready. A task is ready when "
@@ -1875,7 +2106,12 @@ def verb_batch(args: argparse.Namespace) -> int:
     except IsolationError as exc:
         raise RunnerError(str(exc), exc.findings) from exc
     try:
-        accepted = set(accepted) | set(accepted_task_ids(load_state(resolve_state_path(project_root, None))))
+        try:
+            state_path = resolve_state_path(project_root, None)
+        except IsolationError as exc:
+            raise RunnerError(str(exc), exc.findings) from exc
+        isolation_state = load_state(state_path)
+        accepted = set(accepted) | set(accepted_task_ids(isolation_state))
 
         repo = project_root
         try:
@@ -1883,7 +2119,14 @@ def verb_batch(args: argparse.Namespace) -> int:
         except IsolationError as exc:
             raise RunnerError(str(exc), exc.findings) from exc
         base_commit = _expected_base_commit(repo, args.base_ref)
-        accepted_findings = _accepted_set_findings(project_root, repo, accepted, base_commit)
+        accepted_findings = _accepted_set_findings(
+            project_root,
+            repo,
+            accepted,
+            base_commit,
+            state_path=state_path,
+            state=isolation_state,
+        )
         findings.extend(accepted_findings)
         if any(f["severity"] == "error" for f in accepted_findings):
             raise RunnerError(
@@ -1900,6 +2143,10 @@ def verb_batch(args: argparse.Namespace) -> int:
             "base_ref": args.base_ref,
             "add_ignore": args.add_ignore,
             "budget_chars": args.budget_chars,
+            "state_path": state_path,
+            "isolation_state": isolation_state,
+            "constitution_excerpt": _constitution_excerpt(),
+            "project_config_excerpt": _project_config_excerpt(project_root),
         }
 
         batches: list[dict[str, Any]] = []
@@ -1989,6 +2236,8 @@ def _dry_run_afk(
     processed = 0
     stopped = "no_ready_task"
     work_dir = resolve_work_dir(project_root, args.work_dir)
+    constitution_excerpt = _constitution_excerpt()
+    project_config_excerpt = _project_config_excerpt(project_root)
     while processed < args.max_tasks:
         ready, _, _ = compute_ready(manifest, dry_accepted)
         if not ready:
@@ -2017,7 +2266,13 @@ def _dry_run_afk(
         for task_id in group:
             task = find_task(manifest, task_id)
             _, meta = assemble_context(
-                manifest, task, project_root, args.budget_chars, bodies.get(task_id, "")
+                manifest,
+                task,
+                project_root,
+                args.budget_chars,
+                bodies.get(task_id, ""),
+                constitution_excerpt=constitution_excerpt,
+                project_config_excerpt=project_config_excerpt,
             )
             substitutions = {
                 "{prompt_file}": str(work_dir / f"context-{task_id}.md"),
@@ -2070,9 +2325,9 @@ def verb_run(args: argparse.Namespace) -> int:
         state_path = resolve_state_path(project_root, args.state)
     except IsolationError as exc:
         raise RunnerError(str(exc), exc.findings) from exc
-    accepted |= set(accepted_task_ids(load_state(state_path)))
 
     if args.dry_run:
+        accepted |= set(accepted_task_ids(load_state(state_path)))
         result = _dry_run_afk(
             manifest, bodies, project_root, accepted, findings, argv_template, args
         )
@@ -2100,6 +2355,9 @@ def verb_run(args: argparse.Namespace) -> int:
     stopped = "no_ready_task"
 
     try:
+        isolation_state = load_state(state_path)
+        accepted |= set(accepted_task_ids(isolation_state))
+
         try:
             require_repo(project_root)
         except IsolationError as exc:
@@ -2108,7 +2366,12 @@ def verb_run(args: argparse.Namespace) -> int:
         base_ref = getattr(args, "base_ref", None)
         base_commit = _expected_base_commit(project_root, base_ref)
         accepted_findings = _accepted_set_findings(
-            project_root, project_root, accepted, base_commit, state_path=state_path
+            project_root,
+            project_root,
+            accepted,
+            base_commit,
+            state_path=state_path,
+            state=isolation_state,
         )
         findings.extend(accepted_findings)
         if any(f["severity"] == "error" for f in accepted_findings):
@@ -2127,6 +2390,10 @@ def verb_run(args: argparse.Namespace) -> int:
             "add_ignore": getattr(args, "add_ignore", False),
             "budget_chars": args.budget_chars,
             "state": args.state,
+            "state_path": state_path,
+            "isolation_state": isolation_state,
+            "constitution_excerpt": _constitution_excerpt(),
+            "project_config_excerpt": _project_config_excerpt(project_root),
         }
 
         while processed < args.max_tasks:
@@ -2194,14 +2461,56 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--project-root", required=True, help="Project root directory.")
         sub.add_argument("--format", choices=["text", "json"], default="text", help="Output format.")
 
+    def add_accepted_args(sub: argparse.ArgumentParser, *, accepted_help: str) -> None:
+        sub.add_argument("--accepted", action="append", help=accepted_help)
+        sub.add_argument("--accepted-file", help="File with one accepted task id per line.")
+
+    def add_isolated_execution_args(
+        sub: argparse.ArgumentParser, *, dry_run_help: str
+    ) -> None:
+        sub.add_argument(
+            "--agent-command", required=True, help="JSON argv array for the agent command."
+        )
+        sub.add_argument(
+            "--worktree-root",
+            default=DEFAULT_WORKTREE_ROOT,
+            help=f"Container directory for worktrees (default {DEFAULT_WORKTREE_ROOT}).",
+        )
+        sub.add_argument(
+            "--base-ref", help="Base ref for the integration branch (default the current HEAD)."
+        )
+        sub.add_argument(
+            "--add-ignore",
+            action="store_true",
+            help="Append the worktree container to the repository-local exclude file when it "
+            "is not already ignored. Never touches .gitignore or global git config.",
+        )
+        sub.add_argument(
+            "--budget-chars",
+            type=int,
+            default=DEFAULT_CONTEXT_BUDGET_CHARS,
+            help="Context budget.",
+        )
+        sub.add_argument(
+            "--timeout",
+            type=int,
+            default=DEFAULT_VERIFY_TIMEOUT_SECONDS,
+            help="Verification timeout.",
+        )
+        sub.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
+        sub.add_argument(
+            "--work-dir",
+            default=None,
+            help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).",
+        )
+        sub.add_argument("--dry-run", action="store_true", help=dry_run_help)
+
     next_parser = subparsers.add_parser("next", help="Compute the deterministic ready set.")
     add_common(next_parser)
-    next_parser.add_argument(
-        "--accepted",
-        action="append",
-        help="Task id (or comma-separated ids) already accepted at the current revision.",
+    add_accepted_args(
+        next_parser,
+        accepted_help="Task id (or comma-separated ids) already accepted at the current revision.",
     )
-    next_parser.add_argument("--accepted-file", help="File with one accepted task id per line.")
     next_parser.set_defaults(func=verb_next)
 
     context_parser = subparsers.add_parser("context", help="Assemble a bounded context pack for one task.")
@@ -2241,28 +2550,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common(isolate_parser)
     isolate_parser.add_argument("--task", required=True, help="Task id to isolate.")
-    isolate_parser.add_argument(
-        "--agent-command", required=True, help="JSON argv array for the agent command."
+    add_isolated_execution_args(
+        isolate_parser, dry_run_help="Prepare only; do not run the agent or merge."
     )
-    isolate_parser.add_argument(
-        "--worktree-root",
-        default=DEFAULT_WORKTREE_ROOT,
-        help=f"Container directory for worktrees (default {DEFAULT_WORKTREE_ROOT}).",
-    )
-    isolate_parser.add_argument(
-        "--base-ref", help="Base ref for the integration branch (default the current HEAD)."
-    )
-    isolate_parser.add_argument(
-        "--add-ignore",
-        action="store_true",
-        help="Append the worktree container to the repository-local exclude file when it "
-        "is not already ignored. Never touches .gitignore or global git config.",
-    )
-    isolate_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
-    isolate_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
-    isolate_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
-    isolate_parser.add_argument("--work-dir", default=None, help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).")
-    isolate_parser.add_argument("--dry-run", action="store_true", help="Prepare only; do not run the agent or merge.")
     isolate_parser.set_defaults(func=verb_isolate)
 
     batch_parser = subparsers.add_parser(
@@ -2270,9 +2560,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run independent ready tasks concurrently and integrate the composite.",
     )
     add_common(batch_parser)
-    batch_parser.add_argument(
-        "--agent-command", required=True, help="JSON argv array for the agent command."
-    )
     batch_parser.add_argument(
         "--tasks",
         action="append",
@@ -2284,34 +2571,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Maximum members per batch (default: unlimited).",
     )
-    batch_parser.add_argument("--accepted", action="append", help="Already accepted task ids.")
-    batch_parser.add_argument("--accepted-file", help="File with one accepted task id per line.")
-    batch_parser.add_argument(
-        "--worktree-root",
-        default=DEFAULT_WORKTREE_ROOT,
-        help=f"Container directory for worktrees (default {DEFAULT_WORKTREE_ROOT}).",
+    add_accepted_args(batch_parser, accepted_help="Already accepted task ids.")
+    add_isolated_execution_args(
+        batch_parser, dry_run_help="Report the planned batches; create nothing."
     )
-    batch_parser.add_argument(
-        "--base-ref", help="Base ref for the integration branch (default the current HEAD)."
-    )
-    batch_parser.add_argument(
-        "--add-ignore",
-        action="store_true",
-        help="Append the worktree container to the repository-local exclude file when it "
-        "is not already ignored. Never touches .gitignore or global git config.",
-    )
-    batch_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
-    batch_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
-    batch_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
-    batch_parser.add_argument("--work-dir", default=None, help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).")
-    batch_parser.add_argument("--dry-run", action="store_true", help="Report the planned batches; create nothing.")
     batch_parser.set_defaults(func=verb_batch)
 
     run_parser = subparsers.add_parser("run", help="AFK loop over ready tasks using an operator-supplied agent command.")
     add_common(run_parser)
-    run_parser.add_argument("--agent-command", required=True, help="JSON argv array for the agent command.")
-    run_parser.add_argument("--accepted", action="append", help="Already accepted task ids.")
-    run_parser.add_argument("--accepted-file", help="File with one accepted task id per line.")
+    add_accepted_args(run_parser, accepted_help="Already accepted task ids.")
     run_parser.add_argument("--max-tasks", type=int, default=1, help="Maximum tasks to process in this run.")
     run_parser.add_argument(
         "--max-concurrency",
@@ -2324,25 +2592,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Isolation state file path (default: project evidence directory).",
     )
-    run_parser.add_argument(
-        "--worktree-root",
-        default=DEFAULT_WORKTREE_ROOT,
-        help=f"Container directory for worktrees (default {DEFAULT_WORKTREE_ROOT}).",
+    add_isolated_execution_args(
+        run_parser, dry_run_help="Print the agent argv without executing it."
     )
-    run_parser.add_argument(
-        "--base-ref", help="Base ref for the integration branch (default the current HEAD)."
-    )
-    run_parser.add_argument(
-        "--add-ignore",
-        action="store_true",
-        help="Append the worktree container to the repository-local exclude file when it "
-        "is not already ignored. Never touches .gitignore or global git config.",
-    )
-    run_parser.add_argument("--budget-chars", type=int, default=DEFAULT_CONTEXT_BUDGET_CHARS, help="Context budget.")
-    run_parser.add_argument("--timeout", type=int, default=DEFAULT_VERIFY_TIMEOUT_SECONDS, help="Verification timeout.")
-    run_parser.add_argument("--agent-timeout", type=int, default=1800, help="Agent command timeout.")
-    run_parser.add_argument("--work-dir", default=None, help="Directory for context packs and agent logs (default: the project's evidence directory + runner/).")
-    run_parser.add_argument("--dry-run", action="store_true", help="Print the agent argv without executing it.")
     run_parser.set_defaults(func=verb_run)
 
     return parser
@@ -2359,7 +2611,7 @@ def main(argv: list[str] | None = None) -> int:
             "check": f"run:{args.verb}",
             "schema_version": MANIFEST_SCHEMA_VERSION,
             "findings": exc.findings
-            or [{"severity": "error", "code": "runner_error", "path": "runner", "message": str(exc)}],
+            or [make_error("runner_error", "runner", str(exc))],
             "limitations": ["Explicitly invoked per unit of work; never a daemon, scheduler, or background service."],
         }
         _print(payload, getattr(args, "format", "text"))

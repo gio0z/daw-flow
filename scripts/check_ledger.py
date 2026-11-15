@@ -9,7 +9,7 @@ from typing import Any
 
 try:
     from scripts.daw_common import (
-        SCHEMA_VERSION,
+        build_result as _build_result,
         compute_sha256,
         make_error as _error,
         make_warning as _warning,
@@ -19,7 +19,7 @@ try:
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
-        SCHEMA_VERSION,
+        build_result as _build_result,
         compute_sha256,
         make_error as _error,
         make_warning as _warning,
@@ -45,21 +45,6 @@ LEDGER_LIMITATIONS = [
     "Validator is read-only and does not persist state; parent workflow must verify transition provenance and record actual state changes.",
     "Durable-path check is a deterministic path-segment denylist (tmp/temp/.tmp/scratch/.cache/__pycache__/dot-segments except .github); it cannot detect gitignored paths.",
 ]
-
-
-def _build_result(
-    check: str,
-    findings: list[dict[str, str]],
-    limitations: list[str],
-) -> dict[str, Any]:
-    valid = not any(f["severity"] == "error" for f in findings)
-    return {
-        "valid": valid,
-        "check": check,
-        "schema_version": SCHEMA_VERSION,
-        "findings": findings,
-        "limitations": limitations,
-    }
 
 
 def is_durable(path_str: str) -> bool:

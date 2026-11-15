@@ -39,11 +39,19 @@
 - **Task Manifest Derivation Tool:** [`scripts/derive_tasks.py`](scripts/derive_tasks.py) projects a plan's hand-authored Markdown task files into the machine manifest embedded in that plan. It follows the ledger deriver's discipline: without `--write` it prints the manifest it would write and touches nothing, it refuses to run when the task files fail validation, and it never invents a task field. The Markdown task files stay the single hand-authored source; the embedded manifest is their verified projection, and `validate.py tasks` reports any drift between them.
 - **Deterministic Execution Runner:** [`scripts/run.py`](scripts/run.py) (`next`/`context`/`verify`/`isolate`/`run`) consumes the task manifest carried by a saved plan and makes three decisions mechanically: which task may run next, what bounded context a worker receives, and whether the task's verification command actually passed. It is explicitly invoked per unit of work — never a daemon, scheduler, or background service — never pushes/tags/publishes/deploys, never writes to a protected branch, and never installs or discovers an agent command. Contract: [`references/execution-runner.md`](references/execution-runner.md).
 - **Task Isolation Tool:** [`scripts/worktree.py`](scripts/worktree.py) gives every task its own git branch and worktree, based on a local integration branch, and merges a task branch only when that task's verification evidence is green at the merged commit. It is the deterministic path for plan-driven isolation; it never touches a protected branch, a remote, or the user's own working tree (an agent that writes outside its worktree is detected and not integrated). It is the suite's third writer alongside `derive_ledger.py` and `derive_tasks.py`: it writes only worktree metadata and a state file inside the project root, never a specification or a plan.
+- **Parallel Batch Mechanism:** [`scripts/batch.py`](scripts/batch.py) determines prefix-aware disjoint write sets for parallel batches (consumed by `scripts/run.py`, never importing it) and runs the composite branch merge gate (`merge_composite_branch`).
+- **Packaging, CLI & Offline Installer:**
+  - [`scripts/install.py`](scripts/install.py): Offline, standard-library installer (`install`, `status`, `uninstall`, `doctor`) with receipt verification, `--link` dev mode, `--agent all`, pre-mutation tamper checks, and sibling alias symlinks.
+  - [`scripts/daw.py`](scripts/daw.py): Unified stdlib CLI entrypoint (`daw`) dispatching to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, and `derive-tasks`.
+  - [`scripts/package_layout.py`](scripts/package_layout.py): Packaging and distribution layout contract (`OPERATIONAL_SCRIPTS`, `REQUIRED_FILES`, `REQUIRED_DIRS`, `OPTIONAL_DIRS`, `operational_entries`).
+  - [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) & [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): Claude Code native plugin and marketplace manifests.
+  - [`pyproject.toml`](pyproject.toml): Zero-dependency PEP 621 package metadata exposing the `daw` console script.
 - **Behavioral Evaluations & Benchmarks (Developer Tooling):** [`tools/evaluation/evaluate.py`](tools/evaluation/evaluate.py), [`tools/evaluation/wizard_bench.py`](tools/evaluation/wizard_bench.py), and evaluation guides in [`docs/evaluation/`](docs/evaluation/) run explicitly configured agent commands in disposable fixtures and retain evidence. Plumbing tests do not establish model quality.
 - **Test Suites & Fixtures:**
   - [`tests/test_validate.py`](tests/test_validate.py): Standard library `unittest` verifying package checks, contract schemas, boundary traversal prevention, duplicate-key rejection, and stage transitions.
   - [`tests/test_route.py`](tests/test_route.py): Standard library `unittest` verifying route calculations, schema constraints, path containment, high-risk flags, error envelopes, and `--check-suite`.
   - [`tests/test_surface.py`](tests/test_surface.py): Standard library `unittest` verifying surface-session shape rules and the contract completion gate that consumes them.
+  - [`tests/test_daw_cli.py`](tests/test_daw_cli.py): Standard library `unittest` verifying `scripts/daw.py`, `.claude-plugin/plugin.json` validation, and `pyproject.toml` version sync.
   - [`tests/fixtures/wizard-bench`](tests/fixtures/wizard-bench): Evaluation benchmark scenario fixtures (bookmark manager, expense tracker, log analyzer).
   - Test Execution: `python3 -m unittest discover -s tests -p "test_*.py"` or isolated test runners (`pytest`).
 - **Operational & Schema References:**
@@ -55,7 +63,7 @@
   - [`references/task-contract.example.json`](references/task-contract.example.json): Canonical JSON task-contract example envelope.
   - [`references/change-coupling.md`](references/change-coupling.md): Change-coupling taxonomy, dependency tracing heuristics, and boundary unentanglement reference.
   - [`references/developer-lifecycle.md`](references/developer-lifecycle.md): Professional delivery lifecycle protocols (inner loop, time-boxing, spike, refactor, maintenance, bisection, commit hygiene, PR/CI, review feedback, release, retro).
-- - [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md), [`templates/erd.md`](templates/erd.md) (conditional).
+- **Document Templates:** [`templates/brd.md`](templates/brd.md), [`templates/prd.md`](templates/prd.md), [`templates/frd.md`](templates/frd.md), [`templates/techstack.md`](templates/techstack.md), [`templates/design.md`](templates/design.md), [`templates/wireframe.md`](templates/wireframe.md), [`templates/ui-ux.md`](templates/ui-ux.md), [`templates/blueprint.md`](templates/blueprint.md), [`templates/security.md`](templates/security.md), [`templates/qa.md`](templates/qa.md), [`templates/deployment.md`](templates/deployment.md), [`templates/runbook.md`](templates/runbook.md), [`templates/roadmap.md`](templates/roadmap.md), [`templates/erd.md`](templates/erd.md) (conditional).
 - **Standalone Repository Specifications:**
   - [`CHANGELOG.md`](CHANGELOG.md): Chronological suite change history and architecture decisions log.
   - [`docs/BRD.md`](docs/BRD.md): Business Requirements Document.
@@ -82,3 +90,25 @@
 ## BLOCKERS
 
 - None currently known. The repository quality gate passed using an isolated pytest runner; rerun the gate before each push rather than treating this record as authorization or a reusable pass.
+
+<!-- daw-config:start -->
+
+## DAW Configuration
+
+- schema: 1
+- daw_version: 0.5.0
+- spec_dir: docs
+- test_command: python3 -m unittest discover -s tests -p "test_*.py"
+- lint_command: none
+- build_command: none
+- workspace: in-place
+- high_risk_paths: .github/workflows/, scripts/install.py
+- issue_tracker: github
+- default_branch: main
+- commit_convention: conventional
+- pr_template: none
+- ci_checks: Checks
+- release_process: changelog+tags
+- branch_pattern: feature/*
+
+<!-- daw-config:end -->

@@ -31,6 +31,7 @@ plan, and never records parent acceptance.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import pathlib
@@ -315,18 +316,56 @@ def _status_paths(repo: pathlib.Path) -> list[str]:
     return paths
 
 
-def snapshot_tree_state(repo: pathlib.Path) -> dict[str, str]:
+def _normalize_owned(
+    owned_prefixes: Sequence[str] = (),
+    owned_paths: Sequence[str] = (),
+) -> tuple[tuple[str, ...], frozenset[str]]:
+    prefixes = tuple(
+        p for p in (prefix.strip("/") for prefix in owned_prefixes if prefix) if p
+    )
+    exact = frozenset(
+        p for p in (path.strip("/") for path in owned_paths if path) if p
+    )
+    return prefixes, exact
+
+
+def _is_owned_path(
+    relative: str,
+    prefixes: tuple[str, ...],
+    exact: frozenset[str],
+) -> bool:
+    if relative in exact:
+        return True
+    return any(
+        relative == prefix or relative.startswith(prefix + "/")
+        for prefix in prefixes
+    )
+
+
+def snapshot_tree_state(
+    repo: pathlib.Path,
+    owned_prefixes: Sequence[str] = (),
+    owned_paths: Sequence[str] = (),
+) -> dict[str, str]:
     """Map every dirty path in the working tree to the SHA-256 of its bytes.
 
     The value is the empty string for a path that does not exist (a deleted
     file). Untracked directories are expanded into their individual files
     (``-uall``) so a runner artifact is never mistaken for a new directory.
 
+    When ``owned_prefixes`` or ``owned_paths`` are provided, matching paths are
+    excluded before SHA-256 hashing so large or growing runner logs are never
+    hashed unnecessarily.
+
     A failing ``git status`` raises: a detection tool that cannot see the
     tree must not report the tree as clean.
     """
+    prefixes, exact = _normalize_owned(owned_prefixes, owned_paths)
+    has_owned = bool(prefixes or exact)
     state: dict[str, str] = {}
     for relative in _status_paths(repo):
+        if has_owned and _is_owned_path(relative, prefixes, exact):
+            continue
         target = repo / relative
         try:
             state[relative] = compute_sha256(target)
@@ -359,25 +398,16 @@ def escape_paths(
     one of them is runner-owned. ``owned_paths`` are exact repository-relative
     paths.
     """
-    prefixes = tuple(prefix.strip("/") for prefix in owned_prefixes if prefix)
-    exact = tuple(path.strip("/") for path in owned_paths if path)
-
-    def owned(relative: str) -> bool:
-        if relative in exact:
-            return True
-        return any(
-            relative == prefix or relative.startswith(prefix + "/")
-            for prefix in prefixes
-        )
+    prefixes, exact = _normalize_owned(owned_prefixes, owned_paths)
 
     escaped: list[str] = []
     for relative, digest in after.items():
-        if owned(relative):
+        if _is_owned_path(relative, prefixes, exact):
             continue
         if relative not in before or before[relative] != digest:
             escaped.append(relative)
     for relative in before:
-        if relative in after or owned(relative):
+        if relative in after or _is_owned_path(relative, prefixes, exact):
             continue
         escaped.append(relative)
     return sorted(escaped)
@@ -503,6 +533,8 @@ def record_task_entry(
     state: dict[str, Any],
     task_id: str,
     entry: dict[str, Any],
+    *,
+    save: bool = True,
 ) -> None:
     """Merge ``entry`` into the task's state entry and save the state file.
 
@@ -510,7 +542,8 @@ def record_task_entry(
     that records one fact about a task does not erase the others.
     """
     _task_entry(state, task_id).update(entry)
-    save_state(state_path, state)
+    if save:
+        save_state(state_path, state)
 
 
 def record_batch_failure(
@@ -518,21 +551,30 @@ def record_batch_failure(
     state: dict[str, Any],
     task_id: str,
     marker: dict[str, Any],
+    *,
+    save: bool = True,
 ) -> None:
     """Record that the batch this task belongs to was proven broken."""
     _task_entry(state, task_id)["batch_failure"] = marker
-    save_state(state_path, state)
+    if save:
+        save_state(state_path, state)
 
 
 def clear_batch_failure(
-    state_path: pathlib.Path, state: dict[str, Any], task_id: str
-) -> None:
+    state_path: pathlib.Path,
+    state: dict[str, Any],
+    task_id: str,
+    *,
+    save: bool = True,
+) -> bool:
     """Remove a task's batch failure marker, if it has one."""
     entry = state.get("tasks", {}).get(task_id)
     if not isinstance(entry, dict) or "batch_failure" not in entry:
-        return
+        return False
     del entry["batch_failure"]
-    save_state(state_path, state)
+    if save:
+        save_state(state_path, state)
+    return True
 
 
 def batch_failure_marker(state: dict[str, Any], task_id: str) -> dict[str, Any] | None:
@@ -777,6 +819,7 @@ def merge_task_branch(
     project_root: pathlib.Path | None = None,
     evidence: dict[str, Any] | None = None,
     state_path: pathlib.Path | None = None,
+    state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Merge a task branch into the integration branch, aborting on conflict.
 
@@ -796,10 +839,11 @@ def merge_task_branch(
         raise IsolationError(f"Integration worktree is missing: {worktree_path}")
 
     resolved_state = state_path
-    if resolved_state is None and project_root is not None:
+    if resolved_state is None and state is None and project_root is not None:
         resolved_state = resolve_state_path(project_root, None)
-    if resolved_state is not None:
-        marker = batch_failure_marker(load_state(resolved_state), task_id)
+    if state is not None or resolved_state is not None:
+        loaded_state = state if state is not None else load_state(resolved_state)  # type: ignore[arg-type]
+        marker = batch_failure_marker(loaded_state, task_id)
         if marker is not None:
             reason = _batch_failure_reason(task_id, marker)
             raise IsolationError(
@@ -876,6 +920,27 @@ def remove_task_worktree(
 # --------------------------------------------------------------------------
 
 
+def parse_log_header_fields(
+    path: pathlib.Path, *, max_lines: int = 12
+) -> dict[str, str] | None:
+    """Parse up to ``max_lines`` header ``key: value`` lines from a log file.
+
+    Streams only the first ``max_lines`` lines instead of reading the whole
+    file. Returns ``None`` when the file cannot be read as UTF-8 text.
+    """
+    fields: dict[str, str] = {}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for raw_line in itertools.islice(handle, max_lines):
+                line = raw_line.rstrip("\r\n")
+                if ":" in line and not line.startswith("$"):
+                    key, _, value = line.partition(":")
+                    fields[key.strip()] = value.strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return fields
+
+
 def latest_verification(root: pathlib.Path, task_id: str) -> dict[str, Any] | None:
     """Return the newest verification evidence recorded for a task under ``root``."""
     directory = artifact_dir(root, "evidence") / task_id
@@ -890,15 +955,9 @@ def latest_verification(root: pathlib.Path, task_id: str) -> dict[str, Any] | No
         return None
     attempts.sort()
     index, path = attempts[-1]
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+    fields = parse_log_header_fields(path)
+    if fields is None:
         return None
-    fields: dict[str, str] = {}
-    for line in text.splitlines()[:12]:
-        if ":" in line and not line.startswith("$"):
-            key, _, value = line.partition(":")
-            fields[key.strip()] = value.strip()
     exit_code = fields.get("exit_code")
     try:
         exit_code_int = int(exit_code) if exit_code is not None else None

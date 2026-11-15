@@ -38,7 +38,14 @@ try:
         extract_sources,
         load_task_files,
     )
-    from scripts.daw_common import DuplicateKeyError, parse_strict_json, resolve_bounded_path
+    from scripts.daw_common import (
+        DuplicateKeyError,
+        build_result,
+        has_errors,
+        make_error,
+        parse_strict_json,
+        resolve_bounded_path,
+    )
 except ImportError:
     from check_tasks import (  # type: ignore[import-not-found]
         MANIFEST_MARKER,
@@ -50,6 +57,9 @@ except ImportError:
     )
     from daw_common import (  # type: ignore[import-not-found]
         DuplicateKeyError,
+        build_result,
+        has_errors,
+        make_error,
         parse_strict_json,
         resolve_bounded_path,
     )
@@ -62,10 +72,6 @@ DERIVE_LIMITATIONS = [
 
 _JSON_PARSE_ERRORS = (json.JSONDecodeError, DuplicateKeyError, RecursionError, ValueError)
 _FENCE_RE = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
-
-
-def _error(code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": "error", "code": code, "path": path, "message": message}
 
 
 def _render_manifest(manifest: dict[str, Any]) -> str:
@@ -105,7 +111,7 @@ def derive(
         text = plan_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return _result(
-            findings + [_error("plan_unreadable", str(plan_path), "Plan cannot be read as UTF-8 text.")],
+            findings + [make_error("plan_unreadable", str(plan_path), "Plan cannot be read as UTF-8 text.")],
             None,
             write,
         )
@@ -115,7 +121,7 @@ def derive(
         return _result(
             findings
             + [
-                _error(
+                make_error(
                     "task_sources_undeclared",
                     str(plan_path),
                     "Plan declares no task-source directory; add a "
@@ -131,7 +137,7 @@ def derive(
         return _result(
             findings
             + [
-                _error(
+                make_error(
                     "task_sources_unsafe",
                     sources,
                     f"Task-source path is unsafe or escapes the project root ({err}).",
@@ -160,7 +166,7 @@ def derive(
         plan_path.write_text(new_text, encoding="utf-8")
     except OSError as exc:
         return _result(
-            findings + [_error("plan_write_failed", str(plan_path), f"Plan cannot be written: {exc}")],
+            findings + [make_error("plan_write_failed", str(plan_path), f"Plan cannot be written: {exc}")],
             None,
             write,
         )
@@ -168,22 +174,23 @@ def derive(
 
 
 def _result(findings: list[dict[str, str]], payload: dict[str, Any] | None, write: bool) -> dict[str, Any]:
-    valid = not any(f.get("severity") == "error" for f in findings)
-    result: dict[str, Any] = {
-        "valid": valid,
-        "check": "derive_tasks",
-        "schema_version": MANIFEST_SCHEMA_VERSION,
+    valid = not has_errors(findings)
+    extra: dict[str, Any] = {
         "written": bool(write and valid and payload and payload.get("written")),
-        "findings": findings,
-        "limitations": DERIVE_LIMITATIONS,
     }
     if payload is not None:
-        result["manifest"] = payload["manifest"]
+        extra["manifest"] = payload["manifest"]
         if payload.get("written"):
-            result["replaced_existing_block"] = bool(payload.get("replaced"))
+            extra["replaced_existing_block"] = bool(payload.get("replaced"))
         else:
-            result["rendered"] = payload["rendered"]
-    return result
+            extra["rendered"] = payload["rendered"]
+    return build_result(
+        "derive_tasks",
+        findings,
+        DERIVE_LIMITATIONS,
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        extra=extra,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

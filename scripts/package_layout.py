@@ -20,6 +20,7 @@ OPERATIONAL_SCRIPTS = (
     "scripts/check_surface.py",
     "scripts/check_tasks.py",
     "scripts/batch.py",
+    "scripts/daw.py",
     "scripts/derive_ledger.py",
     "scripts/derive_tasks.py",
     "scripts/package_layout.py",
@@ -42,6 +43,9 @@ REQUIRED_DIRS = (
 
 OPTIONAL_DIRS = (
     "agents",
+    ".claude-plugin",
+    ".cursor-plugin",
+    ".codex-plugin",
 )
 
 

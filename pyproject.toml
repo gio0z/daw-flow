@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deterministic-agentic-workflow"
+version = "0.5.0"
+description = "Portable planning, execution, and verification suite for AI coding agents."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [
+    { name = "Regio Dani Pangestu" },
+]
+keywords = ["ai-agents", "workflow", "planning", "verification", "agent-skills"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gio0z/daw-flow"
+Repository = "https://github.com/gio0z/daw-flow"
+
+[project.scripts]
+daw = "scripts.daw:main"
+
+[tool.setuptools]
+packages = ["scripts"]

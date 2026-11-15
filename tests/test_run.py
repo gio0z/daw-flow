@@ -197,7 +197,97 @@ class ContextAssemblyTests(RunnerTestBase):
         meta = payload["context"]
         self.assertTrue(meta["files_truncated"])
         self.assertEqual(meta["files_truncated"][0]["reason"], "truncated to context budget")
-        self.assertLessEqual(meta["pack_chars"], 1200 + 2000)
+        self.assertLessEqual(meta["pack_chars"], 1200)
+
+    def test_context_truncation_marker_fits_budget_and_counts_utf8_bytes(self) -> None:
+        sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+        import run as runner_module
+
+        text = "é" * 500  # 500 chars, 1000 UTF-8 bytes
+        (self.root / "src" / "utf8.py").write_text(text, encoding="utf-8")
+        task = _task("T-1", target_files=["src/utf8.py"])
+        manifest = {"schema_version": 1, "workflow_id": "wf-test", "tasks": [task]}
+
+        # Fit entire file without truncation: bytes must reflect UTF-8 byte count.
+        _, full_meta = runner_module.assemble_context(
+            manifest, task, self.root, budget_chars=20_000
+        )
+        self.assertEqual(full_meta["files_included"][0]["bytes"], 1000)
+        self.assertFalse(full_meta["files_included"][0]["truncated"])
+
+        # Tight budget that truncates: pack_chars <= budget_chars and bytes == 2 * chars.
+        _, base_meta = runner_module.assemble_context(
+            manifest, _task("T-1", target_files=["src/missing.py"]), self.root, budget_chars=20_000
+        )
+        header_chars = base_meta["pack_chars"]
+        budget = header_chars + 160
+        pack, trunc_meta = runner_module.assemble_context(
+            manifest, task, self.root, budget_chars=budget
+        )
+        self.assertLessEqual(trunc_meta["pack_chars"], budget)
+        self.assertIn(runner_module.CONTEXT_TRUNCATION_MARKER, pack)
+        included = trunc_meta["files_included"][0]
+        self.assertTrue(included["truncated"])
+        self.assertEqual(included["bytes"] % 2, 0)
+        self.assertGreater(included["bytes"], 0)
+        self.assertLess(included["bytes"], 160 * 2)
+
+        # Budget too small for file header + marker: reported as budget exhausted, not overflowing.
+        tight_budget = header_chars + 120
+        _, exhausted_meta = runner_module.assemble_context(
+            manifest, task, self.root, budget_chars=tight_budget
+        )
+        self.assertLessEqual(exhausted_meta["pack_chars"], tight_budget)
+        self.assertEqual(exhausted_meta["files_included"], [])
+        self.assertEqual(exhausted_meta["files_truncated"][0]["reason"], "budget exhausted")
+
+    def test_context_excerpts_are_reused_across_tasks_in_dry_run(self) -> None:
+        sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+        import run as runner_module
+        from unittest import mock
+
+        (self.root / "AGENTS.md").write_text(
+            "<!-- daw-config:start -->\n- test_command: pytest\n<!-- daw-config:end -->\n",
+            encoding="utf-8",
+        )
+        tasks = [
+            _task("T-1", target_files=["src/app.py"]),
+            _task("T-2", target_files=["src/other.py"]),
+        ]
+        (self.root / "src" / "other.py").write_text("VALUE = 2\n", encoding="utf-8")
+        manifest = {"schema_version": 1, "workflow_id": "wf-test", "tasks": tasks}
+        args = runner_module.build_parser().parse_args(
+            [
+                "run",
+                "--plan",
+                str(self.root / "docs" / "plans" / "plan.md"),
+                "--project-root",
+                str(self.root),
+                "--agent-command",
+                json.dumps(["echo", "{prompt_file}"]),
+                "--max-tasks",
+                "5",
+                "--dry-run",
+            ]
+        )
+        with (
+            mock.patch.object(
+                runner_module,
+                "_constitution_excerpt",
+                wraps=runner_module._constitution_excerpt,
+            ) as const_spy,
+            mock.patch.object(
+                runner_module,
+                "_project_config_excerpt",
+                wraps=runner_module._project_config_excerpt,
+            ) as cfg_spy,
+        ):
+            result = runner_module._dry_run_afk(
+                manifest, {}, self.root, set(), [], ["echo", "{prompt_file}"], args
+            )
+        self.assertEqual(len(result["completed"]), 2)
+        self.assertEqual(const_spy.call_count, 1)
+        self.assertEqual(cfg_spy.call_count, 1)
 
     def test_context_output_file_written(self) -> None:
         plan = self.write_plan(_manifest([_task("T-1")]))

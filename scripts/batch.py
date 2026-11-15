@@ -33,6 +33,7 @@ try:
         container_dir,
         is_protected_branch,
         merge_branch_into_worktree,
+        parse_log_header_fields,
         prune_worktrees,
         run_git,
         worktree_for_branch,
@@ -52,6 +53,7 @@ except ImportError:
         container_dir,
         is_protected_branch,
         merge_branch_into_worktree,
+        parse_log_header_fields,
         prune_worktrees,
         run_git,
         worktree_for_branch,
@@ -273,19 +275,10 @@ def read_composite_record(path: pathlib.Path) -> dict[str, Any] | None:
 def _log_header_fields(path: pathlib.Path) -> dict[str, str]:
     """Parse a verification log's header fields.
 
-    The header is read from the first twelve lines, the same way
-    ``worktree.latest_verification`` reads a task log.
+    The header is read from the first twelve lines via the shared streaming
+    helper ``worktree.parse_log_header_fields``.
     """
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return {}
-    fields: dict[str, str] = {}
-    for line in text.splitlines()[:12]:
-        if ":" in line and not line.startswith("$"):
-            key, _, value = line.partition(":")
-            fields[key.strip()] = value.strip()
-    return fields
+    return parse_log_header_fields(path) or {}
 
 
 def derive_base_commit(repo: pathlib.Path, composite_commit: str) -> str:

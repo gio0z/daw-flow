@@ -453,6 +453,27 @@ def has_errors(findings: list[dict[str, str]]) -> bool:
     return any(f.get("severity") == "error" for f in findings)
 
 
+def build_result(
+    check: str,
+    findings: list[dict[str, str]],
+    limitations: list[str],
+    *,
+    schema_version: int = SCHEMA_VERSION,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assemble a standard validator result envelope."""
+    result: dict[str, Any] = {
+        "valid": not has_errors(findings),
+        "check": check,
+        "schema_version": schema_version,
+    }
+    if extra:
+        result.update(extra)
+    result["findings"] = findings
+    result["limitations"] = limitations
+    return result
+
+
 def output_result(result: dict[str, Any], fmt: str) -> None:
     if fmt == "json":
         print(json.dumps(result, indent=2))

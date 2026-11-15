@@ -17,7 +17,10 @@ from typing import Any, Tuple
 
 # Bundled helper imports must not modify the installed suite.
 sys.dont_write_bytecode = True
-import daw_common
+try:
+    import daw_common
+except ImportError:
+    from scripts import daw_common  # type: ignore[import-not-found]
 
 SCHEMA_VERSION = 1
 MAX_INPUT_BYTES = 1024 * 1024  # 1 MiB bounded input limit
@@ -189,39 +192,18 @@ def _validate_condition_expression(expr: str) -> str | None:
     return None
 
 
-def _reject_constant(_: str) -> None:
-    raise ValueError("Non-standard JSON constant rejected.")
-
-
 def parse_strict_json(raw_text: str) -> Tuple[Any, str | None]:
     """Parse JSON strictly: reject duplicate keys, NaN, Infinity, and non-finite values."""
     if not isinstance(raw_text, str):
         return None, "Input must be a string."
-
-    def pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        obj: dict[str, Any] = {}
-        seen_keys: set[str] = set()
-        for k, v in pairs:
-            if k in seen_keys:
-                raise ValueError("Duplicate key encountered in JSON object.")
-            seen_keys.add(k)
-            obj[k] = v
-        return obj
-
     try:
-        data = json.loads(
-            raw_text,
-            object_pairs_hook=pairs_hook,
-            parse_constant=_reject_constant,
-        )
-        return data, None
+        return daw_common.parse_strict_json(raw_text), None
     except json.JSONDecodeError:
         return None, "JSON syntax error."
+    except daw_common.DuplicateKeyError:
+        return None, "Duplicate key encountered in JSON object."
     except ValueError as exc:
-        msg = str(exc)
-        if "Duplicate key" in msg:
-            return None, "Duplicate key encountered in JSON object."
-        if "Non-standard JSON constant" in msg:
+        if "Non-standard JSON constant" in str(exc):
             return None, "Non-standard JSON numeric constant rejected."
         return None, "JSON value error."
     except RecursionError:
@@ -262,7 +244,13 @@ def find_suite_root(explicit_root: pathlib.Path | str | None = None) -> pathlib.
     """Resolve the suite root directory."""
     if explicit_root:
         return pathlib.Path(explicit_root).resolve()
-    return pathlib.Path(__file__).resolve().parent.parent
+    parent = pathlib.Path(__file__).resolve().parent.parent
+    if (parent / "SKILL.md").is_file() and (parent / "VERSION").is_file():
+        return parent
+    shared = pathlib.Path(sys.prefix).resolve() / "share" / "deterministic-agentic-workflow"
+    if (shared / "SKILL.md").is_file() and (shared / "VERSION").is_file():
+        return shared
+    return parent
 
 
 def validate_module_file(root: pathlib.Path, expected_name: str, rel_path: Any) -> list[dict[str, str]]:

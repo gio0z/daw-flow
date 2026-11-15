@@ -17,18 +17,16 @@ from typing import Any
 
 try:
     from scripts.daw_common import (
-        SCHEMA_VERSION,
         DuplicateKeyError,
-        has_errors,
+        build_result,
         make_error,
         parse_strict_json,
         resolve_bounded_path,
     )
 except ImportError:
     from daw_common import (  # type: ignore[import-not-found]
-        SCHEMA_VERSION,
         DuplicateKeyError,
-        has_errors,
+        build_result,
         make_error,
         parse_strict_json,
         resolve_bounded_path,
@@ -64,17 +62,6 @@ def _heading_slug(heading_text: str) -> str:
     hyphenated = filtered.replace(" ", "-")
     collapsed = re.sub(r"-+", "-", hyphenated)
     return collapsed.strip("-")
-
-
-def _envelope(steps_count: int, findings: list[dict[str, str]]) -> dict[str, Any]:
-    return {
-        "valid": not has_errors(findings),
-        "check": "flow",
-        "schema_version": SCHEMA_VERSION,
-        "steps": steps_count,
-        "findings": findings,
-        "limitations": FLOW_LIMITATIONS,
-    }
 
 
 def _read_bounded(path: pathlib.Path, code: str, findings: list[dict[str, str]]) -> str | None:
@@ -499,4 +486,4 @@ def validate_flow(project_root: pathlib.Path) -> dict[str, Any]:
         }
     if mapping is not None:
         _validate_manifest(root, step_ids, mapping.get("artifact_steps"), findings)
-    return _envelope(steps_count, findings)
+    return build_result("flow", findings, FLOW_LIMITATIONS, extra={"steps": steps_count})
