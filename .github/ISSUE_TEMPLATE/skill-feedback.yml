@@ -1,0 +1,66 @@
+name: Skill Usage Feedback
+description: Report friction, bugs, false blocks, routing mismatches, or token bloat encountered while using DAW.
+title: "[feedback] "
+labels: ["skill-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share sanitized workflow feedback with `gio0z/daw-flow`.
+        Please **never** paste private source code, file paths, tokens, or credentials.
+        You can pre-fill this form locally by running `daw feedback --project-root .`.
+  - type: input
+    id: daw_version
+    attributes:
+      label: DAW Version
+      description: Installed suite version (from `VERSION` or `daw --version`).
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS/arch, and agent client/model label.
+      placeholder: "Python 3.12 | Linux (x86_64) | Client: claude-code"
+    validations:
+      required: false
+  - type: input
+    id: route_module
+    attributes:
+      label: Route / Module
+      description: Active route and DAW module where the issue occurred.
+      placeholder: "route: feature | module: daw-plan"
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Primary type of feedback.
+      options:
+        - friction
+        - bug
+        - false-block
+        - token-bloat
+        - routing-mismatch
+        - other
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: finding_codes
+    attributes:
+      label: Finding Codes
+      description: Validator, route, or runner finding codes observed (e.g. `manifest_drift`, `batch_task_verification_failed`).
+      placeholder: "manifest_drift (2x)"
+    validations:
+      required: false
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary / Notes
+      description: Describe what happened, what was expected, and how many turns or corrections were needed (no private code/secrets).
+      placeholder: "Expected behavior, observed behavior, and sanitized reproduction notes."
+    validations:
+      required: true
