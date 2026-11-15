@@ -23,6 +23,7 @@ OPERATIONAL_SCRIPTS = (
     "scripts/daw.py",
     "scripts/derive_ledger.py",
     "scripts/derive_tasks.py",
+    "scripts/feedback.py",
     "scripts/package_layout.py",
     "scripts/run.py",
     "scripts/worktree.py",

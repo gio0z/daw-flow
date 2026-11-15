@@ -105,7 +105,9 @@ daw validate package --root .
 daw install doctor --scope user
 ```
 
-`daw <subcommand> [args...]` dispatches to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, and `derive-tasks` while preserving their arguments and exit codes.
+`daw <subcommand> [args...]` dispatches to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, `derive-tasks`, and `feedback` while preserving their arguments and exit codes.
+
+- **`daw feedback`** — opt-in, read-only, offline by default. It harvests structural finding codes from `docs/daw/evidence/`, prints a sanitized preview, and returns a 1-click GitHub Issue URL for `gio0z/daw-flow`. `gh issue create` runs only with an explicit `--submit` and explicit operator consent. Evidence scanning retains finding codes and environment metadata only; operator free text (`--summary`, `--note`, `--client`) is redacted for absolute paths, git SHAs, task IDs, credential assignments, and opaque token runs. Pasted source code cannot be detected mechanically, so the operator remains responsible for the contents of the summary. See [`references/installation.md`](references/installation.md#daw-feedback).
 
 See [installation and compatibility](references/installation.md) for exact paths, platform limits, and custom directories. `status` checks files and module aliases; confirm client discovery in your agent's skill list after installation.
 

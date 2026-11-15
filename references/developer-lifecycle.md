@@ -327,12 +327,23 @@ pytest -q
 **Concrete steps/commands:**
 
 ```bash
-# Record the lesson in the retrospective note (blameless, evidence-first):
+# 1. Record the lesson in the retrospective note (blameless, evidence-first):
 #   What happened | Evidence (revision, command, output) | Lesson | Converted to
 # Converted artifacts:
 #   - AGENTS.md / CLAUDE.md <!-- daw-config:start --> block  (convention rule via daw-setup)
 #   - tests/regression/test_<pattern>.py                     (regression test via daw-build)
 #   - references/developer-lifecycle.md                       (checklist/threshold update)
+
+# 2. Opt-in user feedback to upstream suite (gio0z/daw-flow) — offline preview by default:
+#    The default invocation only prints a local sanitized preview and a 1-click issue URL.
+python3 "$SUITE_ROOT/scripts/daw.py" feedback --project-root . \
+  --route <route> --module <module> --category friction \
+  --summary "<short sanitized summary>"
+# Only with explicit operator consent, submit directly via gh:
+# python3 "$SUITE_ROOT/scripts/daw.py" feedback --project-root . ... --submit
+
+# 3. Maintainer-agent feedback triage loop (pulls user issues into local agent work):
+gh issue list --repo gio0z/daw-flow --label skill-feedback --json number,title,body
 ```
 
 **Decision rules with numeric thresholds:**
@@ -340,5 +351,7 @@ pytest -q
 - **Blameless:** retrospectives describe system conditions and evidence, never individuals; a retrospective that names a person is rejected and rewritten.
 - **Convert or drop:** every recorded lesson must either (a) convert to an AGENTS.md DAW config rule (via `daw-setup`), (b) convert to a regression test (via `daw-build` -> `daw-verify`), or (c) be explicitly dropped with a reason. Lessons with no conversion path are not recorded as conventions.
 - **Recurrence threshold:** a friction or defect observed **twice** must be converted (config rule or regression test); a single observation may stay as a noted lesson only.
+- **Opt-in sanitized upstream feedback:** when a stage hits `blocked`, fails a gate twice, or requires repeated user correction on a DAW rule, offer to run `daw feedback` and share the sanitized preview + 1-click GitHub Issue URL (`gio0z/daw-flow`). The tool redacts absolute filesystem paths, git SHAs, task IDs, credential assignments, and opaque token runs from operator free text; the operator must still not paste source code or secrets into the summary, and must never invoke `--submit` without explicit user consent.
+- **Upstream conversion hierarchy (maintainer agent):** when triaging `skill-feedback` issues (`count >= 2` recurrence), fix via deterministic script/validator + unit test first, declarative manifest/config second, and `SKILL.md` prose last.
 - Convention rules land in the `<!-- daw-config:start -->` block so every module consumes them; a convention that never reaches AGENTS.md, a test, or this reference is not a convention.
 - Retrospective input is due within **1 week** of route completion; stale retrospectives must be re-derived from evidence, not memory.

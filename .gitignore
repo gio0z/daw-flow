@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 .agents/
 eval-results/
+build/
+dist/
+*.egg-info/

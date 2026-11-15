@@ -18,6 +18,7 @@ SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "install": ("install", "Install, inspect, diagnose, or uninstall the DAW skill bundle."),
     "derive-ledger": ("derive_ledger", "Derive <spec_dir>/ledger.json from transition records."),
     "derive-tasks": ("derive_tasks", "Derive a plan's embedded task manifest from task files."),
+    "feedback": ("feedback", "Generate or submit sanitized skill usage feedback."),
 }
 
 

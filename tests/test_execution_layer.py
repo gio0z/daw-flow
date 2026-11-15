@@ -150,9 +150,10 @@ class ExecutionLayerIntegrationTests(unittest.TestCase):
 
     def test_status_agrees_with_the_gate_on_a_missing_manifest(self) -> None:
         self.write_plan("# Plan\n\n- [ ] step: edit file, expected: tests pass\n")
+        suite_version = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
         (self.root / "AGENTS.md").write_text(
             "<!-- daw-config:start -->\n\n## DAW Configuration\n\n"
-            "- schema: 1\n- daw_version: 0.5.0\n- spec_dir: docs/specs\n"
+            f"- schema: 1\n- daw_version: {suite_version}\n- spec_dir: docs/specs\n"
             "- test_command: none\n- lint_command: none\n- build_command: none\n"
             "- workspace: in-place\n- high_risk_paths: none\n- issue_tracker: none\n"
             "- default_branch: main\n- commit_convention: conventional\n"

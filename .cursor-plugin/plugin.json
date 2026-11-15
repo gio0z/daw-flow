@@ -1,6 +1,6 @@
 {
   "name": "deterministic-agentic-workflow",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Deterministic Agentic Workflow (DAW) Suite: root router dispatch across 12 specialized engineering modules, 14-document specification matrix, fail-closed risk gating, and verifiable evidence gates.",
   "author": {
     "name": "Regio Dani Pangestu"

@@ -98,6 +98,7 @@ class DawCliTests(unittest.TestCase):
                 "install",
                 "derive-ledger",
                 "derive-tasks",
+                "feedback",
             ):
                 self.assertIn(cmd, res.stdout)
 
@@ -119,6 +120,7 @@ class DawCliTests(unittest.TestCase):
             "install",
             "derive-ledger",
             "derive-tasks",
+            "feedback",
         ):
             res = self._run_daw(cmd, "--help")
             self.assertEqual(res.returncode, 0, f"{cmd} --help failed: {res.stderr}")

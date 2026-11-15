@@ -42,7 +42,8 @@
 - **Parallel Batch Mechanism:** [`scripts/batch.py`](scripts/batch.py) determines prefix-aware disjoint write sets for parallel batches (consumed by `scripts/run.py`, never importing it) and runs the composite branch merge gate (`merge_composite_branch`).
 - **Packaging, CLI & Offline Installer:**
   - [`scripts/install.py`](scripts/install.py): Offline, standard-library installer (`install`, `status`, `uninstall`, `doctor`) with receipt verification, `--link` dev mode, `--agent all`, pre-mutation tamper checks, and sibling alias symlinks.
-  - [`scripts/daw.py`](scripts/daw.py): Unified stdlib CLI entrypoint (`daw`) dispatching to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, and `derive-tasks`.
+  - [`scripts/daw.py`](scripts/daw.py): Unified stdlib CLI entrypoint (`daw`) dispatching to `route`, `validate`, `run`, `worktree`, `install`, `derive-ledger`, `derive-tasks`, and `feedback`.
+  - [`scripts/feedback.py`](scripts/feedback.py): Opt-in, read-only sanitized usage feedback generator and optional `gh` issue submitter targeting `gio0z/daw-flow` (offline by default; evidence scanning retains structural finding codes only, and operator free text is redacted for absolute paths, git SHAs, task IDs, credential assignments, and opaque token runs).
   - [`scripts/package_layout.py`](scripts/package_layout.py): Packaging and distribution layout contract (`OPERATIONAL_SCRIPTS`, `REQUIRED_FILES`, `REQUIRED_DIRS`, `OPTIONAL_DIRS`, `operational_entries`).
   - [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) & [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): Claude Code native plugin and marketplace manifests.
   - [`pyproject.toml`](pyproject.toml): Zero-dependency PEP 621 package metadata exposing the `daw` console script.
@@ -96,7 +97,7 @@
 ## DAW Configuration
 
 - schema: 1
-- daw_version: 0.5.0
+- daw_version: 0.6.0
 - spec_dir: docs
 - test_command: python3 -m unittest discover -s tests -p "test_*.py"
 - lint_command: none

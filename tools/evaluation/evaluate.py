@@ -71,7 +71,7 @@ STATUS_CONFIG = """<!-- daw-config:start -->
 ## DAW Configuration
 
 - schema: 1
-- daw_version: 0.5.0
+- daw_version: {daw_version}
 - spec_dir: docs/specs
 - test_command: python3 -m unittest
 - lint_command: daw-eval-missing-lint run
@@ -93,7 +93,7 @@ FEATURE_CONFIG = """<!-- daw-config:start -->
 ## DAW Configuration
 
 - schema: 1
-- daw_version: 0.5.0
+- daw_version: {daw_version}
 - spec_dir: docs/specs
 - test_command: python3 -m unittest
 - lint_command: none
@@ -243,6 +243,9 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
         location = ".agents/skills/deterministic-agentic-workflow" if mode == "skill" else "tools/daw"
         suite_root = workspace / location
         stage_suite(source, suite_root)
+    # The fixture config records the suite version it was generated for, so a
+    # version bump does not make the fixture look stale to the config check.
+    daw_version = (source / "VERSION").read_text(encoding="utf-8").strip()
     if case == "patch":
         (workspace / "calculator.py").write_text(PATCH_SOURCE, encoding="utf-8")
         task = (
@@ -267,7 +270,9 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
     elif case == "feature":
         (workspace / "docs" / "specs").mkdir(parents=True)
         (workspace / "tests").mkdir()
-        (workspace / "AGENTS.md").write_text(FEATURE_CONFIG, encoding="utf-8")
+        (workspace / "AGENTS.md").write_text(
+            FEATURE_CONFIG.format(daw_version=daw_version), encoding="utf-8"
+        )
         (workspace / "docs" / "specs" / "prd.md").write_text(FEATURE_SPEC, encoding="utf-8")
         (workspace / "ledger.py").write_text(FEATURE_SOURCE, encoding="utf-8")
         (workspace / "tests" / "__init__.py").write_text("", encoding="utf-8")
@@ -277,7 +282,9 @@ def prepare_case(workspace: Path, case: str, mode: str, source: Path) -> tuple[s
         )
         task = "/skill:deterministic-agentic-workflow tambahkan fitur sesuai docs/specs/prd.md"
     elif case == "status":
-        (workspace / "AGENTS.md").write_text(STATUS_CONFIG, encoding="utf-8")
+        (workspace / "AGENTS.md").write_text(
+            STATUS_CONFIG.format(daw_version=daw_version), encoding="utf-8"
+        )
         (workspace / "docs" / "specs").mkdir(parents=True)
         task = "/skill:deterministic-agentic-workflow cek status dong"
     else:

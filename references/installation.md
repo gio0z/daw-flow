@@ -180,9 +180,27 @@ daw worktree status --project-root .
 daw install doctor --scope project --project-root .
 daw derive-ledger --spec-dir docs
 daw derive-tasks --plan <plan.md>
+daw feedback --project-root .
 ```
 
 From a source checkout without installing the console script, invoke `python3 scripts/daw.py <subcommand> [args...]`.
+
+### `daw feedback`
+
+Opt-in, read-only, offline by default. It prints a sanitized preview and a 1-click GitHub Issue URL for `gio0z/daw-flow`; it never writes to the project and never sends a network request unless `--submit` is passed.
+
+```bash
+daw feedback --project-root . --route feature --module daw-plan \
+  --category friction --summary "short sanitized summary"
+```
+
+- **Flags:** `--route`, `--module`, `--category`, `--client`, `--finding` (repeatable), `--summary`, `--note`, `--project-root`, `--submit`, `--format`, `--json`.
+- **Categories:** `friction`, `bug`, `false-block`, `token-bloat`, `routing-mismatch`, `other`.
+- **Exit codes:** `0` success; `1` invalid input or a failed submission; `2` invalid arguments (for example a `--project-root` that is not a directory).
+- **What is collected:** structural finding codes and environment metadata harvested from `docs/daw/evidence/` — no paths, task IDs, prompts, or source are read out of project files.
+- **What is redacted:** operator free text (`--summary`, `--note`, `--client`) is masked for absolute filesystem paths, git SHAs, task IDs, credential assignments, and opaque token runs. Pasted source code cannot be detected mechanically, so the operator remains responsible for the contents of the summary.
+- **Network and subprocess:** the default mode makes no network request and spawns no subprocess. `--submit` is the only path that reaches `gh issue create` (argv, no shell, fixed repository, 30 s timeout) and it requires explicit operator consent.
+- **Upstream prerequisites:** the `skill-feedback` issue form and the `skill-feedback` label must exist in the target repository. A missing label is reported as `feedback_label_missing` with the `gh label create` command to run.
 
 ## Canonical paths and verification
 

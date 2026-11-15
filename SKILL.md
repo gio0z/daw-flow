@@ -4,7 +4,7 @@ description: "Use to route multi-step engineering tasks, bootstrap greenfield sp
 compatibility: "Python 3.10+ stdlib validator & route engine; core workflow instructions remain fully usable without Python."
 license: MIT
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # Deterministic Agentic Workflow
@@ -26,20 +26,20 @@ DAW is a **complete 12-module bundle** requiring no external workflow frameworks
 
 Delivery flow is adopted, not invented: [Best Practice Flow](references/best-practice-flow.md) maps nine adopted steps (spec-kit, superpowers, Matt Pocock) to DAW rules, read by `validate.py flow` and the route flow gate.
 
-| Module            | Canonical Path                                                 | Primary Responsibility                                                                                                                          |
-| :---------------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **daw-design**    | [skills/daw-design/SKILL.md](skills/daw-design/SKILL.md)       | Architecture, technical requirements, specification authoring, 14-doc matrix.                                                                   |
-| **daw-plan**      | [skills/daw-plan/SKILL.md](skills/daw-plan/SKILL.md)           | Structured task planning, phase breakdowns, risk assessment, task contracts.                                                                    |
-| **daw-debug**     | [skills/daw-debug/SKILL.md](skills/daw-debug/SKILL.md)         | Root cause analysis, minimal reproduction, failure diagnostics, regression isolation.                                                           |
-| **daw-build**     | [skills/daw-build/SKILL.md](skills/daw-build/SKILL.md)         | Implementation, code editing, minimal change construction, zero dead weight.                                                                    |
-| **daw-review**    | [skills/daw-review/SKILL.md](skills/daw-review/SKILL.md)       | Two-stage code review, architectural boundary compliance, security auditing.                                                                    |
-| **daw-verify**    | [skills/daw-verify/SKILL.md](skills/daw-verify/SKILL.md)       | Behavioral verification, test execution, regression proof, evidence checks.                                                                     |
-| **daw-workspace** | [skills/daw-workspace/SKILL.md](skills/daw-workspace/SKILL.md) | Isolated workspace/worktree setup, git worktree lifecycle, boundary containment.                                                                |
-| **daw-ask**       | [skills/daw-ask/SKILL.md](skills/daw-ask/SKILL.md)             | Read-only architecture consultation, contextual guidance, decision frontier exploration.                                                        |
-| **daw-setup**     | [skills/daw-setup/SKILL.md](skills/daw-setup/SKILL.md)         | Interactive configuration setup, tool command discovery, and repo convention authoring.                                                         |
-| **daw-wizard**    | [skills/daw-wizard/SKILL.md](skills/daw-wizard/SKILL.md)       | Interactive greenfield requirements interview & initial specification document authoring.                                                       |
+| Module            | Canonical Path                                                 | Primary Responsibility                                                                                                                                            |
+| :---------------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **daw-design**    | [skills/daw-design/SKILL.md](skills/daw-design/SKILL.md)       | Architecture, technical requirements, specification authoring, 14-doc matrix.                                                                                     |
+| **daw-plan**      | [skills/daw-plan/SKILL.md](skills/daw-plan/SKILL.md)           | Structured task planning, phase breakdowns, risk assessment, task contracts.                                                                                      |
+| **daw-debug**     | [skills/daw-debug/SKILL.md](skills/daw-debug/SKILL.md)         | Root cause analysis, minimal reproduction, failure diagnostics, regression isolation.                                                                             |
+| **daw-build**     | [skills/daw-build/SKILL.md](skills/daw-build/SKILL.md)         | Implementation, code editing, minimal change construction, zero dead weight.                                                                                      |
+| **daw-review**    | [skills/daw-review/SKILL.md](skills/daw-review/SKILL.md)       | Two-stage code review, architectural boundary compliance, security auditing.                                                                                      |
+| **daw-verify**    | [skills/daw-verify/SKILL.md](skills/daw-verify/SKILL.md)       | Behavioral verification, test execution, regression proof, evidence checks.                                                                                       |
+| **daw-workspace** | [skills/daw-workspace/SKILL.md](skills/daw-workspace/SKILL.md) | Isolated workspace/worktree setup, git worktree lifecycle, boundary containment.                                                                                  |
+| **daw-ask**       | [skills/daw-ask/SKILL.md](skills/daw-ask/SKILL.md)             | Read-only architecture consultation, contextual guidance, decision frontier exploration.                                                                          |
+| **daw-setup**     | [skills/daw-setup/SKILL.md](skills/daw-setup/SKILL.md)         | Interactive configuration setup, tool command discovery, and repo convention authoring.                                                                           |
+| **daw-wizard**    | [skills/daw-wizard/SKILL.md](skills/daw-wizard/SKILL.md)       | Interactive greenfield requirements interview & initial specification document authoring.                                                                         |
 | **daw-untangle**  | [skills/daw-untangle/SKILL.md](skills/daw-untangle/SKILL.md)   | Read-only structural analysis, change-coupling investigation, modular boundaries, zero mutation ([references/change-coupling.md](references/change-coupling.md)). |
-| **daw-ship**      | [skills/daw-ship/SKILL.md](skills/daw-ship/SKILL.md)           | Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness.                                   |
+| **daw-ship**      | [skills/daw-ship/SKILL.md](skills/daw-ship/SKILL.md)           | Integration & delivery: commit hygiene, pull requests, CI triage, review feedback, merge & release readiness.                                                     |
 
 ### Module Delegation Rules
 
@@ -116,7 +116,7 @@ Route tasks by explicit finite intent precedence on operational facts, not open-
 
 Read-only intents (`review`, `untangle`, `ask`) hold top precedence. Choose mutating intents by observable character: `ship` (delivery of already-verified changes), `spike` (throwaway evidence for uncertainty), `refactor` (identical observable behavior), `maintain` (dependency/toolchain/deprecation), else `bugfix`/`patch`/`feature`. Split mixed behavior + restructuring requests into `refactor` first, then `feature`.
 
-Flow: setup -> clarify/spike -> design -> plan -> build + inner loop -> review -> verify -> ship -> release -> retro feeding `AGENTS.md`. Reference: [Developer Lifecycle](references/developer-lifecycle.md) (inner loop §1, time-boxing §2, spike §3, refactor §4, maintenance §5, bisection §6, commit hygiene §7, PR/CI §8, review feedback §9, release §10, retro §11).
+Flow: setup -> clarify/spike -> design -> plan -> build + inner loop -> review -> verify -> ship -> release -> retro feeding `AGENTS.md` (and optional consent-gated `daw feedback`). Reference: [Developer Lifecycle](references/developer-lifecycle.md) (inner loop §1, time-boxing §2, spike §3, refactor §4, maintenance §5, bisection §6, commit hygiene §7, PR/CI §8, review feedback §9, release §10, retro §11).
 
 ### Routing Execution API & Manifest Policy
 
@@ -130,6 +130,7 @@ python3 "$SUITE_ROOT/scripts/route.py" REQUEST.json [--format text|json] [--root
 Invoke via resolved `$SUITE_ROOT/scripts/route.py` (never assume `scripts/` exists in `cwd`). Always pass `--project-root` when routing a project so the [flow gate](references/best-practice-flow.md) downgrades `ready` to `blocked` (`FLOW_GATE_MISSING_ARTIFACT`, `FLOW_GATE_UNREADABLE`) when `flow_gate.affected_intents` lack required spec/plan artifacts.
 
 Required request facts (`schema_version`, `intent`, `requirements`, `risk`, `workspace`):
+
 - Returns `status: "needs-input"` with blockers when: `requirements` is unknown for `bootstrap`/`feature`/`refactor`/`maintain`, unknown/unclear for `patch`, `workspace` is unknown for mutating intents (`feature`/`bugfix`/`patch`/`refactor`/`maintain`), or `risk` is unknown for mutating intents (`feature`/`bugfix`/`patch`/`refactor`/`maintain`/`ship`). `spike` allows unknown requirements; `ship` flags unknown risk as `needs-input` and high risk as `interactive_approval_required`.
 - In Python-less/shell-less environments, evaluate `references/suite-manifest.json` manually and disclose that the script was unexercised.
 
@@ -152,12 +153,29 @@ python3 "$SUITE_ROOT/scripts/run.py" isolate --plan docs/daw/plans/<workflow-id>
 ```
 
 Runner rules:
+
 - Explicitly invoked per unit of work — never a daemon, scheduler, or background service; never installs/discovers an agent command.
 - Never pushes, tags, publishes, or deploys; never writes to a protected branch; never grants point-of-risk authorization (passing verification is evidence, not approval).
 - Only `afk` tasks enter the ready set; `hitl` tasks always wait for a live human decision.
 - Task list lives in the saved plan (`<!-- daw-task-manifest -->` JSON block) so prose and executable list stay synchronized.
 - Verification commands run as argv without a shell; output captures to `docs/daw/evidence/<task-id>/`.
 - Under per-task isolation, writes outside the task's worktree are detected and never integrated.
+
+### Usage Feedback (`daw feedback`)
+
+Opt-in, read-only, offline by default. It harvests structural finding codes from `docs/daw/evidence/`, prints a sanitized preview, and returns a 1-click GitHub Issue URL for `gio0z/daw-flow`.
+
+```bash
+# Local sanitized preview only; no network request, no subprocess.
+python3 "$SUITE_ROOT/scripts/daw.py" feedback --project-root "$PROJECT_DIR" \
+  --route <route> --module <module> --category friction --summary "<short sanitized summary>"
+```
+
+- Evidence scanning retains structural finding codes and environment metadata only.
+- Operator free text (`--summary`, `--note`, `--client`) is redacted for absolute paths, git SHAs, task IDs, credential assignments, and opaque token runs; pasted source code cannot be detected mechanically, so the operator remains responsible for the summary's contents.
+- `--submit` is the only path that reaches `gh issue create` and it requires explicit operator consent. Without `--submit` the tool never sends a network request and never spawns a subprocess.
+- The `skill-feedback` issue form and label must exist in the target repository; a missing label fails closed with `feedback_label_missing`.
+- Never invoke `--submit` without explicit user consent, and never paste source code or secrets into the summary.
 
 ---
 
